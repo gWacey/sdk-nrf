@@ -156,6 +156,14 @@ config BT_DEVICE_NAME
 	string
 	default "Broadcast Audio Sink"
 
+config BT_AUDIO_BROADCAST_SNK_STREAM_COUNT
+	int
+	default 2
+
+config BT_ISO_MAX_CHAN
+	int
+	default 2
+
 endif # AUDIO_DEV = 1 (HEADSET)
 
 # GATEWAY
@@ -168,6 +176,18 @@ config BT_AUDIO_BROADCAST_SOURCE
 config BT_DEVICE_NAME
 	string
 	default "Broadcast Audio Source"
+
+config BT_ISO_TX_BUF_COUNT
+	int
+	default 2
+
+config BT_AUDIO_BROADCAST_SRC_STREAM_COUNT
+	int
+	default 2
+
+config BT_ISO_MAX_CHAN
+	int
+	default 2
 
 endif # AUDIO_DEV = 2 (GATEWAY)
 
