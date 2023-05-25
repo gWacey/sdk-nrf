@@ -1,7 +1,7 @@
 /*
  * Copyright(c) 2018 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #ifndef _LC3_DECODER_H_
 #define _LC3_DECODER_H_

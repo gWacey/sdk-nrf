@@ -1,7 +1,7 @@
 /*
- * Copyright(c) 2018 Nordic Semiconductor ASA
+ * Copyright(c) 2023 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #include "lc3_decoder.h"
 
@@ -50,7 +50,19 @@ struct _amod_functions lc3_dec_functions = {
 	/**
 	 * @brief  Function to get the configuration of the LC3 decoder module.
 	 */
-	.configuration_get = lc3_dec_configuration_set,
+	.configuration_get = lc3_dec_configuration_get,
+
+	/**
+	 * @brief Start a module processing data.
+	 *
+	 */
+	.start = NULL,
+
+	/**
+	 * @brief Pause a module processing data.
+	 *
+	 */
+	.pause = NULL,
 
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.
@@ -62,7 +74,7 @@ struct _amod_functions lc3_dec_functions = {
  * @brief The set-up parameters for the LC3 decoder.
  *
  */
-struct _amod_parameters lc3_dec_params = { .name = "LC3 DECODER",
+struct _amod_parameters lc3_dec_params = { .name = "LC3 Dcoder",
 					   .type = AMOD_TYPE_PROCESSOR,
 					   .functions = &lc3_dec_functions,
 					   .thread_config.set = 0 };
@@ -71,14 +83,14 @@ struct _amod_parameters lc3_dec_params = { .name = "LC3 DECODER",
  * @brief A private pointer to the LC3 decoder set-up parameters.
  *
  */
-amod_parameters lc3_dec_parameters = &lc3_dec_params;
+struct amod_parameters lc3_dec_parameters = &lc3_dec_params;
 
 /**
  * @brief  Function for querying the resources required for the LC3 decoder
- *		 module with the given configuration.
+ *		   module with the given configuration.
  *
  */
-int lc3_dec_query_resource(amod_configuration configuration)
+int lc3_dec_query_resource(struct amod_configuration *configuration)
 {
 	return sizeof(struct lc3_decoder_context);
 }
@@ -87,7 +99,7 @@ int lc3_dec_query_resource(amod_configuration configuration)
  * @brief Open an instance of the LC3 decoder
  *
  */
-int lc3_dec_open(struct _amod_handle *handle, amod_configuration configuration)
+int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
@@ -189,7 +201,7 @@ int lc3_dec_close(struct _amod_handle *handle)
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_set(struct _amod_handle *handle, amod_configuration configuration)
+int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
@@ -247,7 +259,7 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, amod_configuration co
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_get(struct _amod_handle *handle, amod_configuration configuration)
+int lc3_dec_configuration_get(struct _amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;

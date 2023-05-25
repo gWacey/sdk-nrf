@@ -1,7 +1,7 @@
 /*
  * Copyright(c) 2018 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
 #include "amod_api.h"
@@ -181,8 +181,8 @@ static int data_send(struct amod_handle *tx_handle, struct amod_handle *rx_handl
  * @brief Function to clean up items if a procedure fails.
  *
  */
-static clean_ups(struct _amod_handle *hdl, struct _amod_data_in_message *in_msg,
-		 struct _amod_data_out_message *out_msg, char *data)
+static clean_up(struct _amod_handle *hdl, struct _amod_data_in_message *in_msg,
+		struct _amod_data_out_message *out_msg, char *data)
 {
 	if (in_msg->response_cb != NULL) {
 		in_msg->response_cb(in_msg->tx_handle, in_msg->data);
@@ -898,6 +898,16 @@ int amod_start(struct amod_handle *handle)
 		return -ENOTSUP;
 	}
 
+	if (params->functions->start) {
+		size = params->functions->start(configuration);
+		if (size < 0) {
+			LOG_DBG("Failed user start for module %s, ret %d", params->name, size);
+			return -EFAULT;
+		}
+	} else {
+		LOG_DBG("No user start function for module %d", params->name);
+	}
+
 	hdl->previous_state = hdl->state;
 	hdl->state = AUDIO_MODULE_STATE_RUNNING;
 
@@ -920,6 +930,16 @@ int amod_pause(struct amod_handle *handle)
 		LOG_DBG("Module %s in an invalid state, %d, for set configuration", hdl->name,
 			hdl->state);
 		return -ENOTSUP;
+	}
+
+	if (params->functions->pause) {
+		size = params->functions->pause(configuration);
+		if (size < 0) {
+			LOG_DBG("Failed user pause for module %s, ret %d", params->name, size);
+			return -EFAULT;
+		}
+	} else {
+		LOG_DBG("No user pause function for module %d", params->name);
 	}
 
 	hdl->previous_state = hdl->state;

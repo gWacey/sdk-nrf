@@ -1,7 +1,7 @@
 /*
  * Copyright(c) 2018 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #ifndef _MODULE1_PRIVATE_H_
 #define _MODULE1_PRIVATE_H_
@@ -42,7 +42,7 @@ struct lc3_decoder_context {
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_query_resource(amod_configuration configuration);
+int lc3_dec_query_resource(struct amod_configuration *configuration);
 
 /**
  * @brief  Function for opening a module.
@@ -52,7 +52,7 @@ int lc3_dec_query_resource(amod_configuration configuration);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_open(struct _amod_handle *handle, amod_configuration configuration);
+int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function close an open module.

@@ -1,11 +1,11 @@
 /*
  * Copyright(c) 2018 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#ifndef _AMOD_API_H_
-#define _AMOD_API_H_
+#ifndef _AOBJ_API_H_
+#define _AOBJ_API_H_
 
 #include <zephyr/kernel.h>
 #include <stddef.h>
@@ -165,4 +165,4 @@ struct aobj_object {
 	void *user_data;
 };
 
-#endif /* _AMOD_API_H_ */
+#endif /* _AOBJ_API_H_ */

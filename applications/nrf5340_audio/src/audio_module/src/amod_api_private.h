@@ -1,7 +1,7 @@
 /*
  * Copyright(c) 2018 Nordic Semiconductor ASA
  *
- * SPDX - License-Identifier: LicenseRef-Nordic-5-Clause
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #ifndef _AMOD_API_PRIVATE_H_
 #define _AMOD_API_PRIVATE_H_
@@ -31,7 +31,7 @@ struct _amod_functions {
 	 *
 	 * @return If successful the value will be 0 or greater, otherwise error value
 	 */
-	int (*query_resource)(amod_configuration configuration);
+	int (*query_resource)(struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function for opening a module.
@@ -41,7 +41,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*open)(struct _amod_handle *handle, amod_configuration configuration);
+	int (*open)(struct _amod_handle *handle, struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function to close an open module.
@@ -60,7 +60,8 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_set)(struct _amod_handle *handle, amod_configuration configuration);
+	int (*configuration_set)(struct _amod_handle *handle,
+				 struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function to get the configuration of a module.
@@ -70,7 +71,26 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_get)(struct _amod_handle *handle, amod_configuration configuration);
+	int (*configuration_get)(struct _amod_handle *handle,
+				 struct amod_configuration *configuration);
+
+	/**
+	 * @brief Start a module processing data.
+	 *
+	 * @param handle  The handle for the module to start
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*start)(struct amod_handle *handle);
+
+	/**
+	 * @brief Pause a module processing data.
+	 *
+	 * @param handle  The handle for the module to pause
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*pause)(struct amod_handle *handle);
 
 	/**
 	 * @brief The core data processing function for the module. Can be either an
