@@ -52,7 +52,7 @@ int lc3_dec_query_resource(struct amod_configuration *configuration);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configuration);
+int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function close an open module.
@@ -61,7 +61,7 @@ int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configu
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_close(struct _amod_handle *handle);
+int lc3_dec_close(struct amod_handle *handle);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -71,7 +71,7 @@ int lc3_dec_close(struct _amod_handle *handle);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_set(struct _amod_handle *handle,
+int lc3_dec_configuration_set(struct amod_handle *handle,
 			      struct lc3_dec_configuration *configuration);
 
 /**
@@ -82,7 +82,7 @@ int lc3_dec_configuration_set(struct _amod_handle *handle,
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_get(struct _amod_handle *handle,
+int lc3_dec_configuration_get(struct amod_handle *handle,
 			      struct lc3_dec_configuration *configuration);
 
 /**
@@ -95,7 +95,7 @@ int lc3_dec_configuration_get(struct _amod_handle *handle,
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_process_data(struct _amod_handle *handle, struct aobj_object *object_in,
+int lc3_dec_process_data(struct amod_handle *handle, struct aobj_object *object_in,
 			 struct aobj_object *object_out);
 
 #endif _MODULE1_PRIVATE_H_

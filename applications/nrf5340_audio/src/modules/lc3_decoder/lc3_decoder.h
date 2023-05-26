@@ -17,7 +17,7 @@
  * @brief Private pointer to the module's parameters.
  *
  */
-extern amod_parameters lc3_dec_parameters;
+extern struct amod_parameters *lc3_dec_parameters;
 
 /**
  * @brief The module configuration structure.

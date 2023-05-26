@@ -14,12 +14,6 @@
 #include "data_fifo.h"
 
 /**
- * @brief Private pointer to a modules context.
- *
- */
-struct amod_context;
-
-/**
  * @brief Private pointer to a modules functions.
  *
  */
@@ -41,7 +35,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*open)(struct _amod_handle *handle, struct amod_configuration *configuration);
+	int (*open)(struct amod_handle *handle, struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function to close an open module.
@@ -50,7 +44,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*close)(struct _amod_handle *handle);
+	int (*close)(struct amod_handle *handle);
 
 	/**
 	 * @brief  Function to set the configuration of a module.
@@ -60,7 +54,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_set)(struct _amod_handle *handle,
+	int (*configuration_set)(struct amod_handle *handle,
 				 struct amod_configuration *configuration);
 
 	/**
@@ -71,7 +65,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_get)(struct _amod_handle *handle,
+	int (*configuration_get)(struct amod_handle *handle,
 				 struct amod_configuration *configuration);
 
 	/**
@@ -102,7 +96,7 @@ struct _amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*data_process)(struct _amod_handle *handle, struct aobj_object *object_in,
+	int (*data_process)(struct amod_handle *handle, struct aobj_object *object_in,
 			    struct aobj_object *object_out);
 };
 
@@ -110,7 +104,7 @@ struct _amod_functions {
  * @brief Module's thread configuration structure.
  *
  */
-struct amod_thread_configuration {
+struct _amod_thread_configuration {
 	/*! Flag to indicate thread configuration has been set */
 	bool set;
 
@@ -121,19 +115,13 @@ struct amod_thread_configuration {
 	size_t stack_size;
 
 	/*! Thread priority */
-	enum amod_id priority;
+	int priority;
 
-	/*! Number of data input messages that can be queued */
-	uint32_t in_msg_num;
+	/*! Number of concurrent input messages */
+	int in_msg_num;
 
-	/*! Number of data output messages that can be queued */
-	uint32_t out_msg_num;
-
-	/*! Number of data buffers that can be queued */
-	uint32_t data_num;
-
-	/*! Size of a single data buffer */
-	uint32_t data_size;
+	/*! Number of concurrent output messages */
+	int out_msg_num;
 };
 
 /**
@@ -141,17 +129,14 @@ struct amod_thread_configuration {
  *
  */
 struct _amod_parameters {
-	/*! The module base name*/
+	/*! The module base name */
 	char *name;
 
 	/*! The module type */
 	enum amod_type type;
 
 	/*! A pointer to the functions to implment the module */
-	struct amod_functions *functions;
-
-	/*! Thread configuration */
-	struct amod_thread_configuration thread_config;
+	struct _amod_functions *functions;
 };
 
 /**
@@ -169,7 +154,7 @@ struct _amod_handle {
 	enum amod_type type;
 
 	/*! Pointer to the specific module functions */
-	struct amod_functions *functions;
+	struct _amod_functions *functions;
 
 	/*! Current state of the module */
 	enum amod_state state;
@@ -195,20 +180,20 @@ struct _amod_handle {
 	/*! Size of a data output buffer */
 	size_t data_size;
 
-	/*! Array of module handles for sending the output data to */
-	struct amod_handle *output_handles[CONFIG_AMOD_OUTPUT_MODULE_NUM];
+	/* List node (next pointer) */
+	sys_snode_t node;
 
-	/*! Number of modules to send the output to */
-	int output_handles_num;
+	/*! A singley linked-list of the handles the module is connected to. */
+	sys_slist_t hdl_dest_list;
+
+	/* Mutex to make the above destinations list thread safe */
+	struct k_mutex dest_mutex;
 
 	/*! Modules thread configuration */
-	struct amod_thread_configuration thread;
+	struct _amod_thread_configuration thread;
 
 	/*! Private context for the module */
 	struct amod_context *context;
-
-	/*! Size of the private context for the module */
-	size_t context_size;
 };
 
-#endif _AMOD_API_PRIVATE_H_
+#endif /* _AMOD_API_PRIVATE_H_ */

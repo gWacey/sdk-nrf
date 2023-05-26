@@ -79,13 +79,13 @@ enum aobj_interleaved {
  *
  */
 struct aobj_format {
-	union type {
+	union {
 		/* An enum/defines list giving the PCM types supported (e.g., linear, Alaw, etc.) */
 		enum aobj_pcm_type pcm_type;
 
 		/* An enum/defines list giving the coding types supported (e.g., LC3, MP3, etc.) */
 		enum aobj_coding_type coding_type;
-	};
+	} type;
 
 	/* The PCM sample rate */
 	uint32_t sample_rate;

@@ -16,6 +16,9 @@
 #include "LC3API.h"
 #include "lc3_decoder_private.h"
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(led, CONFIG_LC3_DECODER_MODULE_LOG_LEVEL);
+
 /**
  * @brief Number of micro seconds in a second.
  *
@@ -76,14 +79,13 @@ struct _amod_functions lc3_dec_functions = {
  */
 struct _amod_parameters lc3_dec_params = { .name = "LC3 Dcoder",
 					   .type = AMOD_TYPE_PROCESSOR,
-					   .functions = &lc3_dec_functions,
-					   .thread_config.set = 0 };
+					   .functions = &lc3_dec_functions };
 
 /**
  * @brief A private pointer to the LC3 decoder set-up parameters.
  *
  */
-struct amod_parameters lc3_dec_parameters = &lc3_dec_params;
+struct amod_parameters *lc3_dec_parameters = &lc3_dec_params;
 
 /**
  * @brief  Function for querying the resources required for the LC3 decoder
@@ -180,7 +182,8 @@ int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configu
  */
 int lc3_dec_close(struct _amod_handle *handle)
 {
-	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)handle->context;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	int ret;
 
 	/* Free decoder memory */
@@ -205,10 +208,9 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configura
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	struct lc3_decoder_context *ctx;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	LC3FrameSize_t framesize;
-
-	ctx = (struct lc3_decoder_context *)handle->context;
 
 	/* Free previous decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
@@ -261,14 +263,10 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configura
  */
 int lc3_dec_configuration_get(struct _amod_handle *handle, struct amod_configuration *configuration)
 {
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)handle->context;
-
-	if (ctx == NULL) {
-		LOG_DBG("LC3 decoder context error for module %s", handle->name);
-		return -EINVAL;
-	}
 
 	memcopy(config, ctx->config, sizeof(struct lc3_decoder_configuration));
 
@@ -287,7 +285,8 @@ int lc3_dec_configuration_get(struct _amod_handle *handle, struct amod_configura
 int lc3_dec_data_process(struct _amod_handle *handle, struct aobj_object *object_in,
 			 struct aobj_object *object_out)
 {
-	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)handle->context;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	bool bad_frame;
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;

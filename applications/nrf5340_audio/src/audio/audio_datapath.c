@@ -851,6 +851,13 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 	size_t pcm_size;
 
 	ret = sw_codec_decode(buf, size, bad_frame, &ctrl_blk.decoded_data, &pcm_size);
+	/*
+	 * int amod_object_data_attach(&object_in, buf, size);
+	 *
+	 * ret = amod_data_send_retrieve(lc3_dec_hdl, &object_in, &object_out);
+	 *
+	 * int amod_object_data_extract(&object_out, &ctrl_blk.decoded_data, &pcm_size);
+	 */
 
 	if (ret) {
 		LOG_WRN("SW codec decode error: %d", ret);
