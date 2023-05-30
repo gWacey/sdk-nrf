@@ -101,45 +101,6 @@ struct _amod_functions {
 };
 
 /**
- * @brief Module's thread configuration structure.
- *
- */
-struct _amod_thread_configuration {
-	/*! Flag to indicate thread configuration has been set */
-	bool set;
-
-	/*! Thread stack */
-	k_thread_stack_t *stack;
-
-	/* Thread stack size */
-	size_t stack_size;
-
-	/*! Thread priority */
-	int priority;
-
-	/*! Number of concurrent input messages */
-	int in_msg_num;
-
-	/*! Number of concurrent output messages */
-	int out_msg_num;
-};
-
-/**
- * @brief A modules minimum description.
- *
- */
-struct _amod_parameters {
-	/*! The module base name */
-	char *name;
-
-	/*! The module type */
-	enum amod_type type;
-
-	/*! A pointer to the functions to implment the module */
-	struct _amod_functions *functions;
-};
-
-/**
  * @brief Private module handle.
  *
  */
@@ -190,7 +151,7 @@ struct _amod_handle {
 	struct k_mutex dest_mutex;
 
 	/*! Modules thread configuration */
-	struct _amod_thread_configuration thread;
+	struct amod_thread_configuration thread;
 
 	/*! Private context for the module */
 	struct amod_context *context;

@@ -68,6 +68,7 @@ zephyr_library_include_directories(
     src/bluetooth
     src/drivers
     src/modules
+    src/modules/lc3_decoder
     src/utils
     src/utils/macros
 )
@@ -81,6 +82,7 @@ add_subdirectory(src/audio_module)
 add_subdirectory(src/bluetooth)
 add_subdirectory(src/drivers)
 add_subdirectory(src/modules)
+add_subdirectory(src/modules/lc3_decoder)
 add_subdirectory(src/utils)
 
 ## Cirrus Logic

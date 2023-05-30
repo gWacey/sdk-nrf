@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#ifndef _MODULE1_PRIVATE_H_
-#define _MODULE1_PRIVATE_H_
+#ifndef _LC3_DECODER_PRIVATE_H_
+#define _LC3_DECODER_PRIVATE_H_
 
 #include "lc3_decoder.h"
 
@@ -14,8 +14,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include "LC3API.h"
+
+#define CONFIG_LC3_DECODER_MAX_CHANNELS (2)
 
 /**
  * @brief  Private module context.
@@ -71,8 +73,7 @@ int lc3_dec_close(struct amod_handle *handle);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_set(struct amod_handle *handle,
-			      struct lc3_dec_configuration *configuration);
+int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -82,8 +83,7 @@ int lc3_dec_configuration_set(struct amod_handle *handle,
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_get(struct amod_handle *handle,
-			      struct lc3_dec_configuration *configuration);
+int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief An event will fire when a new data block is available to pull out
@@ -95,7 +95,7 @@ int lc3_dec_configuration_get(struct amod_handle *handle,
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_process_data(struct amod_handle *handle, struct aobj_object *object_in,
+int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_in,
 			 struct aobj_object *object_out);
 
-#endif _MODULE1_PRIVATE_H_
+#endif /* _LC3_DECODER_PRIVATE_H_ */

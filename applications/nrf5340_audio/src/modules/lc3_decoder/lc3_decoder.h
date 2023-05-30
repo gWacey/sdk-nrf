@@ -17,7 +17,7 @@
  * @brief Private pointer to the module's parameters.
  *
  */
-extern struct amod_parameters *lc3_dec_parameters;
+extern struct amod_description *lc3_dec_description;
 
 /**
  * @brief The module configuration structure.
@@ -40,4 +40,4 @@ struct lc3_decoder_configuration {
 	uint32_t channel_map;
 };
 
-#endif _LC3_DECODER_H_
+#endif /* _LC3_DECODER_H_ */

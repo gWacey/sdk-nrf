@@ -25,28 +25,16 @@
 struct amod_handle;
 
 /**
- * @brief Modules private context.
- *
- */
-struct amod_context;
-
-/**
  * @brief Modules private configuration.
  *
  */
 struct amod_configuration;
 
 /**
- * @brief Modules private parameters.
+ * @brief Modules private functions list
  *
  */
-struct amod_parameters;
-
-/**
- * @brief Modules private thread configuration.
- *
- */
-struct amod_thread_configuration;
+struct amod_functions;
 
 /**
  * @brief Module type relative to the module.
@@ -85,6 +73,54 @@ enum amod_state {
 
 	/*! Number of module states */
 	AMOD_STATE_UNKNOWN
+};
+
+/**
+ * @brief A modules minimum description.
+ *
+ */
+struct amod_description {
+	/*! The module base name */
+	char *name;
+
+	/*! The module type */
+	enum amod_type type;
+
+	/*! A pointer to the functions to implment the module */
+	struct amod_functions *functions;
+};
+
+/**
+ * @brief Module's thread configuration structure.
+ *
+ */
+struct amod_thread_configuration {
+	/*! Thread stack */
+	k_thread_stack_t *stack;
+
+	/* Thread stack size */
+	size_t stack_size;
+
+	/*! Thread priority */
+	int priority;
+
+	/*! Number of concurrent input messages */
+	int in_msg_num;
+
+	/*! Number of concurrent output messages */
+	int out_msg_num;
+};
+
+/**
+ * @brief Module's generic set-up structure.
+ *
+ */
+struct amod_parameters {
+	/* The modules private description */
+	struct amod_description *description;
+
+	/* The modules thread setting */
+	struct amod_thread_configuration thread;
 };
 
 /**
@@ -177,24 +213,22 @@ int amod_query_resource(struct amod_parameters *parameters,
 /**
  * @brief  Function for opening a module.
  *
- * @param parameters            Pointer to the module parameters
- * @param configuration         A pointer to the modules configuration (this must also
- *                              be passed to the #amod_set_configuration() unchanged)
- * @param thread_configuration  The settins for the module's internal thread
- * @param name                  A unique name for this instance of the module
- * @param in_msg_block          Pointer to the memory allocated for module data input messages
- * @param out_msg_block         Pointer to the memory allocated for module data output messages
- * @param data_block            Pointer to the memory allocated for module data buffers
- * @param data_size             The size of each audio data buffer in chars
- * @param data_num              The number of data buffers in the data memory block
- * @param handle                Pointer to the memory allocated for the module handle
+ * @param parameters     Pointer to the module set-up parameters
+ * @param configuration  A pointer to the modules configuration (this must also
+ *                       be passed to the #amod_set_configuration() unchanged)
+ * @param name           A unique name for this instance of the module
+ * @param in_msg_block   Pointer to the memory allocated for module data input messages
+ * @param out_msg_block  Pointer to the memory allocated for module data output messages
+ * @param data_block     Pointer to the memory allocated for module data buffers
+ * @param data_size      The size of each audio data buffer in chars
+ * @param data_num       The number of data buffers in the data memory block
+ * @param handle         Pointer to the memory allocated for the module handle
  *
  * @return 0 if successful, error value
  */
 int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      struct amod_thread_configuration *thread_configuration, char *name,
-	      char *in_msg_block, char *out_msg_block, char *data_block, size_t data_size,
-	      uint32_t data_num, struct amod_handle *handle);
+	      char *name, char *in_msg_block, char *out_msg_block, char *data_block,
+	      size_t data_size, uint32_t data_num, struct amod_handle *handle);
 
 /**
  * @brief  Function to close an open module.
@@ -304,18 +338,19 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
  * @brief Helper function to configure the thread information for the module
  *        set-up parameters structure.
  *
- * @param thread_configuration  A pointer to the private thread configuration
- * @param stack                 Memory block for the threads stack
- * @param stack_size            Size of the threads stack
- * @param priority              Priority of the thread insatnce, one of #amod_id
- * @param in_msg_num            Number of concurrent input messages
- * @param out_msg_num           Number of concurrent output messages
+ * @param parameters   Pointer to the module set-up parameters
+ * @param description  Pointer to the modules private description
+ * @param stack        Memory block for the threads stack
+ * @param stack_size   Size of the threads stack
+ * @param priority     Priority of the thread insatnce, one of #amod_id
+ * @param in_msg_num   Number of concurrent input messages
+ * @param out_msg_num  Number of concurrent output messages
  *
  * @return 0 if successful, error value
  */
-int amod_thread_configure(struct amod_thread_configuration *thread_configuration,
-			  k_thread_stack_t *stack, size_t stack_size, int priority, int in_msg_num,
-			  int out_msg_num);
+int amod_parameters_configure(struct amod_parameters *parameters,
+			      struct amod_description *description, k_thread_stack_t *stack,
+			      size_t stack_size, int priority, int in_msg_num, int out_msg_num);
 
 /**
  * @brief Helper function to return the base and instance names for a given

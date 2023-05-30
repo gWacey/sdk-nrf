@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
+#include <errno.h>
 #include "aobj_api.h"
 #include "amod_api.h"
 #include "amod_api_private.h"
@@ -17,7 +18,7 @@
 #include "lc3_decoder_private.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(led, CONFIG_LC3_DECODER_MODULE_LOG_LEVEL);
+LOG_MODULE_REGISTER(lc3_decoder, 3);
 
 /**
  * @brief Number of micro seconds in a second.
@@ -70,22 +71,22 @@ struct _amod_functions lc3_dec_functions = {
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.
 	 */
-	.data_process = lc3_dec_process_data,
+	.data_process = lc3_dec_data_process,
 };
 
 /**
  * @brief The set-up parameters for the LC3 decoder.
  *
  */
-struct _amod_parameters lc3_dec_params = { .name = "LC3 Dcoder",
-					   .type = AMOD_TYPE_PROCESSOR,
-					   .functions = &lc3_dec_functions };
+struct amod_description lc3_dec_dept = { .name = "LC3 Dcoder",
+					 .type = AMOD_TYPE_PROCESSOR,
+					 .functions = (struct amod_functions *)&lc3_dec_functions };
 
 /**
  * @brief A private pointer to the LC3 decoder set-up parameters.
  *
  */
-struct amod_parameters *lc3_dec_parameters = &lc3_dec_params;
+struct amod_description *lc3_dec_description = &lc3_dec_dept;
 
 /**
  * @brief  Function for querying the resources required for the LC3 decoder
@@ -101,16 +102,15 @@ int lc3_dec_query_resource(struct amod_configuration *configuration)
  * @brief Open an instance of the LC3 decoder
  *
  */
-int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configuration)
+int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	int ret;
-	LC3FrameSize_t framesize;
 	uint8_t enc_sample_rates = 0;
 	uint8_t dec_sample_rates = 0;
 	uint8_t unique_session = 0;
 	LC3FrameSize_t framesize;
+	int ret;
 
 	/* Set unique session to 0 for using the default sharing memory setting.
 	 *
@@ -180,11 +180,10 @@ int lc3_dec_open(struct _amod_handle *handle, struct amod_configuration *configu
  * @brief  Function close an instance of the LC3 decoder.
  *
  */
-int lc3_dec_close(struct _amod_handle *handle)
+int lc3_dec_close(struct amod_handle *handle)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	int ret;
 
 	/* Free decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
@@ -204,13 +203,14 @@ int lc3_dec_close(struct _amod_handle *handle)
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configuration *configuration)
+int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	LC3FrameSize_t framesize;
+	int ret;
 
 	/* Free previous decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
@@ -237,7 +237,7 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configura
 			config->sample_rate, config->bit_depth, framesize, NULL, NULL, &ret);
 		if (ret) {
 			LOG_ERR("LC3 decoder channel %d failed to initialise for module %s", i,
-				handle->name);
+				hdl->name);
 			return ret;
 		}
 	}
@@ -250,9 +250,9 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configura
 		(ctx->config.duration_us * ctx->config.sample_rate) / LC3_DECODER_US_IN_A_SECOND;
 
 	/* Configure decoder */
-	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits %dus %d channel(s)", handle->name,
+	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits %dus %d channel(s)", hdl->name,
 		ctx->config.sample_rate, ctx->config.bit_depth, ctx->config.duration_us,
-		ctx->config.number_channels, ctx->config.channel_map);
+		ctx->config.number_channels);
 
 	return 0;
 }
@@ -261,18 +261,18 @@ int lc3_dec_configuration_set(struct _amod_handle *handle, struct amod_configura
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_get(struct _amod_handle *handle, struct amod_configuration *configuration)
+int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
 
-	memcopy(config, ctx->config, sizeof(struct lc3_decoder_configuration));
+	memcpy(config, &ctx->config, sizeof(struct lc3_decoder_configuration));
 
 	/* Configure decoder */
 	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits %dus %d channel(s) mapped as 0x%X",
-		handle->name, config->sample_rate, config->bit_depth, config->duration_us,
+		hdl->name, config->sample_rate, config->bit_depth, config->duration_us,
 		config->number_channels, config->channel_map);
 
 	return 0;
@@ -282,12 +282,11 @@ int lc3_dec_configuration_get(struct _amod_handle *handle, struct amod_configura
  * @brief Process an audio data object in an instance of the LC3 decoder.
  *
  */
-int lc3_dec_data_process(struct _amod_handle *handle, struct aobj_object *object_in,
+int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_in,
 			 struct aobj_object *object_out)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	bool bad_frame;
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;
 	size_t session_in_size;
@@ -296,8 +295,8 @@ int lc3_dec_data_process(struct _amod_handle *handle, struct aobj_object *object
 	uint8_t *data_out;
 	int ret;
 
-	if (object_in->data_type != AUDIO_CODING_TYPE_LC3) {
-		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", handle->name);
+	if (object_in->format.type.coding_type != AOBJ_CODING_TYPE_LC3) {
+		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", hdl->name);
 		return -EINVAL;
 	}
 

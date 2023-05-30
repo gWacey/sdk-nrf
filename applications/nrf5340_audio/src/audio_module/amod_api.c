@@ -43,24 +43,23 @@ LOG_MODULE_REGISTER(amod_api, 3);
 		 false)
 
 /**
- * @brief Helper function to validate the module parameters.
+ * @brief Helper function to validate the module description.
  *
- * @param params  The module parameters
+ * @param parameters  The module parameters
  *
  * @return 0 if successful, error value
  */
-static int validate_params(struct amod_parameters *parameters)
+static int validate_description(struct amod_parameters *parameters)
 {
-	struct _amod_parameters *params = (struct _amod_parameters *)parameters;
-
 	if (parameters == NULL) {
 		LOG_DBG("No description for module");
 		return -EINVAL;
 	}
 
-	if ((params->type != AMOD_TYPE_INPUT && params->type != AMOD_TYPE_OUTPUT &&
-	     params->type != AMOD_TYPE_PROCESSOR) ||
-	    params->name == NULL || params->functions == NULL) {
+	if ((parameters->description->type != AMOD_TYPE_INPUT &&
+	     parameters->description->type != AMOD_TYPE_OUTPUT &&
+	     parameters->description->type != AMOD_TYPE_PROCESSOR) ||
+	    parameters->description->name == NULL || parameters->description->functions == NULL) {
 		LOG_DBG("Error in description for module");
 		return -EINVAL;
 	}
@@ -156,16 +155,16 @@ static void clean_up(struct _amod_handle *hdl, struct _amod_in_message **in_msg,
  *
  * @return 0 if successful, error value
  */
-static int module_thread_input(struct amod_handle *module_handle)
+static int module_thread_input(struct amod_handle *handle)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)module_handle;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct _amod_handle *hdl_to;
 	struct _amod_in_message *in_msg;
 	struct _amod_out_message *out_msg;
 	int ret;
 	char *data;
 
-	if (module_handle == NULL) {
+	if (handle == NULL) {
 		LOG_DBG("Error in the module task as handle NULL");
 		return -EINVAL;
 	}
@@ -201,7 +200,7 @@ static int module_thread_input(struct amod_handle *module_handle)
 			out_msg->object.data_size = hdl->data_size;
 
 			/* Process the input audio object */
-			ret = hdl->functions->data_process(module_handle, NULL, &out_msg->object);
+			ret = hdl->functions->data_process(handle, NULL, &out_msg->object);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -246,16 +245,16 @@ static int module_thread_input(struct amod_handle *module_handle)
  *
  * @return 0 if successful, error value
  */
-static int module_thread_output(struct amod_handle *module_handle)
+static int module_thread_output(struct amod_handle *handle)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)module_handle;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	int ret;
 	struct _amod_in_message *in_msg;
 	size_t size;
 	struct _amod_out_message *out_msg;
 	char *data = NULL;
 
-	if (module_handle == NULL) {
+	if (handle == NULL) {
 		LOG_DBG("Error in the module task as handle NULL");
 		return -EINVAL;
 	}
@@ -282,7 +281,7 @@ static int module_thread_output(struct amod_handle *module_handle)
 
 		if (hdl->functions->data_process != NULL) {
 			/* Process the input audio object and output from the audio system */
-			ret = hdl->functions->data_process(module_handle, in_msg->object, NULL);
+			ret = hdl->functions->data_process(handle, in_msg->object, NULL);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -310,9 +309,9 @@ static int module_thread_output(struct amod_handle *module_handle)
  *
  * @return 0 if successful, error value
  */
-static int module_thread_processor(struct amod_handle *module_handle)
+static int module_thread_processor(struct amod_handle *handle)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)module_handle;
+	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct _amod_handle *hdl_to;
 	int ret;
 	struct _amod_in_message *in_msg;
@@ -320,7 +319,7 @@ static int module_thread_processor(struct amod_handle *module_handle)
 	char *data = NULL;
 	size_t size;
 
-	if (module_handle == NULL) {
+	if (handle == NULL) {
 		LOG_DBG("Error in the module task as handle NULL");
 		return -EINVAL;
 	}
@@ -372,7 +371,7 @@ static int module_thread_processor(struct amod_handle *module_handle)
 			out_msg->object.data_size = hdl->data_size;
 
 			/* Process the input audio object into the output audio object */
-			ret = hdl->functions->data_process(module_handle, in_msg->object,
+			ret = hdl->functions->data_process(handle, in_msg->object,
 							   &out_msg->object);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
@@ -420,24 +419,26 @@ static int module_thread_processor(struct amod_handle *module_handle)
 int amod_query_resource(struct amod_parameters *parameters,
 			struct amod_configuration *configuration)
 {
-	struct _amod_parameters *params = (struct _amod_parameters *)parameters;
+	struct _amod_functions *functions =
+		(struct _amod_functions *)parameters->description->functions;
 	int ret;
 	int size = 0;
 
-	ret = validate_params(parameters);
+	ret = validate_description(parameters);
 	if (ret) {
 		LOG_DBG("Invalid parameters for module, returned %d", ret);
 		return ret;
 	}
 
-	if (params->functions->query_resource != NULL) {
-		size = params->functions->query_resource(configuration);
+	if (functions->query_resource != NULL) {
+		size = functions->query_resource(configuration);
 		if (size < 0) {
-			LOG_DBG("Failed query resource for module %s, ret %d", params->name, size);
+			LOG_DBG("Failed query resource for module %s, ret %d",
+				parameters->description->name, size);
 			return -EFAULT;
 		}
 	} else {
-		LOG_DBG("No query resource function for module %s", params->name);
+		LOG_DBG("No query resource function for module %s", parameters->description->name);
 	}
 
 	size += WB_UP(sizeof(struct _amod_handle));
@@ -449,14 +450,10 @@ int amod_query_resource(struct amod_parameters *parameters,
  * @brief  Function for opening a module.
  */
 int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      struct amod_thread_configuration *thread_configuration, char *name,
-	      char *in_msg_block, char *out_msg_block, char *data_block, size_t data_size,
-	      uint32_t data_num, struct amod_handle *handle)
+	      char *name, char *in_msg_block, char *out_msg_block, char *data_block,
+	      size_t data_size, uint32_t data_num, struct amod_handle *handle)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_parameters *params = (struct _amod_parameters *)parameters;
-	struct _amod_thread_configuration *thread_config =
-		(struct _amod_thread_configuration *)thread_configuration;
 	int ret;
 
 	if (handle == NULL) {
@@ -469,20 +466,15 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return -EALREADY;
 	}
 
-	ret = validate_params(parameters);
+	ret = validate_description(parameters);
 	if (ret) {
 		LOG_DBG("Invalid parameters for module, ret %d", ret);
 		return ret;
 	}
 
-	if (thread_configuration == NULL) {
-		LOG_DBG("Error within the thread parameters for module %s", name);
-		return -EINVAL;
-	}
-
 	memset(handle, 0, WB_UP(sizeof(struct _amod_handle)));
 
-	hdl->type = params->type;
+	hdl->type = parameters->description->type;
 
 	if (hdl->type == AMOD_TYPE_INPUT && out_msg_block == NULL && data_block == NULL) {
 		LOG_DBG("Incorrect memory for module %s in the open function", name);
@@ -505,16 +497,16 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	hdl->context = (struct amod_context *)((char *)handle + WB_UP(sizeof(struct _amod_handle)));
 
 	memcpy(hdl->name, name, AMOD_NAME_SIZE);
-	memcpy(hdl->base_name, params->name, AMOD_NAME_SIZE);
-	hdl->functions = params->functions;
+	memcpy(hdl->base_name, parameters->description->name, AMOD_NAME_SIZE);
+	hdl->functions = (struct _amod_functions *)parameters->description->functions;
 
-	memcpy(&hdl->thread, thread_config, sizeof(struct _amod_thread_configuration));
+	memcpy(&hdl->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
 
 	sys_slist_init(&hdl->hdl_dest_list);
 	k_mutex_init(&hdl->dest_mutex);
 
 	if (hdl->functions->open != NULL) {
-		ret = hdl->functions->open(handle, configuration);
+		ret = hdl->functions->open((struct amod_handle *)hdl, configuration);
 		if (ret) {
 			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
 			return ret;
@@ -614,7 +606,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		break;
 
 	default:
-		LOG_DBG("Invalid module type%d for module %s", hdl->type, hdl->name);
+		LOG_DBG("Invalid module type %d for module %s", hdl->type, hdl->name);
 		return -EINVAL;
 	}
 
@@ -1000,23 +992,21 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
  *        set-up parameters structure.
  *
  */
-int amod_thread_configure(struct amod_thread_configuration *thread_configuration,
-			  k_thread_stack_t *stack, size_t stack_size, int priority, int in_msg_num,
-			  int out_msg_num)
+int amod_parameters_configure(struct amod_parameters *parameters,
+			      struct amod_description *description, k_thread_stack_t *stack,
+			      size_t stack_size, int priority, int in_msg_num, int out_msg_num)
 {
-	struct _amod_thread_configuration *thread_config =
-		(struct _amod_thread_configuration *)thread_configuration;
-
-	if (thread_configuration == NULL) {
-		LOG_DBG("Input thread configuration is NULL");
+	if (parameters == NULL) {
+		LOG_DBG("Error parameters pointer is NULL");
 		return -EINVAL;
 	}
 
-	thread_config->stack = stack;
-	thread_config->stack_size = stack_size;
-	thread_config->priority = priority;
-	thread_config->in_msg_num = in_msg_num;
-	thread_config->out_msg_num = out_msg_num;
+	parameters->description = description;
+	parameters->thread.stack = stack;
+	parameters->thread.stack_size = stack_size;
+	parameters->thread.priority = priority;
+	parameters->thread.in_msg_num = in_msg_num;
+	parameters->thread.out_msg_num = out_msg_num;
 
 	return 0;
 }
