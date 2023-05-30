@@ -42,8 +42,6 @@ LOG_MODULE_REGISTER(amod_api, 3);
 		 true :                                                                            \
 		 false)
 
-static sys_slist_t amod_handles = SYS_SLIST_STATIC_INIT(&_amod_handle);
-
 /**
  * @brief Helper function to validate the module parameters.
  *
@@ -80,11 +78,8 @@ static int validate_params(struct amod_parameters *parameters)
 void object_release_cb(struct amod_handle *handle, struct aobj_object *object)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	unsigned int count;
 
-	if (count == 1) {
-		data_fifo_block_free(&hdl->out_msg, (void **)&object->data);
-	}
+	data_fifo_block_free(&hdl->out_msg, (void **)&object->data);
 }
 
 /**
@@ -98,34 +93,34 @@ void object_release_cb(struct amod_handle *handle, struct aobj_object *object)
  *
  * @return 0 if successful, error value
  */
-static int data_send(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
+static int data_send(struct _amod_handle *tx_handle, struct _amod_handle *rx_handle,
 		     struct aobj_object *object, amod_response_cb data_in_response_cb)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)rx_handle;
 	struct _amod_in_message *data_in_msg;
 	int ret;
 
-	ret = data_fifo_pointer_first_vacant_get(&hdl->in_msg, (void **)&data_in_msg, K_NO_WAIT);
+	ret = data_fifo_pointer_first_vacant_get(&rx_handle->in_msg, (void **)&data_in_msg,
+						 K_NO_WAIT);
 	if (ret) {
-		LOG_DBG("Module %s no free data buffer, ret %d", hdl->name, ret);
+		LOG_DBG("Module %s no free data buffer, ret %d", rx_handle->name, ret);
 		return ret;
 	}
 
 	/* fill data */
 	data_in_msg->object = object;
-	data_in_msg->tx_handle = tx_handle;
+	data_in_msg->tx_handle = (struct amod_handle *)tx_handle;
 	data_in_msg->response_cb = data_in_response_cb;
 
-	ret = data_fifo_block_lock(&hdl->in_msg, (void **)&data_in_msg,
+	ret = data_fifo_block_lock(&rx_handle->in_msg, (void **)&data_in_msg,
 				   sizeof(struct _amod_in_message));
 	if (ret) {
-		data_fifo_block_free(&hdl->in_msg, (void **)&data_in_msg);
+		data_fifo_block_free(&rx_handle->in_msg, (void **)&data_in_msg);
 
-		LOG_DBG("Module %s failed to return output buffer, ret %d", hdl->name, ret);
+		LOG_DBG("Module %s failed to return output buffer, ret %d", rx_handle->name, ret);
 		return ret;
 	}
 
-	LOG_DBG("Data sent to module %s", hdl->name);
+	LOG_DBG("Data sent to module %s", rx_handle->name);
 
 	return 0;
 }
@@ -164,7 +159,7 @@ static void clean_up(struct _amod_handle *hdl, struct _amod_in_message **in_msg,
 static int module_thread_input(struct amod_handle *module_handle)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)module_handle;
-	struct amod_handle *handle;
+	struct _amod_handle *hdl_to;
 	struct _amod_in_message *in_msg;
 	struct _amod_out_message *out_msg;
 	int ret;
@@ -218,8 +213,8 @@ static int module_thread_input(struct amod_handle *module_handle)
 
 			/* Send output audio object to next module(s) */
 			if (!sys_slist_is_empty(&hdl->hdl_dest_list)) {
-				SYS_SLIST_FOR_EACH_CONTAINER(&amod_handles, handle, node) {
-					ret = data_send(module_handle, handle, &out_msg->object,
+				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
+					ret = data_send(hdl, hdl_to, &out_msg->object,
 							&object_release_cb);
 				}
 			} else {
@@ -318,7 +313,7 @@ static int module_thread_output(struct amod_handle *module_handle)
 static int module_thread_processor(struct amod_handle *module_handle)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)module_handle;
-	struct amod_handle *handle;
+	struct _amod_handle *hdl_to;
 	int ret;
 	struct _amod_in_message *in_msg;
 	struct _amod_out_message *out_msg;
@@ -388,8 +383,8 @@ static int module_thread_processor(struct amod_handle *module_handle)
 
 			/* Send output audio object to next module(s) */
 			if (!sys_slist_is_empty(&hdl->hdl_dest_list)) {
-				SYS_SLIST_FOR_EACH_CONTAINER(&amod_handles, handle, node) {
-					ret = data_send(module_handle, handle, &out_msg->object,
+				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
+					ret = data_send(hdl, hdl_to, &out_msg->object,
 							&object_release_cb);
 				}
 			} else {
@@ -882,7 +877,7 @@ int amod_data_send(struct amod_handle *handle, struct aobj_object *object,
 		return -ENOTSUP;
 	}
 
-	return data_send((void *)NULL, handle, object, response_cb);
+	return data_send((void *)NULL, hdl, object, response_cb);
 }
 
 /**
@@ -974,7 +969,7 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
 		return -ECONNREFUSED;
 	}
 
-	ret = data_send(NULL, handle, object_in, NULL);
+	ret = data_send(NULL, hdl, object_in, NULL);
 	if (ret) {
 		LOG_DBG("Failed to send data to module %s, ret %d", hdl->name, ret);
 		return ret;
