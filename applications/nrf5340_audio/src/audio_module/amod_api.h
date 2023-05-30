@@ -154,7 +154,7 @@ struct _amod_out_message {
  * @brief Macro to return the memory required for a set of data output.
  *
  */
-#define AMOD_OUT_MSG_SET_SIZE(num) (AMOD_OUT_MSG_SIZE * DATA_OUT_NUM)
+#define AMOD_OUT_MSG_SET_SIZE(num) (AMOD_OUT_MSG_SIZE * (num))
 
 /**
  * @brief Macro to return the memory required for a set of data output.
@@ -275,7 +275,7 @@ int amod_pause(struct amod_handle *handle);
  * @return 0 if successful, error value
  */
 int amod_data_send(struct amod_handle *handle, struct aobj_object *object,
-		   amod_response_cb *response_cb);
+		   amod_response_cb response_cb);
 
 /**
  * @brief Retrieve data from the module.
@@ -304,17 +304,18 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
  * @brief Helper function to configure the thread information for the module
  *        set-up parameters structure.
  *
- * @param parameters   A pointer to the module parameters
- * @param stack        Memory block for the threads stack
- * @param stack_size   Size of the threads stack
- * @param priority     Priority of the thread insatnce, one of #amod_id
- * @param in_msg_num   Number of concurrent input messages
- * @param out_msg_num  Number of concurrent output messages
+ * @param thread_configuration  A pointer to the private thread configuration
+ * @param stack                 Memory block for the threads stack
+ * @param stack_size            Size of the threads stack
+ * @param priority              Priority of the thread insatnce, one of #amod_id
+ * @param in_msg_num            Number of concurrent input messages
+ * @param out_msg_num           Number of concurrent output messages
  *
  * @return 0 if successful, error value
  */
-int amod_thread_configure(struct amod_parameters *parameters, char *stack, size_t stack_size,
-			  int priority, int in_msg_num, int out_msg_num);
+int amod_thread_configure(struct amod_thread_configuration *thread_configuration,
+			  k_thread_stack_t *stack, size_t stack_size, int priority, int in_msg_num,
+			  int out_msg_num);
 
 /**
  * @brief Helper function to return the base and instance names for a given
@@ -333,7 +334,7 @@ int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_n
  *
  * @param handle  A handle to this module instance
  *
- * @return If successful the value will be 0 or greater, otherwise error value
+ * @return 0 if successful, error value
  */
 int amod_state_get(struct amod_handle *handle);
 
@@ -344,7 +345,7 @@ int amod_state_get(struct amod_handle *handle);
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
  *
- * @return If successful the value will be 0 or greater, otherwise error value
+ * @return 0 if successful, error value
  */
 int amod_object_data_attach(struct aobj_object *object, char *data, size_t data_size);
 
@@ -355,8 +356,8 @@ int amod_object_data_attach(struct aobj_object *object, char *data, size_t data_
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
  *
- * @return If successful the value will be 0 or greater, otherwise error value
+ * @return 0 if successful, error value
  */
-int amod_object_data_extract(struct aobj_object *object, char *data, size_t data_size);
+int amod_object_data_extract(struct aobj_object *object, char *data, size_t *data_size);
 
 #endif /*_AMOD_API_H_ */

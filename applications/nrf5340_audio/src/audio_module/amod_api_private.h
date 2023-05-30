@@ -109,7 +109,7 @@ struct _amod_thread_configuration {
 	bool set;
 
 	/*! Thread stack */
-	uint8_t *stack;
+	k_thread_stack_t *stack;
 
 	/* Thread stack size */
 	size_t stack_size;
