@@ -78,7 +78,12 @@ void object_release_cb(struct amod_handle *handle, struct aobj_object *object)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 
-	data_fifo_block_free(&hdl->out_msg, (void **)&object->data);
+	k_sem_take(&hdl->sem, K_NO_WAIT);
+
+	if (k_sem_count_get(&hdl->sem) == 0) {
+		/* Object data has been consumed by all modules so now can free the memory */
+		data_fifo_block_free(&hdl->out_msg, (void **)&object->data);
+	}
 }
 
 /**
@@ -159,7 +164,7 @@ static int module_thread_input(struct amod_handle *handle)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct _amod_handle *hdl_to;
-	struct _amod_in_message *in_msg;
+	struct _amod_in_message *in_msg = NULL;
 	struct _amod_out_message *out_msg;
 	int ret;
 	char *data;
@@ -176,7 +181,7 @@ static int module_thread_input(struct amod_handle *handle)
 
 		if (hdl->functions->data_process != NULL) {
 			/* Get a new output buffer */
-			ret = k_mem_slab_alloc(&hdl->data_slab, (void **)&data, K_NO_WAIT);
+			ret = k_mem_slab_alloc(&hdl->data_slab, (void **)&data, K_FOREVER);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -186,7 +191,7 @@ static int module_thread_input(struct amod_handle *handle)
 			}
 
 			ret = data_fifo_pointer_first_vacant_get(&hdl->out_msg, (void **)&out_msg,
-								 K_NO_WAIT);
+								 K_FOREVER);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -195,7 +200,6 @@ static int module_thread_input(struct amod_handle *handle)
 			}
 
 			/* Configure new audio object */
-			memcpy(&out_msg->object, in_msg->object, sizeof(struct aobj_object));
 			out_msg->object.data = data;
 			out_msg->object.data_size = hdl->data_size;
 
@@ -208,16 +212,25 @@ static int module_thread_input(struct amod_handle *handle)
 				continue;
 			}
 
-			k_mutex_init(&hdl->dest_mutex);
-
-			/* Send output audio object to next module(s) */
+			/* Send input audio object to next module(s) */
 			if (!sys_slist_is_empty(&hdl->hdl_dest_list)) {
+				k_mutex_lock(&hdl->dest_mutex, K_FOREVER);
+				k_sem_init(&hdl->sem, 0, hdl->dest_count);
+
 				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
 					ret = data_send(hdl, hdl_to, &out_msg->object,
 							&object_release_cb);
+					if (ret) {
+						LOG_DBG("Failed to send to module %s from %s",
+							hdl_to->name, hdl->name);
+					} else {
+						k_sem_give(&hdl->sem);
+					}
 				}
+
+				k_mutex_unlock(&hdl->dest_mutex);
 			} else {
-				/* Send output audio object back to module sending the data */
+				/* Send input audio object */
 				ret = data_fifo_block_lock(&hdl->out_msg, (void **)&out_msg,
 							   sizeof(struct _amod_in_message));
 				if (ret) {
@@ -250,9 +263,9 @@ static int module_thread_output(struct amod_handle *handle)
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	int ret;
 	struct _amod_in_message *in_msg;
-	size_t size;
-	struct _amod_out_message *out_msg;
+	struct _amod_out_message *out_msg = NULL;
 	char *data = NULL;
+	size_t size;
 
 	if (handle == NULL) {
 		LOG_DBG("Error in the module task as handle NULL");
@@ -262,8 +275,6 @@ static int module_thread_output(struct amod_handle *handle)
 	/* Execute thread */
 	for (;;) {
 		in_msg = NULL;
-		out_msg = NULL;
-		data = NULL;
 
 		ret = data_fifo_pointer_last_filled_get(&hdl->in_msg, (void **)&in_msg, &size,
 							K_FOREVER);
@@ -288,6 +299,7 @@ static int module_thread_output(struct amod_handle *handle)
 				LOG_DBG("Data process error in module %s, ret %d", hdl->name, ret);
 				continue;
 			}
+
 			if (in_msg->response_cb != NULL) {
 				in_msg->response_cb(in_msg->tx_handle, in_msg->object);
 			}
@@ -366,7 +378,6 @@ static int module_thread_processor(struct amod_handle *handle)
 			}
 
 			/* Configure new audio object */
-			memcpy(&out_msg->object, in_msg->object, sizeof(struct aobj_object));
 			out_msg->object.data = data;
 			out_msg->object.data_size = hdl->data_size;
 
@@ -382,10 +393,21 @@ static int module_thread_processor(struct amod_handle *handle)
 
 			/* Send output audio object to next module(s) */
 			if (!sys_slist_is_empty(&hdl->hdl_dest_list)) {
+				k_mutex_lock(&hdl->dest_mutex, K_FOREVER);
+				k_sem_init(&hdl->sem, 0, hdl->dest_count);
+
 				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
 					ret = data_send(hdl, hdl_to, &out_msg->object,
 							&object_release_cb);
+					if (ret) {
+						LOG_DBG("Failed to send to module %s from %s",
+							hdl_to->name, hdl->name);
+					} else {
+						k_sem_give(&hdl->sem);
+					}
 				}
+
+				k_mutex_unlock(&hdl->dest_mutex);
 			} else {
 				/* Send output audio object back to module sending the data */
 				ret = data_fifo_block_lock(&hdl->out_msg, (void **)&out_msg,
@@ -742,7 +764,13 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 		return -ENOTSUP;
 	}
 
+	k_mutex_lock(&hdl_from->dest_mutex, K_FOREVER);
+
 	sys_slist_append(&hdl_from->hdl_dest_list, &hdl_to->node);
+
+	hdl_from->dest_count += 1;
+
+	k_mutex_unlock(&hdl_from->dest_mutex);
 
 	return 0;
 }
@@ -766,11 +794,17 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 		return -ENOTSUP;
 	}
 
+	k_mutex_lock(&hdl->dest_mutex, K_FOREVER);
+
 	if (!sys_slist_find_and_remove(&hdl->hdl_dest_list, &hdl_remove->node)) {
 		LOG_DBG("Connection to module %s has not been found for module %s",
 			hdl_remove->name, hdl->name);
 		return -EINVAL;
 	}
+
+	hdl->dest_count -= 1;
+
+	k_mutex_unlock(&hdl->dest_mutex);
 
 	return 0;
 }
@@ -988,13 +1022,12 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
 };
 
 /**
- * @brief Helper function to configure the thread information for the module
- *        set-up parameters structure.
+ * @brief Helper function to configure the modules description and thread information.
  *
  */
-int amod_parameters_configure(struct amod_parameters *parameters,
-			      struct amod_description *description, k_thread_stack_t *stack,
-			      size_t stack_size, int priority, int in_msg_num, int out_msg_num)
+int amod_description_configure(struct amod_parameters *parameters,
+			       struct amod_description *description, k_thread_stack_t *stack,
+			       size_t stack_size, int priority, int in_msg_num, int out_msg_num)
 {
 	if (parameters == NULL) {
 		LOG_DBG("Error parameters pointer is NULL");

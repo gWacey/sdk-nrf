@@ -144,8 +144,14 @@ struct _amod_handle {
 	/* List node (next pointer) */
 	sys_snode_t node;
 
-	/*! A singley linked-list of the handles the module is connected to. */
+	/*! A singley linked-list of the handles the module is connected to */
 	sys_slist_t hdl_dest_list;
+
+	/*! Number of destination modules */
+	uint8_t dest_count;
+
+	/*! Semaphore to count messages between modules */
+	struct k_sem sem;
 
 	/* Mutex to make the above destinations list thread safe */
 	struct k_mutex dest_mutex;

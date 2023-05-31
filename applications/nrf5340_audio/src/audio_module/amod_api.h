@@ -348,9 +348,9 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
  *
  * @return 0 if successful, error value
  */
-int amod_parameters_configure(struct amod_parameters *parameters,
-			      struct amod_description *description, k_thread_stack_t *stack,
-			      size_t stack_size, int priority, int in_msg_num, int out_msg_num);
+int amod_description_configure(struct amod_parameters *parameters,
+			       struct amod_description *description, k_thread_stack_t *stack,
+			       size_t stack_size, int priority, int in_msg_num, int out_msg_num);
 
 /**
  * @brief Helper function to return the base and instance names for a given
