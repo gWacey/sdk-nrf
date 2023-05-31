@@ -12,65 +12,93 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/**
+ * @brief Value to define the data type carried by the object.
+ *
+ */
 enum aobj_type {
-	/* The audio data object is raw samples */
+	/*! The audio data object is raw samples */
 	AOBJ_TYPE_SAMPLES = 0,
 
-	/* The audio data object is coded data */
+	/*! The audio data object is coded data */
 	AOBJ_TYPE_CODED = 1,
 
-	/* The audio data object is user defined */
+	/*! The audio data object is user defined */
 	AOBJ_TYPE_USER = 1
 };
 
+/**
+ * @brief Value to define the PCM type carried by the object.
+ *
+ */
 enum aobj_pcm_type {
-	/* The audio data object contains samples in linear format */
+	/*! The audio data object contains samples in linear format */
 	AOBJ_PCM_TYPE_LINEAR = 0,
 
-	/* The audio data object contains samples in ulaw format */
+	/*! The audio data object contains samples in ulaw format */
 	AOBJ_PCM_TYPE_ULAW = 1,
 
-	/* The audio data object contains samples in Alaw format */
+	/*! The audio data object contains samples in Alaw format */
 	AOBJ_PCM_TYPE_ALAW = 2
 };
 
+/**
+ * @brief Value to define the coding type carried by the object.
+ *
+ */
 enum aobj_coding_type {
-	/* The audio data object is coded in LC3 */
+	/*! The audio data object is coded in LC3 */
 	AOBJ_CODING_TYPE_LC3 = 0,
 
-	/* The audio data object is coded in LC3plus */
+	/*! The audio data object is coded in LC3plus */
 	AOBJ_CODING_TYPE_LC3PLUS = 1,
 };
 
+/**
+ * @brief Value to define the PCM alignment.
+ *
+ */
 enum aobj_alignment {
-	/* A sample is aligned to the left in the carrier */
+	/*! A sample is aligned to the left in the carrier */
 	AOBJ_ALIGNMENT_LEFT = 0,
 
-	/* A sample is aligned to the right in the carrier */
+	/*! A sample is aligned to the right in the carrier */
 	AOBJ_ALIGNMENT_RIGHT = 1
 };
 
+/**
+ * @brief Value to define the PCM data sign type.
+ *
+ */
 enum aobj_sign {
-	/* A sample is signed data */
+	/*! A sample is signed data */
 	AOBJ_SIGNED = 0,
 
-	/* A sample is unsigned data */
+	/*! A sample is unsigned data */
 	AOBJ_UNSIGNED = 1
 };
 
+/**
+ * @brief Value to define the endiamism for the data in the object.
+ *
+ */
 enum aobj_endianism {
-	/* Audio samples are stored in little endian */
+	/*! Audio samples are stored in little endian */
 	AOBJ_ENDIAN_LITTLE = 0,
 
-	/* Audio samples are stored in big endian */
+	/*! Audio samples are stored in big endian */
 	AOBJ_ENDIAN_BIG = 1
 };
 
+/**
+ * @brief Value to define the PCM interleaving type.
+ *
+ */
 enum aobj_interleaved {
-	/* Audio samples are deinterleaved within the buffer */
+	/*! Audio samples are deinterleaved within the buffer */
 	AOBJ_DEINTERLEAVED = 0,
 
-	/* Audio samples are interleaved within the buffer */
+	/*! Audio samples are interleaved within the buffer */
 	AOBJ_INTERLEAVED = 1
 };
 
@@ -80,38 +108,42 @@ enum aobj_interleaved {
  */
 struct aobj_format {
 	union {
-		/* An enum/defines list giving the PCM types supported (e.g., linear, Alaw, etc.) */
+		/*! An enum/defines list giving the PCM types
+		 * supported (e.g., linear, Alaw, etc.)
+		 */
 		enum aobj_pcm_type pcm_type;
 
-		/* An enum/defines list giving the coding types supported (e.g., LC3, MP3, etc.) */
+		/*! An enum/defines list giving the coding types
+		 * supported (e.g., LC3, MP3, etc.)
+		 */
 		enum aobj_coding_type coding_type;
 	} type;
 
-	/* The PCM sample rate */
+	/*! The PCM sample rate */
 	uint32_t sample_rate;
 
-	/* Number of valid bits for a sample */
+	/*! Number of valid bits for a sample */
 	uint8_t bits_per_sample;
 
-	/* Number of bits used to carry a sample of size bits_per_sample*/
+	/*! Number of bits used to carry a sample of size bits_per_sample*/
 	uint8_t carrier_size;
 
-	/* Flag indicating the alignment of the sample within the carrier */
+	/*! Flag indicating the alignment of the sample within the carrier */
 	enum aobj_alignment alignment;
 
-	/* Flag indicated if the sample is signed or unsigned */
+	/*! Flag indicated if the sample is signed or unsigned */
 	enum aobj_sign sign;
 
-	/* Flag indicating the endianness of the sample */
+	/*! Flag indicating the endianness of the sample */
 	enum aobj_endianism sample_endianism;
 
-	/* A flag indicating if the PCM object is sample interleaved or not */
+	/*! A flag indicating if the PCM object is sample interleaved or not */
 	enum aobj_interleaved interleaved;
 
-	/* Number of channels in the PCM object */
+	/*! Number of channels in the PCM object */
 	uint8_t number_channels;
 
-	/* A 32 bit array indicating which channel(s) are contained within
+	/*! A 32 bit array indicating which channel(s) are contained within
 	 * the PCM object (1 = channel location, 0 = not this channel)
 	 */
 	uint32_t channel_map;
@@ -122,10 +154,10 @@ struct aobj_format {
  *
  */
 struct aobj_sync {
-	/* The previous SDU reference position in time */
+	/*! The previous SDU reference position in time */
 	uint32_t previous_sdu_ref_us;
 
-	/* The current SDU reference position in time */
+	/*! The current SDU reference position in time */
 	uint32_t current_pres_dly_us;
 };
 
@@ -134,34 +166,34 @@ struct aobj_sync {
  *
  */
 struct aobj_object {
-	/* Indicates the data type of the object coded or samples or user defined */
+	/*! Indicates the data type of the object coded or samples or user defined */
 	enum aobj_type data_type;
 
-	/* A pointer to the raw or coded data (e.g., PCM, LC3, etc.) */
+	/*! A pointer to the raw or coded data (e.g., PCM, LC3, etc.) */
 	uint8_t *data;
 
-	/* The size, in bytes of the raw data object */
+	/*! The size, in bytes of the raw data object */
 	size_t data_size;
 
-	/* A structure defining the audio data objects format */
+	/*! A structure defining the audio data objects format */
 	struct aobj_format format;
 
-	/* A structure holding the data required for synchronised
+	/*! A structure holding the data required for synchronised
 	 * audio  (e.g., PTS, buff occupancy, etc.)
 	 */
 	struct aobj_sync sync_data;
 
-	/* A Boolean flag to indicate this frame has errors in the
+	/*! A Boolean flag to indicate this frame has errors in the
 	 * data (::true = bad, fales:: = good)
 	 */
 	bool bad_frame;
 
-	/* A Boolean flag to indicate the last buffer in the
+	/*! A Boolean flag to indicate the last buffer in the
 	 * stream (fales:: = more to come, ::true = last buffer)
 	 */
 	bool last_flag;
 
-	/* A pointer to private data associated with the data object */
+	/*! A pointer to private data associated with the data object */
 	void *user_data;
 };
 

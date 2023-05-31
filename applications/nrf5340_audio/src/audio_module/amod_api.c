@@ -49,7 +49,7 @@ LOG_MODULE_REGISTER(amod_api, 3);
  *
  * @return 0 if successful, error value
  */
-static int validate_description(struct amod_parameters *parameters)
+static int validate_parameters(struct amod_parameters *parameters)
 {
 	if (parameters == NULL) {
 		LOG_DBG("No description for module");
@@ -446,7 +446,7 @@ int amod_query_resource(struct amod_parameters *parameters,
 	int ret;
 	int size = 0;
 
-	ret = validate_description(parameters);
+	ret = validate_parameters(parameters);
 	if (ret) {
 		LOG_DBG("Invalid parameters for module, returned %d", ret);
 		return ret;
@@ -488,7 +488,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return -EALREADY;
 	}
 
-	ret = validate_description(parameters);
+	ret = validate_parameters(parameters);
 	if (ret) {
 		LOG_DBG("Invalid parameters for module, ret %d", ret);
 		return ret;
@@ -1022,12 +1022,13 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
 };
 
 /**
- * @brief Helper function to configure the modules description and thread information.
+ * @brief Helper function to configure the thread information for the module
+ *        set-up parameters structure.
  *
  */
-int amod_description_configure(struct amod_parameters *parameters,
-			       struct amod_description *description, k_thread_stack_t *stack,
-			       size_t stack_size, int priority, int in_msg_num, int out_msg_num)
+int amod_parameters_configure(struct amod_parameters *parameters,
+			      struct amod_description *description, k_thread_stack_t *stack,
+			      size_t stack_size, int priority, int in_msg_num, int out_msg_num)
 {
 	if (parameters == NULL) {
 		LOG_DBG("Error parameters pointer is NULL");

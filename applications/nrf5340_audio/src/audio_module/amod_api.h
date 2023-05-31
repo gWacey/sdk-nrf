@@ -98,7 +98,7 @@ struct amod_thread_configuration {
 	/*! Thread stack */
 	k_thread_stack_t *stack;
 
-	/* Thread stack size */
+	/*! Thread stack size */
 	size_t stack_size;
 
 	/*! Thread priority */
@@ -116,10 +116,10 @@ struct amod_thread_configuration {
  *
  */
 struct amod_parameters {
-	/* The modules private description */
+	/*! The modules private description */
 	struct amod_description *description;
 
-	/* The modules thread setting */
+	/*! The modules thread setting */
 	struct amod_thread_configuration thread;
 };
 
@@ -348,9 +348,9 @@ int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *obje
  *
  * @return 0 if successful, error value
  */
-int amod_description_configure(struct amod_parameters *parameters,
-			       struct amod_description *description, k_thread_stack_t *stack,
-			       size_t stack_size, int priority, int in_msg_num, int out_msg_num);
+int amod_parameters_configure(struct amod_parameters *parameters,
+			      struct amod_description *description, k_thread_stack_t *stack,
+			      size_t stack_size, int priority, int in_msg_num, int out_msg_num);
 
 /**
  * @brief Helper function to return the base and instance names for a given
