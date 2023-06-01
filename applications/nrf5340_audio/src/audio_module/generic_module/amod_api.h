@@ -41,17 +41,17 @@ struct amod_functions;
  *
  */
 enum amod_type {
+	/*! The module type is undefined */
+	AMOD_TYPE_UNDEFINED = 0,
+
 	/*! This is an input only module */
-	AMOD_TYPE_INPUT = 0,
+	AMOD_TYPE_INPUT,
 
 	/*! This is an output only module */
 	AMOD_TYPE_OUTPUT,
 
 	/*! This is an input/output processing module */
 	AMOD_TYPE_PROCESSOR,
-
-	/*! The module type cannot be determined */
-	AMOD_TYPE_UNDEFINED
 };
 
 /**
@@ -59,8 +59,11 @@ enum amod_type {
  *
  */
 enum amod_state {
+	/*! Module state undefined */
+	AMOD_STATE_UNDEFINED = 0,
+
 	/*! Module is in the open state */
-	AMOD_STATE_OPEN = 0,
+	AMOD_STATE_OPEN,
 
 	/*! Module is in the configured state */
 	AMOD_STATE_CONFIGURED,
@@ -70,16 +73,13 @@ enum amod_state {
 
 	/*! Module is in the paused state */
 	AMOD_STATE_PAUSED,
-
-	/*! Number of module states */
-	AMOD_STATE_UNKNOWN
 };
 
 /**
  * @brief A modules minimum description.
  *
  */
-struct amod_description {
+const struct amod_description {
 	/*! The module base name */
 	char *name;
 
@@ -308,18 +308,18 @@ int amod_pause(struct amod_handle *handle);
  *
  * @return 0 if successful, error value
  */
-int amod_data_send(struct amod_handle *handle, struct aobj_object *object,
-		   amod_response_cb response_cb);
+int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
+		 amod_response_cb response_cb);
 
 /**
  * @brief Retrieve data from the module.
  *
- * @param handle       A handle to this module instance
- * @param object       Pointer to the audio data object from the module
+ * @param handle  A handle to this module instance
+ * @param object  Pointer to the audio data object from the module
  *
  * @return 0 if successful, error value
  */
-int amod_data_retrieve(struct amod_handle *handle, struct aobj_object *object);
+int amod_data_rx(struct amod_handle *handle, struct aobj_object *object);
 
 /**
  * @brief Send and retrieve data from the module all data is consumed within
@@ -331,8 +331,8 @@ int amod_data_retrieve(struct amod_handle *handle, struct aobj_object *object);
  *
  * @return 0 if successful, error value
  */
-int amod_data_send_retrieve(struct amod_handle *handle, struct aobj_object *object_in,
-			    struct aobj_object *object_out);
+int amod_data_tx_rx(struct amod_handle *handle, struct aobj_object *object_in,
+		    struct aobj_object *object_out);
 
 /**
  * @brief Helper function to configure the thread information for the module

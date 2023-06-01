@@ -6,12 +6,12 @@
 #ifndef _AMOD_API_PRIVATE_H_
 #define _AMOD_API_PRIVATE_H_
 
-#include "amod_api.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zephyr/kernel.h>
 #include "data_fifo.h"
+#include "amod_api.h"
 
 /**
  * @brief Private pointer to a modules functions.
@@ -109,13 +109,13 @@ struct _amod_handle {
 	char name[AMOD_NAME_SIZE];
 
 	/*! Base module name */
-	char base_name[AMOD_NAME_SIZE];
+	const char base_name[AMOD_NAME_SIZE];
 
 	/*! The module type */
-	enum amod_type type;
+	const enum amod_type type;
 
 	/*! Pointer to the specific module functions */
-	struct _amod_functions *functions;
+	const struct _amod_functions *functions;
 
 	/*! Current state of the module */
 	enum amod_state state;

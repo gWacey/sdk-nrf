@@ -18,26 +18,6 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sw_codec_select, CONFIG_SW_CODEC_SELECT_LOG_LEVEL);
 
-#ifdef TEST_LC3_DECODER_MODULE
-#include "aobj_api.h"
-#include "amod_api.h"
-#include "lc3_decoder.h"
-
-#define LC3_DEC1_IN_MESSAGE_NUM	   4
-#define LC3_DEC1_OUT_MESSAGE_NUM   4
-#define LC3_DEC1_DATA_NUM	   4
-#define LC3_DEC1_THREAD_STACK_SIZE (1024)
-
-#if ((CONFIG_AUDIO_FRAME_DURATION_US == 7500) && CONFIG_SW_CODEC_LC3)
-
-#define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 15 / 2) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
-#else
-#define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 10) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
-#endif /* ((CONFIG_AUDIO_FRAME_DURATION_US == 7500) && CONFIG_SW_CODEC_LC3) */
-
-K_THREAD_STACK_DEFINE(lc3_dec1_thread_stack, LC3_DEC1_THREAD_STACK_SIZE);
-#endif /* TEST_LC3_DECODER_MODULE */
-
 static struct sw_codec_config m_config;
 
 int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, size_t *encoded_size)
@@ -215,68 +195,6 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 	return 0;
 }
 
-#ifdef TEST_LC3_DECODER_MODULE
-/**
- * @brief Dynamic allocation of the memory for the LC3 decoder module.
- *
- */
-static int dynamic_memory_allocate(struct amod_parameters *parameters,
-				   struct amod_configuration *mod_config,
-				   struct amod_handle **handle, char **in_msg_mem,
-				   size_t in_msg_num, char **out_msg_mem, size_t out_msg_num,
-				   char **data_mem, size_t data_size, size_t data_num)
-{
-	int ret;
-	int handle_size, in_msg_size, out_msg_size, data_size;
-	struct _amod_parameters *params = (struct _amod_parameters *)parameters;
-
-	handle_size = amod_query_resource(params, mod_config);
-	if (handle_size < 0) {
-		printf("Querry resource FAILED , ret %d", handle_size);
-		return -1;
-	}
-
-	*handle = k_alloc(handle_size, K_NO_WAIT);
-
-	if (in_msg_num > 0) {
-		*in_msg_mem = k_calloc(in_msg_num, AMOD_IN_MSG_SIZE);
-	} else {
-		*in_msg_mem = NULL;
-	}
-
-	if (out_msg_num > 0) {
-		*out_msg_mem = k_calloc(out_msg_num, AMOD_OUT_MSG_SIZE);
-	} else {
-		*out_msg_mem = NULL;
-	}
-
-	if (data_num > 0) {
-		*data_mem = k_calloc(data_num, AMOD_DATA_BUF_SIZE(data_size));
-	} else {
-		*data_mem = NULL;
-	}
-
-	return 0;
-}
-/**
- * @brief Dynamic free the memory for the LC3 decoder module.
- *
- */
-static void dynamic_memory_free(struct amod_handle **handle, char **in_msg_mem, char **out_msg_mem,
-				char **data_mem)
-{
-	k_free(*handle);
-	k_free(*in_msg_mem);
-	k_free(*out_msg_mem);
-	k_free(*data_mem);
-
-	*handle = NULL;
-	*in_msg_mem = NULL;
-	*out_msg_mem = NULL;
-	*data_mem = NULL;
-}
-#endif /* TEST_LC3_DECODER_MODULE */
-
 int sw_codec_uninit(struct sw_codec_config sw_codec_cfg)
 {
 	int ret;
@@ -305,21 +223,10 @@ int sw_codec_uninit(struct sw_codec_config sw_codec_cfg)
 				LOG_WRN("Trying to uninit decoder, it has not been initialized");
 				return -EALREADY;
 			}
-#ifdef TEST_LC3_DECODER_MODULE
-			ret = amod_close(sw_codec_cfg.lc3_dec1_hdl);
-			if (ret) {
-				return ret;
-			}
-
-			dynamic_memory_free(
-				&sw_codec_cfg.lc3_dec1_hdl, &sw_codec_cfg.dec1_in_msg_mem,
-				&sw_codec_cfg.dec1_out_msg_mem, &sw_codec_cfg.dec1_data_mem);
-#else
 			ret = sw_codec_lc3_dec_uninit_all();
 			if (ret) {
 				return ret;
 			}
-#endif /* TEST_LC3_DECODER_MODULE */
 			m_config.decoder.enabled = false;
 		}
 #endif /* (CONFIG_SW_CODEC_LC3) */
@@ -384,7 +291,6 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg)
 			if (ret) {
 				return ret;
 			}
-#endif /* TEST_LC3_DECODER_MODULE */
 		}
 		break;
 #else

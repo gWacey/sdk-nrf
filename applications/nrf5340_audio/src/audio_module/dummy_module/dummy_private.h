@@ -3,38 +3,31 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#ifndef _LC3_DECODER_PRIVATE_H_
-#define _LC3_DECODER_PRIVATE_H_
+#ifndef _DUMMY_PRIVATE_H_
+#define _DUMMY_PRIVATE_H_
 
-#include "lc3_decoder.h"
+#include "dummy.h"
 
-#include "aobj_api.h"
-#include "amod_api.h"
-#include "amod_api_private.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zephyr/kernel.h>
-#include "LC3API.h"
+#include "aobj_api.h"
+#include "amod_api.h"
+#include "amod_api_private.h"
 
-#define CONFIG_LC3_DECODER_MAX_CHANNELS (2)
+#define DUMMY_MODULE_LAST_BYTES_NUM (10)
 
 /**
  * @brief  Private module context.
  *
  */
-struct lc3_decoder_context {
-	/* Array of decoder channel handles */
-	LC3DecoderHandle_t *lc3_dec_channel[CONFIG_LC3_DECODER_MAX_CHANNELS];
-
-	/*! Number of decoder channel handles */
-	uint32_t dec_handles_count;
+struct dummy_context {
+	/* Array of data to test with */
+	uint8_t dummy_data[DUMMY_MODULE_LAST_BYTES_NUM];
 
 	/*! The decoder cnfiguration */
-	struct lc3_decoder_configuration config;
-
-	/*! Audio samples per frame */
-	size_t samples_per_frame;
+	struct dummy_configuration config;
 };
 
 /**
@@ -44,7 +37,7 @@ struct lc3_decoder_context {
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_query_resource(struct amod_configuration *configuration);
+int dummy_query_resource(struct amod_configuration *configuration);
 
 /**
  * @brief  Function for opening a module.
@@ -54,7 +47,7 @@ int lc3_dec_query_resource(struct amod_configuration *configuration);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configuration);
+int dummy_open(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function close an open module.
@@ -63,7 +56,7 @@ int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configur
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_close(struct amod_handle *handle);
+int dummy_close(struct amod_handle *handle);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -73,7 +66,7 @@ int lc3_dec_close(struct amod_handle *handle);
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration);
+int dummy_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -83,7 +76,7 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration);
+int dummy_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief An event will fire when a new data block is available to pull out
@@ -95,7 +88,7 @@ int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configurat
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_in,
-			 struct aobj_object *object_out);
+int dummy_data_process(struct amod_handle *handle, struct aobj_object *object_in,
+		       struct aobj_object *object_out);
 
-#endif /* _LC3_DECODER_PRIVATE_H_ */
+#endif /* _DUMMY_PRIVATE_H_ */

@@ -17,14 +17,11 @@
  *
  */
 enum aobj_type {
-	/*! The audio data object is raw samples */
-	AOBJ_TYPE_SAMPLES = 0,
+	/*! The audio data object is raw PCM */
+	AOBJ_TYPE_PCM = 0,
 
 	/*! The audio data object is coded data */
 	AOBJ_TYPE_CODED = 1,
-
-	/*! The audio data object is user defined */
-	AOBJ_TYPE_USER = 1
 };
 
 /**

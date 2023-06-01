@@ -3,71 +3,48 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#include "amod_api.h"
-#include "aobj_api.h"
-#include "data_fifo.h"
-#include "lc3_decoder.h"
+
 #include <ctype.h>
 #include <nrfx_clock.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
+#include "aobj_api.h"
+#include "data_fifo.h"
+#include "module.h"
+#include "amod_api.h"
 
-/* Headers below only for testing */
-#include "amod_api_private.h"
-#include "lc3_decoder_private.h"
+#define MODULE_INSTANCE_NUM (2)
+#define MODULE_DATA_SIZE_BYTES (150)
 
 #define MODULE_DATA_SIZE (4096)
-#define LC3_DECODER_DATA_SIZE AMOD_DATA_OUT_SET_SIZE(FRAME_SIZE_BYTES)
-#define LC3_DECODER_IN_MESSAGE_NUM (2)
-#define LC3_DECODER_OUT_MESSAGE_NUM (2)
-#define LC3_DECODER_DATA_NUM (4)
+#define MODULE_DATA_SIZE AMOD_DATA_BUF_SET_SIZE(MODULE_DATA_SIZE_BYTES, 2)
+#define MODULE_MESSAGE_IN_NUM (2)
+#define MODULE_MESSAGE_OUT_NUM (2)
+#define MODULE_DATA_NUM (4)
 
-#define LC3_DECODER_THREAD_STACK_SIZE (4096)
-#define LC3_DECODER_THREAD_PRIORITY (2)
-#define LC3_DECODER_CHANNELS (2)
-#define LEFT_CHANNEL BIT(0)
-#define RIGHT_CHANNEL BIT(1)
+#define MODULE_THREAD_STACK_SIZE (4096)
+#define MODULE_THREAD_PRIORITY (2)
 
-char *lc3_decoder_instance_name = "LC3 Decoder inst 1";
-char private_mem_static[WB_UP(MODULE_DATA_SIZE)];
-char in_msg_mem_static[AMOD_IN_MSG_SET_SIZE(LC3_DECODER_IN_MESSAGE_NUM)];
-char out_msg_mem_static[AMOD_OUT_MSG_SET_SIZE(LC3_DECODER_OUT_MESSAGE_NUM)];
-char data_mem_static[AMOD_DATA_BUF_SET_SIZE(WB_UP(FRAME_SIZE_BYTES), LC3_DECODER_CHANNELS,
-					    LC3_DECODER_DATA_NUM)];
+K_THREAD_STACK_DEFINE(dummy_1_thread_stack, MODULE_THREAD_STACK_SIZE);
+K_THREAD_STACK_DEFINE(dummy_2_thread_stack, MODULE_THREAD_STACK_SIZE);
 
-K_THREAD_STACK_DEFINE(lc3_decoder_thread_stack, LC3_DECODER_THREAD_STACK_SIZE);
+struct dummy_configuration module_inst_1_config = { .rate = 10,
+						    .depth = 100000,
+						    .some_text = "testing 1 testing 1" };
 
-struct lc3_decoder_configuration lc3_dec_inst_1_config = { .sample_rate = 48000,
-							   .bit_depth = 16,
-							   .duration_us = 10000,
-							   .number_channels = LC3_DECODER_CHANNELS,
-							   .channel_map = (LEFT_CHANNEL ||
-									   RIGHT_CHANNEL) };
+struct dummy_configuration module_inst_2_config = { .rate = 20,
+						    .depth = 200000,
+						    .some_text = "testing 2 testing 2" };
 
 /**
- * @brief Static allocate memory for the LC3 decoder module.
+ * @brief Dynamic allocation of memory for a module.
  *
  */
-static int static_allocate_memory(struct amod_handle *handle, char **in_msg_mem, char **out_msg_mem,
-				  char **data_mem)
-{
-	*handle = &private_mem_static[0];
-	*in_msg_mem = &in_msg_mem_static[0];
-	*out_msg_mem = &out_msg_mem_static[0];
-	*data_mem = &data_mem_static[0];
-
-	return 0;
-}
-
-/**
- * @brief Dynamic allocate memory for the LC3 decoder module.
- *
- */
-static int dynamic_allocate_memory(struct amod_parameters *parameters,
-				   struct amod_configuration mod_config, struct amod_handle *handle,
-				   char **in_msg_mem, char **out_msg_mem, char **data_mem)
+static int mem_alloc_dynamic(struct amod_parameters *parameters,
+			     struct amod_configuration mod_config, struct amod_handle *handle,
+			     char **in_msg_mem, char **out_msg_mem, char **data_mem)
 {
 	int ret;
 	int handle_size, in_msg_size, out_msg_size, data_size;
@@ -75,7 +52,7 @@ static int dynamic_allocate_memory(struct amod_parameters *parameters,
 
 	handle_size = amod_query_resource(params, mod_config);
 	if (handle_size < 0) {
-		printf("Querry resource FAILED , ret %d", handle_size);
+		LOG_ERR("Querry resource FAILED , ret %d", handle_size);
 		return -1;
 	}
 
@@ -106,141 +83,94 @@ static int dynamic_allocate_memory(struct amod_parameters *parameters,
  * @brief Basic test of a single module
  *
  */
-static int basic_test(struct amod_description *lc3_dec_parameters, char *in_msg, char *out_msg,
-		      char *data, struct amod_handle handle)
+static int basic_test(struct amod_description *dummpy_parameters, char *instance_name,
+		      struct dummy_configuration config, char *in_msg, char *out_msg, char *data,
+		      struct amod_handle handle)
 {
 	char *base_name;
-	char *instance_name;
-	struct lc3_decoder_configuration lc3_dec_config_retrieved;
+	char *inst_name;
+	struct dummy_configuration config_retrieved;
 
-	ret = amod_open(lc3_dec_parameters, lc3_decoder_instance_name, in_msg, out_msg, data,
-			LC3_DECODER_DATA_SIZE, LC3_DECODER_DATA_NUM, handle);
+	ret = amod_open(dummpy_parameters, instance_name, in_msg, out_msg, data, MODULE_DATA_SIZE,
+			MODULE_DATA_NUM, handle);
 	if (ret) {
-		printf("Open FAILED, ret %d", ret);
+		LOG_ERR("Open FAILED, ret %d", ret);
 		return -1;
 	}
 
-	ret = amod_names_get(handle, base_name, instance_name);
+	ret = amod_names_get(handle, base_name, inst_name);
 	if (ret) {
-		printf("Failed to get names for module, ret %d", ret);
+		LOG_ERR("Failed to get names for module, ret %d", ret);
 		return -1;
 	}
 
-	if (memcmp(base_name, lc3_dec_parameters->name, strlen(lc3_dec_parameters->name))) {
-		printf("Failed to read the base name correctly (%s) for module %s", base_name,
-		       hdl->name);
+	if (memcmp(base_name, dummpy_parameters->base_name, strlen(dummpy_parameters->base_name))) {
+		LOG_ERR("Failed to read the base name correctly (%s) for module %s", base_name,
+			hdl->base_name);
 		return -1;
 	}
 
-	if (memcmp(instance_name, lc3_dec_parameters->name, strlen(lc3_dec_parameters->name))) {
-		printf("Failed to read the instance name correctly (%s) for module %s",
-		       instance_name, hdl->name);
+	if (memcmp(inst_name, dummpy_parameters->name, strlen(lc3_dec_parameters->name))) {
+		LOG_ERR("Failed to read the instance name correctly (%s) for module %s", inst_name,
+			hdl->name);
 		return -1;
 	}
 
 	state = amod_state_get(handle);
 	if (state != AMOD_STATE_OPEN) {
-		printf("Failed to get the correct state for module %s instance %s, ret %d",
-		       base_name, instance_name, ret);
+		LOG_ERR("Failed to get the correct state for module %s instance %s, ret %d",
+			base_name, inst_name, ret);
 		return -1;
 	}
 
-	ret = amod_configuration_set(handle, lc3_dec_inst_1_config);
+	ret = amod_configuration_set(handle, config);
 	if (ret) {
-		printf("Set configuration FAILED test, ret %d", ret);
+		LOG_ERR("Set configuration FAILED test, ret %d", ret);
 		return -1;
 	}
 
 	state = amod_state_get(handle);
 	if (state != AMOD_STATE_CONFIGURED) {
-		printf("Failed to get the correct state for module %s instance %s, ret %d",
-		       base_name, instance_name, ret);
+		LOG_ERR("Failed to get the correct state for module %s instance %s, state %d",
+			base_name, instance_name, state);
 		return -1;
 	}
 
-	ret = amod_configuration_get(handle, lc3_dec_config_retrieved);
+	ret = amod_configuration_get(handle, &config_retrieved);
 	if (ret != -ENOSYS) {
-		printf("Get configuration FAILED, ret %d", ret);
+		LOG_ERR("Get configuration FAILED, ret %d", ret);
 		return -1;
 	}
 
-	state = amod_state_get(handle);
-	if (state != AMOD_STATE_RUNNING) {
-		printf("Failed to get the correct state for module %s instance %s, ret %d",
-		       base_name, instance_name, ret);
+	if (memcmp(config, &config_retrieved, sizeof(struct dummy_configuration))) {
+		LOG_ERR("Failed to read the configuration back correctly (%s) for module %s",
+			inst_name, hdl->name);
 		return -1;
 	}
 
 	ret = amod_start(handle);
 	if (ret) {
-		printf("Start FAILED test, ret %d", ret);
+		LOG_ERR("Start FAILED test, ret %d", ret);
 		return -1;
 	}
 
 	state = amod_state_get(handle);
 	if (state != AMOD_STATE_RUNNING) {
-		printf("Failed to get the correct state for module %s instance %s, ret %d",
-		       base_name, instance_name, ret);
+		LOG_ERR("Failed to get the correct state for module %s instance %s, ret %d",
+			base_name, instance_name, ret);
 		return -1;
 	}
 
 	ret = amod_pause(handle);
 	if (ret) {
-		printf("Send command FAILED test, ret %d", ret);
+		LOG_ERR("Send command FAILED test, ret %d", ret);
 		return -1;
 	}
 
 	state = amod_state_get(handle);
 	if (state != AMOD_STATE_PAUSED) {
-		printf("Failed to get the correct state for module %s instance %s, ret %d",
-		       base_name, instance_name, ret);
-		return -1;
-	}
-
-	return 0;
-}
-
-/**
- * @brief Function to start a single LC3 decoder module and configure it.
- *
- */
-static int lc3_decoder_static_test(void)
-{
-	int ret;
-	struct amod_handle handle;
-	struct amod_parameters lc3_dec_parameters;
-	char *in_msg;
-	char *out_msg;
-	char *data;
-
-	amod_parameters_configure(lc3_dec_parameters, lc3_dec_description, lc3_decoder_thread_stack,
-				  LC3_DECODER_THREAD_STACK_SIZE, LC3_DECODER_THREAD_PRIORITY,
-				  LC3_DECODER_IN_MESSAGE_NUM, LC3_DECODER_OUT_MESSAGE_NUM);
-	if (ret) {
-		printf("Thread configuration FAILED , ret %d", ret);
-		return -1;
-	}
-
-	ret = static_allocate_memory(&handle, &in_msg, &out_msg, &data);
-	if (ret) {
-		printf("Failed to allocate memory, ret %d", ret);
-		return -1;
-	}
-
-	ret = basic_test(&lc3_dec_parameters, in_msg, out_msg, data, handle);
-	if (ret) {
-		printf("Failed to basic tests, ret %d", ret);
-		return -1;
-	}
-
-	ret = amod_close(&handle);
-	if (ret) {
-		printf("Close FAILED, ret %d", ret);
-		return -1;
-	}
-
-	if (handle != NULL) {
-		printf("Close failed to NULL handle");
+		LOG_ERR("Failed to get the correct state for module %s instance %s, ret %d",
+			base_name, instance_name, ret);
 		return -1;
 	}
 
@@ -251,54 +181,125 @@ static int lc3_decoder_static_test(void)
  * @brief Function to start a single module to the configured stage.
  *
  */
-static int void lc3_decoder_dynamic_test(void)
+static int void module_dynamic_test(void)
 {
 	int ret;
-	struct amod_handle handle;
+	struct amod_handle handle_1;
+	struct amod_handle handle_2;
 	struct amod_handle handle_memory;
-	struct amod_parameters lc3_dec_parameters;
-	char *in_msg;
-	char *out_msg;
-	char *data;
+	struct amod_parameters dummy_1_parameters;
+	struct amod_parameters dummy_2_parameters;
+	char *in_msg_1, *in_msg_2;
+	char *out_msg_1, *out_msg_2;
+	char *data_1, *data_2;
 
-	amod_parameters_configure(lc3_dec_parameters, lc3_dec_description, lc3_decoder_thread_stack,
-				  LC3_DECODER_THREAD_STACK_SIZE, LC3_DECODER_THREAD_PRIORITY,
-				  LC3_DECODER_IN_MESSAGE_NUM, LC3_DECODER_OUT_MESSAGE_NUM);
+	amod_parameters_configure(dummy_1_parameters, dummy_description, dummy_1_thread_stack,
+				  MODULE_THREAD_STACK_SIZE, MODULE_THREAD_PRIORITY,
+				  MODULE_MESSAGE_IN_NUM, MODULE_MESSAGE_OUT_NUM);
 	if (ret) {
-		printf("Thread configuration FAILED , ret %d", ret);
+		LOG_ERR("Parameter configuration FAILED , ret %d", ret);
 		return -1;
 	}
 
-	ret = dynamic_allocate_memory(lc3_dec_parameters, &lc3_dec_inst_1_config, &handle, &in_msg,
-				      &out_msg, &data);
+	ret = mem_alloc_dynamic(dummy_1_parameters, &module_inst_1_config, &handle_1, &in_msg_1,
+				&out_msg_1, &data_1);
 	if (ret) {
-		printf("Failed to allocate memory, ret %d", ret);
+		LOG_ERR("Failed to allocate memory, ret %d", ret);
 		return -1;
 	}
 
-	ret = basic_test(in_msg, out_msg, data, handle);
+	ret = basic_test(dummy_1_parameters, &module_inst_1_config, "Instance 1", in_msg, out_msg,
+			 data, handle_1);
 	if (ret) {
-		printf("Failed to basic tests, ret %d", ret);
+		LOG_ERR("Failed to basic tests, ret %d", ret);
 		return -1;
 	}
 
-	handle_memory = handle;
-
-	ret = amod_close(&handle);
+	amod_parameters_configure(dummy_2_parameters, dummy_description, dummy_2_thread_stack,
+				  MODULE_THREAD_STACK_SIZE, MODULE_THREAD_PRIORITY,
+				  MODULE_MESSAGE_IN_NUM, MODULE_MESSAGE_OUT_NUM);
 	if (ret) {
-		printf("Close FAILED, ret %d", ret);
+		LOG_ERR("Parameter configuration FAILED , ret %d", ret);
 		return -1;
 	}
 
-	if (handle != NULL) {
-		printf("Close failed to NULL handle");
+	ret = mem_alloc_dynamic(dummy_2_parameters, &module_inst_2_config, &handle_2, &in_msg_2,
+				&out_msg_2, &data_2);
+	if (ret) {
+		LOG_ERR("Failed to allocate memory, ret %d", ret);
 		return -1;
 	}
 
-	k_free(in_msg);
-	k_free(out_msg);
-	k_free(data);
-	k_free(handle);
+	ret = basic_test(dummy_2_parameters, &module_inst_2_config, "Instance 2", in_msg, out_msg,
+			 data, handle_2);
+	if (ret) {
+		LOG_ERR("Failed to basic tests, ret %d", ret);
+		return -1;
+	}
+
+	/* Re-run tests to check they have not interferred with each other */
+	ret = basic_test(dummy_1_parameters, &module_inst_1_config, "Instance 1", in_msg, out_msg,
+			 data, handle_1);
+	if (ret) {
+		LOG_ERR("Failed to basic tests, ret %d", ret);
+		return -1;
+	}
+
+	ret = basic_test(dummy_2_parameters, &module_inst_2_config, "Instance 2", in_msg, out_msg,
+			 data, handle_2);
+	if (ret) {
+		LOG_ERR("Failed to basic tests, ret %d", ret);
+		return -1;
+	}
+
+	/* Connect the modules together */
+	ret = amod_connect(handle_1, handle_2);
+	if (ret) {
+		LOG_ERR("Failed to connect, ret %d", ret);
+		return -1;
+	}
+
+	/* Disconnect the modules */
+	ret = amod_disconnect(handle_1, handle_2);
+	if (ret) {
+		LOG_ERR("Failed to disconnect, ret %d", ret);
+		return -1;
+	}
+
+	handle_1_memory = handle_1;
+	handle_2_memory = handle_2;
+
+	ret = amod_close(&handle_1);
+	if (ret) {
+		LOG_ERR("Close failed for mosule 1, ret %d", ret);
+		return -1;
+	}
+
+	state = amod_state_get(handle_2);
+	if (state != AMOD_STATE_PAUSED) {
+		LOG_ERR("Close of module 1 has effected module 2", state);
+		return -1;
+	}
+
+	ret = amod_close(&handle_2);
+	if (ret) {
+		LOG_ERR("Close failed for modeule 2, ret %d", ret);
+		return -1;
+	}
+
+	if (handle_1 != NULL || handle_2 != NULL) {
+		LOG_ERR("Close failed to NULL handle");
+		return -1;
+	}
+
+	k_free(in_msg_1);
+	k_free(out_msg_1);
+	k_free(data_1);
+	k_free(handle_1);
+	k_free(in_msg_2);
+	k_free(out_msg_2);
+	k_free(data_2);
+	k_free(handle_2);
 
 	return 0;
 }
@@ -307,15 +308,10 @@ void main(void)
 {
 	int ret;
 
-	ret = lc3_decoder_static_test();
+	ret = module_dynamic_test();
 	if (ret) {
-		printf("Failed: LC3 decoder static memory test");
+		LOG_ERR("Failed test");
 	}
-	printf("Passed: LC3 decoder static memory test");
 
-	ret = lc3_decoder_dynamic_test();
-	if (ret) {
-		printf("Failed: LC3 decoder dynamic memory test");
-	}
-	printf("Passed: LC3 decoder dynamic memory test");
+	LOG_EINF("Passed test");
 }
