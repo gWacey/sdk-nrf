@@ -13,9 +13,7 @@
 #include <errno.h>
 #include "aobj_api.h"
 #include "amod_api.h"
-#include "amod_api_private.h"
 #include "LC3API.h"
-#include "lc3_decoder_private.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(lc3_decoder, 4); /* CONFIG_LC3_DECODER_LOG_LEVEL); */
@@ -30,7 +28,7 @@ LOG_MODULE_REGISTER(lc3_decoder, 4); /* CONFIG_LC3_DECODER_LOG_LEVEL); */
  * @brief Table of the LC3 decoder module functions.
  *
  */
-struct _amod_functions lc3_dec_functions = {
+struct amod_functions lc3_dec_functions = {
 	/**
 	 * @brief  Function for querying the resources required for LC3 decoder.
 	 */
@@ -295,7 +293,7 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_
 	uint8_t *data_out;
 	int ret;
 
-	if (object_in->format.type.coding_type != AOBJ_CODING_TYPE_LC3) {
+	if (object_in->data_type != AOBJ_CODING_TYPE_LC3) {
 		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", hdl->name);
 		return -EINVAL;
 	}

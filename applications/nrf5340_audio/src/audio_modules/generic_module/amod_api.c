@@ -13,7 +13,6 @@
 #include <zephyr/shell/shell.h>
 #include <nrfx_clock.h>
 #include "data_fifo.h"
-#include "amod_api_private.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(module_api, 4); /* CONFIG_MODULE_API_LOG_LEVEL); */
@@ -50,7 +49,7 @@ static int validate_parameters(struct amod_parameters *parameters)
  * @param handle  The handle of the sending modules instance
  * @param object  Pointer to the audio data object to send to the module
  */
-void object_release_cb(struct amod_handle *handle, struct aobj_object *object)
+void object_release(struct amod_handle *handle, struct aobj_object *object)
 {
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 
@@ -58,7 +57,7 @@ void object_release_cb(struct amod_handle *handle, struct aobj_object *object)
 
 	if (k_sem_count_get(&hdl->sem) == 0) {
 		/* Object data has been consumed by all modules so now can free the memory */
-		k_mem_slab_free(&hdl->data_slab, (void **)&object->data);
+		k_mem_slab_free(&hdl->data_slab, (void **)object->data);
 	}
 }
 
@@ -77,7 +76,7 @@ static int data_tx(struct _amod_handle *tx_handle, struct _amod_handle *rx_handl
 		   struct aobj_object *object, amod_response_cb data_in_response_cb)
 {
 	int ret;
-	struct _amod_in_message *data_in_msg;
+	struct _amod_message *data_in_msg;
 
 	ret = data_fifo_pointer_first_vacant_get(&rx_handle->in_msg, (void **)&data_in_msg,
 						 K_NO_WAIT);
@@ -87,12 +86,12 @@ static int data_tx(struct _amod_handle *tx_handle, struct _amod_handle *rx_handl
 	}
 
 	/* fill data */
-	data_in_msg->object = object;
+	memcpy(&data_in_msg->object, object, sizeof(struct aobj_object));
 	data_in_msg->tx_handle = (struct amod_handle *)tx_handle;
 	data_in_msg->response_cb = data_in_response_cb;
 
 	ret = data_fifo_block_lock(&rx_handle->in_msg, (void **)&data_in_msg,
-				   sizeof(struct _amod_in_message));
+				   sizeof(struct _amod_message));
 	if (ret) {
 		data_fifo_block_free(&rx_handle->in_msg, (void **)&data_in_msg);
 
@@ -109,11 +108,11 @@ static int data_tx(struct _amod_handle *tx_handle, struct _amod_handle *rx_handl
  * @brief Function to clean up items if a procedure fails.
  *
  */
-static void clean_up(struct _amod_handle *hdl, struct _amod_in_message **in_msg,
-		     struct _amod_out_message **out_msg, char **data)
+static void clean_up(struct _amod_handle *hdl, struct _amod_message **in_msg,
+		     struct _amod_message **out_msg, char **data)
 {
 	if ((*in_msg)->response_cb != NULL) {
-		(*in_msg)->response_cb((*in_msg)->tx_handle, (*in_msg)->object);
+		(*in_msg)->response_cb((*in_msg)->tx_handle, &(*in_msg)->object);
 	}
 
 	if ((*in_msg) != NULL) {
@@ -141,8 +140,8 @@ static int module_thread_input(struct amod_handle *handle)
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct _amod_handle *hdl_to;
-	struct _amod_in_message *in_msg = NULL;
-	struct _amod_out_message *out_msg;
+	struct _amod_message *in_msg = NULL;
+	struct _amod_message *out_msg;
 	char *data;
 
 	if (handle == NULL) {
@@ -155,7 +154,7 @@ static int module_thread_input(struct amod_handle *handle)
 		out_msg = NULL;
 		data = NULL;
 
-		if (hdl->functions->data_process != NULL) {
+		if (hdl->description.functions->data_process != NULL) {
 			/* Get a new output buffer */
 			ret = k_mem_slab_alloc(&hdl->data_slab, (void **)&data, K_FOREVER);
 			if (ret) {
@@ -180,7 +179,8 @@ static int module_thread_input(struct amod_handle *handle)
 			out_msg->object.data_size = hdl->data_size;
 
 			/* Process the input audio object */
-			ret = hdl->functions->data_process(handle, NULL, &out_msg->object);
+			ret = hdl->description.functions->data_process(handle, NULL,
+								       &out_msg->object);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -195,7 +195,7 @@ static int module_thread_input(struct amod_handle *handle)
 
 				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
 					ret = data_tx(hdl, hdl_to, &out_msg->object,
-						      &object_release_cb);
+						      &object_release);
 					if (ret) {
 						LOG_DBG("Failed to send to module %s from %s",
 							hdl_to->name, hdl->name);
@@ -204,18 +204,21 @@ static int module_thread_input(struct amod_handle *handle)
 				}
 
 				k_mutex_unlock(&hdl->dest_mutex);
-			} else {
-				/* Send input audio object */
+			}
+
+			if (hdl->msg_out) {
+				/* Send audio object to modules output message queue */
 				ret = data_fifo_block_lock(&hdl->out_msg, (void **)&out_msg,
-							   sizeof(struct _amod_in_message));
+							   sizeof(struct _amod_message));
 				if (ret) {
 					clean_up(hdl, &in_msg, &out_msg, &data);
 
 					LOG_DBG("Module %s failed to return output buffer, ret %d",
 						hdl->name, ret);
+
+					k_sem_take(&hdl->sem, K_NO_WAIT);
 					continue;
 				}
-				LOG_DBG("Data sent from module %s", hdl->name);
 			}
 		} else {
 			LOG_DBG("No process function for module %s, discarding input", hdl->name);
@@ -236,8 +239,8 @@ static int module_thread_output(struct amod_handle *handle)
 {
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_in_message *in_msg;
-	struct _amod_out_message *out_msg = NULL;
+	struct _amod_message *in_msg;
+	struct _amod_message *out_msg = NULL;
 	char *data = NULL;
 	size_t size;
 
@@ -257,16 +260,10 @@ static int module_thread_output(struct amod_handle *handle)
 			continue;
 		}
 
-		if (in_msg->object == NULL) {
-			clean_up(hdl, &in_msg, &out_msg, &data);
-
-			LOG_DBG("Error in input data for module %s", hdl->name);
-			continue;
-		}
-
-		if (hdl->functions->data_process != NULL) {
+		if (hdl->description.functions->data_process != NULL) {
 			/* Process the input audio object and output from the audio system */
-			ret = hdl->functions->data_process(handle, in_msg->object, NULL);
+			ret = hdl->description.functions->data_process(handle, &in_msg->object,
+								       NULL);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -275,7 +272,7 @@ static int module_thread_output(struct amod_handle *handle)
 			}
 
 			if (in_msg->response_cb != NULL) {
-				in_msg->response_cb(in_msg->tx_handle, in_msg->object);
+				in_msg->response_cb(in_msg->tx_handle, &in_msg->object);
 			}
 
 		} else {
@@ -300,8 +297,8 @@ static int module_thread_processor(struct amod_handle *handle)
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
 	struct _amod_handle *hdl_to;
-	struct _amod_in_message *in_msg;
-	struct _amod_out_message *out_msg;
+	struct _amod_message *in_msg;
+	struct _amod_message *out_msg;
 	char *data = NULL;
 	size_t size;
 
@@ -323,14 +320,7 @@ static int module_thread_processor(struct amod_handle *handle)
 			continue;
 		}
 
-		if (in_msg->object == NULL) {
-			clean_up(hdl, &in_msg, &out_msg, &data);
-
-			LOG_DBG("Error in input message for module %s", hdl->name);
-			continue;
-		}
-
-		if (hdl->functions->data_process != NULL) {
+		if (hdl->description.functions->data_process != NULL) {
 			/* Get a new output buffer from outside the audio system */
 			ret = k_mem_slab_alloc(&hdl->data_slab, (void **)&data, K_NO_WAIT);
 			if (ret) {
@@ -356,8 +346,8 @@ static int module_thread_processor(struct amod_handle *handle)
 			out_msg->object.data_size = hdl->data_size;
 
 			/* Process the input audio object into the output audio object */
-			ret = hdl->functions->data_process(handle, in_msg->object,
-							   &out_msg->object);
+			ret = hdl->description.functions->data_process(handle, &in_msg->object,
+								       &out_msg->object);
 			if (ret) {
 				clean_up(hdl, &in_msg, &out_msg, &data);
 
@@ -372,31 +362,35 @@ static int module_thread_processor(struct amod_handle *handle)
 
 				SYS_SLIST_FOR_EACH_CONTAINER(&hdl->hdl_dest_list, hdl_to, node) {
 					ret = data_tx(hdl, hdl_to, &out_msg->object,
-						      &object_release_cb);
+						      &object_release);
 					if (ret) {
 						LOG_DBG("Failed to send to module %s from %s",
 							hdl_to->name, hdl->name);
+
 						k_sem_take(&hdl->sem, K_NO_WAIT);
 					}
 				}
 
 				k_mutex_unlock(&hdl->dest_mutex);
-			} else {
-				/* Send output audio object back to module sending the data */
+			}
+
+			if (hdl->msg_out) {
+				/* Send audio object to modules output message queue */
 				ret = data_fifo_block_lock(&hdl->out_msg, (void **)&out_msg,
-							   sizeof(struct _amod_in_message));
+							   sizeof(struct _amod_message));
 				if (ret) {
 					clean_up(hdl, &in_msg, &out_msg, &data);
 
 					LOG_DBG("Module %s failed to return output buffer, ret %d",
 						hdl->name, ret);
+
+					k_sem_take(&hdl->sem, K_NO_WAIT);
 					continue;
 				}
-				LOG_DBG("Data sent from module %s", hdl->name);
 			}
 
 			if (in_msg->response_cb != NULL) {
-				in_msg->response_cb(in_msg->tx_handle, in_msg->object);
+				in_msg->response_cb(in_msg->tx_handle, &in_msg->object);
 			}
 
 		} else {
@@ -416,8 +410,6 @@ int amod_query_resource(struct amod_parameters *parameters,
 {
 	int ret;
 	int size = 0;
-	struct _amod_functions *functions =
-		(struct _amod_functions *)parameters->description->functions;
 
 	ret = validate_parameters(parameters);
 	if (ret) {
@@ -425,8 +417,8 @@ int amod_query_resource(struct amod_parameters *parameters,
 		return ret;
 	}
 
-	if (functions->query_resource != NULL) {
-		size = functions->query_resource(configuration);
+	if (parameters->description->functions->query_resource != NULL) {
+		size = parameters->description->functions->query_resource(configuration);
 		if (size < 0) {
 			LOG_DBG("Failed query resource for module %s, ret %d",
 				parameters->description->name, size);
@@ -440,6 +432,22 @@ int amod_query_resource(struct amod_parameters *parameters,
 
 	return size;
 };
+
+/**
+ * @brief  Function for allocating memory for the module.
+ */
+int amod_memory_allocate(void)
+{
+	return 0;
+}
+
+/**
+ * @brief  Function for de-allocating memory for the module.
+ */
+int amod_memory_deallocate(void)
+{
+	return 0;
+}
 
 /**
  * @brief  Function for opening a module.
@@ -467,16 +475,17 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return ret;
 	}
 
-	memset(handle, 0, WB_UP(sizeof(struct _amod_handle)));
+	memset(handle, 0, sizeof(struct _amod_handle));
 
-	hdl->type = parameters->description->type;
+	hdl->description.type = parameters->description->type;
 
-	if (hdl->type == AMOD_TYPE_INPUT && out_msg_block == NULL && data_block == NULL) {
+	if (hdl->description.type == AMOD_TYPE_INPUT && out_msg_block == NULL &&
+	    data_block == NULL) {
 		LOG_DBG("Incorrect memory for module %s in the open function", name);
 		return -EINVAL;
 	}
 
-	if (hdl->type == AMOD_TYPE_OUTPUT && in_msg_block == NULL) {
+	if (hdl->description.type == AMOD_TYPE_OUTPUT && in_msg_block == NULL) {
 		LOG_DBG("Incorrect memory for module %s in the open function", name);
 		return -EINVAL;
 	}
@@ -489,30 +498,28 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	hdl->previous_state = AMOD_STATE_UNDEFINED;
 	hdl->state = AMOD_STATE_UNDEFINED;
 
+	/* Allocate the context memory */
 	hdl->context = (struct amod_context *)((char *)handle + WB_UP(sizeof(struct _amod_handle)));
 
 	memcpy(hdl->name, name, AMOD_NAME_SIZE);
-	memcpy((void *)hdl->base_name, parameters->description->name, AMOD_NAME_SIZE);
-	hdl->functions = (struct _amod_functions *)parameters->description->functions;
-
+	memcpy(&hdl->description, parameters->description, sizeof(struct amod_description));
 	memcpy(&hdl->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
 
 	sys_slist_init(&hdl->hdl_dest_list);
 	k_mutex_init(&hdl->dest_mutex);
 
-	if (hdl->functions->open != NULL) {
-		ret = hdl->functions->open((struct amod_handle *)hdl, configuration);
+	if (hdl->description.functions->open != NULL) {
+		ret = hdl->description.functions->open((struct amod_handle *)hdl, configuration);
 		if (ret) {
 			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
 			return ret;
 		}
 	}
 
-	if (hdl->type != AMOD_TYPE_INPUT) {
+	if (hdl->description.type != AMOD_TYPE_INPUT) {
 		hdl->in_msg.msgq_buffer = in_msg_block;
-		hdl->in_msg.slab_buffer =
-			in_msg_block + AMOD_IN_MSG_SET_SIZE(hdl->thread.in_msg_num);
-		hdl->in_msg.block_size_max = sizeof(struct _amod_in_message);
+		hdl->in_msg.slab_buffer = in_msg_block + AMOD_MSG_SET_SIZE(hdl->thread.in_msg_num);
+		hdl->in_msg.block_size_max = sizeof(struct _amod_message);
 		hdl->in_msg.elements_max = hdl->thread.in_msg_num;
 		hdl->in_msg.initialized = false;
 		ret = data_fifo_init(&hdl->in_msg);
@@ -523,11 +530,11 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		}
 	}
 
-	if (hdl->type != AMOD_TYPE_OUTPUT) {
+	if (hdl->description.type != AMOD_TYPE_OUTPUT) {
 		hdl->out_msg.msgq_buffer = out_msg_block;
 		hdl->out_msg.slab_buffer =
-			out_msg_block + AMOD_OUT_MSG_SET_SIZE(hdl->thread.out_msg_num);
-		hdl->out_msg.block_size_max = sizeof(struct _amod_out_message);
+			out_msg_block + AMOD_MSG_SET_SIZE(hdl->thread.out_msg_num);
+		hdl->out_msg.block_size_max = sizeof(struct _amod_message);
 		hdl->out_msg.elements_max = hdl->thread.out_msg_num;
 		hdl->out_msg.initialized = false;
 		ret = data_fifo_init(&hdl->out_msg);
@@ -545,7 +552,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		}
 	}
 
-	switch (hdl->type) {
+	switch (hdl->description.type) {
 	case AMOD_TYPE_INPUT:
 		hdl->thread_id =
 			k_thread_create(&hdl->thread_data, hdl->thread.stack,
@@ -593,7 +600,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		break;
 
 	default:
-		LOG_DBG("Invalid module type %d for module %s", hdl->type, hdl->name);
+		LOG_DBG("Invalid module type %d for module %s", hdl->description.type, hdl->name);
 		return -EINVAL;
 	}
 
@@ -622,8 +629,8 @@ int amod_close(struct amod_handle *handle)
 		return -ENOTSUP;
 	}
 
-	if (hdl->functions->close != NULL) {
-		ret = hdl->functions->close(handle);
+	if (hdl->description.functions->close != NULL) {
+		ret = hdl->description.functions->close(handle);
 		if (ret) {
 			LOG_DBG("Failed close call to module %s, returned %d", hdl->name, ret);
 			return ret;
@@ -659,8 +666,8 @@ int amod_configuration_set(struct amod_handle *handle, struct amod_configuration
 		return -ENOTSUP;
 	}
 
-	if (hdl->functions->configuration_set != NULL) {
-		ret = hdl->functions->configuration_set(handle, configuration);
+	if (hdl->description.functions->configuration_set != NULL) {
+		ret = hdl->description.functions->configuration_set(handle, configuration);
 		if (ret) {
 			LOG_DBG("Set configuration for module %s send failed, ret %d", hdl->name,
 				ret);
@@ -695,8 +702,8 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
 		return -ENOTSUP;
 	}
 
-	if (hdl->functions->configuration_get != NULL) {
-		ret = hdl->functions->configuration_get(handle, configuration);
+	if (hdl->description.functions->configuration_get != NULL) {
+		ret = hdl->description.functions->configuration_get(handle, configuration);
 		if (ret) {
 			LOG_DBG("Get configuration for module %s failed, ret %d", hdl->name, ret);
 			return ret;
@@ -723,7 +730,8 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 		return -EINVAL;
 	}
 
-	if (hdl_from->type == AMOD_TYPE_OUTPUT || hdl_to->type == AMOD_TYPE_INPUT) {
+	if (hdl_from->description.type == AMOD_TYPE_OUTPUT ||
+	    hdl_to->description.type == AMOD_TYPE_INPUT) {
 		LOG_DBG("Connections between these modules, %s to %s, is not supported",
 			hdl_from->name, hdl_to->name);
 		return -ENOTSUP;
@@ -737,9 +745,13 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 
 	k_mutex_lock(&hdl_from->dest_mutex, K_FOREVER);
 
-	sys_slist_append(&hdl_from->hdl_dest_list, &hdl_to->node);
-
-	hdl_from->dest_count += 1;
+	if (handle_from == handle_to) {
+		hdl_from->msg_out = true;
+		hdl_from->dest_count += 1;
+	} else {
+		sys_slist_append(&hdl_from->hdl_dest_list, &hdl_to->node);
+		hdl_from->dest_count += 1;
+	}
 
 	k_mutex_unlock(&hdl_from->dest_mutex);
 
@@ -760,7 +772,8 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 		return -EINVAL;
 	}
 
-	if (hdl->type == AMOD_TYPE_OUTPUT || hdl_remove->type == AMOD_TYPE_INPUT) {
+	if (hdl->description.type == AMOD_TYPE_OUTPUT ||
+	    hdl_remove->description.type == AMOD_TYPE_INPUT) {
 		LOG_DBG("Connections between these modules, %s to %s, is not supported", hdl->name,
 			hdl_remove->name);
 		return -ENOTSUP;
@@ -807,8 +820,8 @@ int amod_start(struct amod_handle *handle)
 		return -ENOTSUP;
 	}
 
-	if (hdl->functions->start != NULL) {
-		ret = hdl->functions->start(handle);
+	if (hdl->description.functions->start != NULL) {
+		ret = hdl->description.functions->start(handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user start for module %s, ret %d", hdl->name, ret);
 			return ret;
@@ -842,8 +855,8 @@ int amod_pause(struct amod_handle *handle)
 		return -ENOTSUP;
 	}
 
-	if (hdl->functions->pause != NULL) {
-		ret = hdl->functions->pause(handle);
+	if (hdl->description.functions->pause != NULL) {
+		ret = hdl->description.functions->pause(handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user pause for module %s, ret %d", hdl->name, ret);
 			return ret;
@@ -876,9 +889,9 @@ int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
 		return -ECONNREFUSED;
 	}
 
-	if (hdl->state != AMOD_STATE_RUNNING || hdl->type == AMOD_TYPE_INPUT) {
+	if (hdl->state != AMOD_STATE_RUNNING || hdl->description.type == AMOD_TYPE_INPUT) {
 		LOG_DBG("Module %s in an invalid state (%d) or type (%d) to send data", hdl->name,
-			hdl->state, hdl->type);
+			hdl->state, hdl->description.type);
 		return -ENOTSUP;
 	}
 
@@ -893,7 +906,7 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeo
 {
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_out_message *out_msg;
+	struct _amod_message *out_msg;
 	size_t out_msg_size;
 
 	if (handle == NULL) {
@@ -901,9 +914,9 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeo
 		return -EINVAL;
 	}
 
-	if (hdl->state != AMOD_STATE_RUNNING || hdl->type == AMOD_TYPE_OUTPUT) {
+	if (hdl->state != AMOD_STATE_RUNNING || hdl->description.type == AMOD_TYPE_OUTPUT) {
 		LOG_DBG("Module %s in an invalid state (%d) or type (%d) to receive data",
-			hdl->name, hdl->state, hdl->type);
+			hdl->name, hdl->state, hdl->description.type);
 		return -ENOTSUP;
 	}
 
@@ -912,11 +925,6 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeo
 		return -ECONNREFUSED;
 	}
 
-	if (object->data == NULL || object->data_size == 0) {
-		LOG_DBG("Error in output data buffer for module %s", hdl->name);
-		return -ECONNREFUSED;
-	}
-
 	ret = data_fifo_pointer_last_filled_get(&hdl->out_msg, (void **)&out_msg, &out_msg_size,
 						timeout);
 	if (ret) {
@@ -924,80 +932,97 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeo
 		return ret;
 	}
 
-	if (out_msg->object.data == NULL || out_msg->object.data_size == 0) {
+	if (object->data == NULL || out_msg->object.data_size > object->data_size) {
 		LOG_DBG("Data output buffer too small for received buffer from module %s",
 			hdl->name);
-		return -EINVAL;
+		ret = -EINVAL;
+	} else {
+		uint8_t *data_out = object->data;
+
+		memcpy(object, &out_msg->object, sizeof(struct aobj_object));
+		memcpy(data_out, out_msg->object.data, out_msg->object.data_size);
+
+		ret = 0;
 	}
 
-	memcpy(object, &out_msg->object, sizeof(struct aobj_object));
+	object_release(handle, &out_msg->object);
 
 	data_fifo_block_free(&hdl->out_msg, (void **)&out_msg);
 
-	return 0;
+	return ret;
 }
 
 /**
  * @brief Send data and retrieve the processed data from the module.
  */
-int amod_data_rx_tx(struct amod_handle *handle, struct aobj_object *object_in,
-		    struct aobj_object *object_out, k_timeout_t timeout)
+int amod_data_rx_tx(struct amod_handle *handle_tx, struct amod_handle *handle_rx,
+		    struct aobj_object *object_tx, struct aobj_object *object_rx,
+		    k_timeout_t timeout)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_out_message *out_msg;
+	struct _amod_handle *hdl_tx = (struct _amod_handle *)handle_tx;
+	struct _amod_handle *hdl_rx = (struct _amod_handle *)handle_rx;
+	struct _amod_message *out_msg;
 	size_t out_msg_size;
 
-	if (handle == NULL) {
+	if (handle_tx == NULL || handle_rx == NULL) {
 		LOG_DBG("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (hdl->state != AMOD_STATE_RUNNING || hdl->type != AMOD_TYPE_PROCESSOR) {
-		LOG_DBG("Module %s is in an invalid state, (%d) or type (%d) to send-receive data",
-			hdl->name, hdl->state, hdl->type);
+	if (hdl_tx->state != AMOD_STATE_RUNNING || hdl_rx->state != AMOD_STATE_RUNNING) {
+		LOG_DBG("Module is in an invalid state or type to send-receive data");
 		return -ENOTSUP;
 	}
 
-	if (object_in == NULL || object_out == NULL) {
-		LOG_DBG("Error in audio object pointer for module %s", hdl->name);
+	if (hdl_tx->description.type == AMOD_TYPE_INPUT ||
+	    hdl_rx->description.type == AMOD_TYPE_OUTPUT) {
+		LOG_DBG("Module noyt of the right type for operation");
+		return -EINVAL;
+	}
+
+	if (object_tx == NULL || object_rx == NULL) {
+		LOG_DBG("Error in audio object pointer for module");
 		return -ECONNREFUSED;
 	}
 
-	if (object_in->data == NULL || object_in->data_size == 0) {
-		LOG_DBG("Error in input audio object for module %s", hdl->name);
+	if (object_tx->data == NULL || object_tx->data_size == 0 || object_rx->data == NULL ||
+	    object_rx->data_size == 0) {
+		LOG_DBG("Error in output audio object");
 		return -ECONNREFUSED;
 	}
 
-	if (object_out->data == NULL || object_out->data_size == 0) {
-		LOG_DBG("Error in output audio object for module %s", hdl->name);
-		return -ECONNREFUSED;
-	}
-
-	ret = data_tx(NULL, hdl, object_in, NULL);
+	ret = data_tx(NULL, hdl_tx, object_tx, NULL);
 	if (ret) {
-		LOG_DBG("Failed to send data to module %s, ret %d", hdl->name, ret);
+		LOG_DBG("Failed to send data to module %s, ret %d", hdl_tx->name, ret);
 		return ret;
 	}
 
-	ret = data_fifo_pointer_last_filled_get(&hdl->out_msg, (void **)&out_msg, &out_msg_size,
+	ret = data_fifo_pointer_last_filled_get(&hdl_rx->out_msg, (void **)&out_msg, &out_msg_size,
 						timeout);
 	if (ret) {
-		LOG_DBG("Failed to retrieve data from module %s, ret %d", hdl->name, ret);
+		LOG_DBG("Failed to retrieve data from module %s, ret %d", hdl_rx->name, ret);
 		return ret;
 	}
 
 	if (out_msg->object.data == NULL || out_msg->object.data_size == 0) {
 		LOG_DBG("Data output buffer too small for received buffer from module %s",
-			hdl->name);
-		return -EINVAL;
+			hdl_rx->name);
+		ret = -EINVAL;
+	} else {
+		uint8_t *data_out = object_rx->data;
+
+		memcpy(object_rx, &out_msg->object, sizeof(struct aobj_object));
+		memcpy(data_out, out_msg->object.data, out_msg->object.data_size);
+
+		ret = 0;
 	}
 
-	memcpy(object_out, &out_msg->object, sizeof(struct aobj_object));
+	object_release(handle_rx, &out_msg->object);
 
-	data_fifo_block_free(&hdl->out_msg, (void **)&out_msg);
+	data_fifo_block_free(&hdl_rx->out_msg, (void **)&out_msg);
 
-	return 0;
+	return ret;
 };
 
 /**
@@ -1044,7 +1069,7 @@ int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_n
 		return -ENOTSUP;
 	}
 
-	memcpy(base_name, &hdl->base_name, sizeof(hdl->base_name));
+	memcpy(base_name, &hdl->description.name, sizeof(hdl->description.name));
 	memcpy(instance_name, &hdl->name, sizeof(hdl->name));
 
 	return 0;
@@ -1101,15 +1126,24 @@ int amod_object_fill(struct aobj_object *object, enum aobj_type data_type, char 
  * @brief Helper function to extract the audio data from an audio object.
  *
  */
-int amod_object_data_extract(struct aobj_object *object, char *data, size_t *data_size)
+int amod_object_data_extract(struct aobj_object *object, enum aobj_type data_type, char *data,
+			     size_t *data_size, struct aobj_format *format,
+			     struct aobj_sync *sync_data, bool bad_frame, bool last_flag,
+			     void *user_data)
 {
 	if (object == NULL) {
 		LOG_DBG("Input object parameter is NULL");
 		return -EINVAL;
 	}
 
+	data_type = object->data_type;
 	data = object->data;
 	*data_size = object->data_size;
+	*format = object->format;
+	*sync_data = object->sync_data;
+	bad_frame = object->bad_frame;
+	last_flag = object->last_flag;
+	user_data = object->user_data;
 
 	return 0;
 }

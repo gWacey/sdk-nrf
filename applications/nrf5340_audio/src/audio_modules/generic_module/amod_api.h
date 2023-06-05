@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <zephyr/kernel.h>
+#include "data_fifo.h"
 #include "aobj_api.h"
 
 /**
@@ -20,25 +21,21 @@
 
 /**
  * @brief Modules private handle.
- *
  */
 struct amod_handle;
 
 /**
+ * @brief Private context for the module.
+ */
+struct amod_context;
+
+/**
  * @brief Modules private configuration.
- *
  */
 struct amod_configuration;
 
 /**
- * @brief Modules private functions list
- *
- */
-struct amod_functions;
-
-/**
  * @brief Module type relative to the module.
- *
  */
 enum amod_type {
 	/*! The module type is undefined */
@@ -56,7 +53,6 @@ enum amod_type {
 
 /**
  * @brief Module state.
- *
  */
 enum amod_state {
 	/*! Module state undefined */
@@ -76,8 +72,93 @@ enum amod_state {
 };
 
 /**
+ * @brief Private pointer to a modules functions.
+ */
+struct amod_functions {
+	/** @brief  Function for querying the resources required for a module.
+	 *
+	 * @param configuration  A pointer to the modules configuration
+	 * @param size			 The size of the memory buffer required
+	 *
+	 * @return If successful the value will be 0 or greater, otherwise error value
+	 */
+	int (*query_resource)(struct amod_configuration *configuration);
+
+	/**
+	 * @brief  Function for opening a module.
+	 *
+	 *
+	 * @param handle  A handle to this module instance
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*open)(struct amod_handle *handle, struct amod_configuration *configuration);
+
+	/**
+	 * @brief  Function to close an open module.
+	 *
+	 * @param handle  A handle to this module instance
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*close)(struct amod_handle *handle);
+
+	/**
+	 * @brief  Function to set the configuration of a module.
+	 *
+	 * @param handle		 A handle to this module instance
+	 * @param configuration  A pointer to the modules configuration to set
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*configuration_set)(struct amod_handle *handle,
+				 struct amod_configuration *configuration);
+
+	/**
+	 * @brief  Function to get the configuration of a module.
+	 *
+	 * @param handle		 A handle to this module instance
+	 * @param configuration  A pointer to the modules current configuration
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*configuration_get)(struct amod_handle *handle,
+				 struct amod_configuration *configuration);
+
+	/**
+	 * @brief Start a module processing data.
+	 *
+	 * @param handle  The handle for the module to start
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*start)(struct amod_handle *handle);
+
+	/**
+	 * @brief Pause a module processing data.
+	 *
+	 * @param handle  The handle for the module to pause
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*pause)(struct amod_handle *handle);
+
+	/**
+	 * @brief The core data processing function for the module. Can be either an
+	 *		input or output or processor module type.
+	 *
+	 * @param handle	 A handle to this module instance
+	 * @param handle_tx  Pointer to the input audio object or NULL for an input module
+	 * @param object_rx  Pointer to the output audio object or NULL for an output module
+	 *
+	 * @return 0 if successful, error value
+	 */
+	int (*data_process)(struct amod_handle *handle, struct aobj_object *handle_tx,
+			    struct aobj_object *object_rx);
+};
+
+/**
  * @brief A modules minimum description.
- *
  */
 struct amod_description {
 	/*! The module base name */
@@ -92,7 +173,6 @@ struct amod_description {
 
 /**
  * @brief Module's thread configuration structure.
- *
  */
 struct amod_thread_configuration {
 	/*! Thread stack */
@@ -113,7 +193,6 @@ struct amod_thread_configuration {
 
 /**
  * @brief Module's generic set-up structure.
- *
  */
 struct amod_parameters {
 	/*! The modules private description */
@@ -134,25 +213,9 @@ typedef void (*amod_response_cb)(struct amod_handle *handle, struct aobj_object 
 
 /**
  * @brief Private structure describing a data in message into the module thread.
- *
  */
-struct _amod_in_message {
+struct _amod_message {
 	/*! Audio data object to input */
-	struct aobj_object *object;
-
-	/*! Sending module's handle */
-	struct amod_handle *tx_handle;
-
-	/*! Callback for when the data has been consumed */
-	amod_response_cb response_cb;
-};
-
-/**
- * @brief Private structure describing a data out message from the module thread.
- *
- */
-struct _amod_out_message {
-	/*! Audio data object to output */
 	struct aobj_object object;
 
 	/*! Sending module's handle */
@@ -163,40 +226,83 @@ struct _amod_out_message {
 };
 
 /**
- * @brief Macro to return the memory required for a single data input message.
- *
+ * @brief Macro to return the memory required for a single data message.
  */
-#define AMOD_IN_MSG_SIZE (WB_UP(sizeof(struct _amod_in_message)))
-
-/**
- * @brief Macro to return the memory required for a single data output message.
- *
- */
-#define AMOD_OUT_MSG_SIZE (WB_UP(sizeof(struct _amod_out_message)))
+#define AMOD_MSG_SIZE (WB_UP(sizeof(struct _amod_message)))
 
 /**
  * @brief Macro to return the memory required for a single data output buffer.
- *
  */
 #define AMOD_DATA_BUF_SIZE(size) (WB_UP(size))
 
 /**
  * @brief Macro to return the memory required for a set of data messages.
- *
  */
-#define AMOD_IN_MSG_SET_SIZE(num) (AMOD_IN_MSG_SIZE * (num))
+#define AMOD_MSG_SET_SIZE(num) (AMOD_MSG_SIZE * (num))
 
 /**
  * @brief Macro to return the memory required for a set of data output.
- *
- */
-#define AMOD_OUT_MSG_SET_SIZE(num) (AMOD_OUT_MSG_SIZE * (num))
-
-/**
- * @brief Macro to return the memory required for a set of data output.
- *
  */
 #define AMOD_DATA_BUF_SET_SIZE(size, chans, num) (WB_UP((size)) * (chans) * (num))
+
+/**
+ * @brief Private module handle.
+ */
+struct _amod_handle {
+	/*! Unique name of this module instance */
+	char name[AMOD_NAME_SIZE];
+
+	/*! The modules description */
+	struct amod_description description;
+
+	/*! Current state of the module */
+	enum amod_state state;
+
+	/*! Previous state of the module */
+	enum amod_state previous_state;
+
+	/*! Thread ID */
+	k_tid_t thread_id;
+
+	/*! Thread data */
+	struct k_thread thread_data;
+
+	/*! Pointer to a modules data input fifo */
+	struct data_fifo in_msg;
+
+	/*! Pointer to a modules data input fifo */
+	struct data_fifo out_msg;
+
+	/*! Pointer to a modules data buffer slab */
+	struct k_mem_slab data_slab;
+
+	/*! Size of a data output buffer */
+	size_t data_size;
+
+	/* List node (next pointer) */
+	sys_snode_t node;
+
+	/*! A singley linked-list of the handles the module is connected to */
+	sys_slist_t hdl_dest_list;
+
+	/*! Number of destination modules */
+	uint8_t dest_count;
+
+	/*! Semaphore to count messages between modules */
+	struct k_sem sem;
+
+	/* Mutex to make the above destinations list thread safe */
+	struct k_mutex dest_mutex;
+
+	/* If set, return the data object on the module's output message queue */
+	bool msg_out;
+
+	/*! Modules thread configuration */
+	struct amod_thread_configuration thread;
+
+	/*! Private context for the module */
+	struct amod_context *context;
+};
 
 /**
  * @brief  Function for querying the resources required for a module.
@@ -209,6 +315,20 @@ struct _amod_out_message {
  */
 int amod_query_resource(struct amod_parameters *parameters,
 			struct amod_configuration *configuration);
+
+/**
+ * @brief  Function for allocating memory for the module.
+ *
+ * @return 0 if successful, error value
+ */
+int amod_memory_allocate(void);
+
+/**
+ * @brief  Function for de-allocating memory for the module.
+ *
+ * @return 0 if successful, error value
+ */
+int amod_memory_deallocate(void);
 
 /**
  * @brief  Function for opening a module.
@@ -264,7 +384,8 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
  * @brief Function to connect two modules together.
  *
  * @param handle_from  The handle for the module for output
- * @param handle_to    The handle of the module to for input
+ * @param handle_to    The handle of the module to for input, if the same as ::handle from
+ *                     the data will be put on the ::handle_from output message quere.
  *
  * @return 0 if successful, error value
  */
@@ -328,17 +449,19 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeo
  * @brief Send and retrieve data from the module all data is consumed within
  *        the call. The input data buffer maybe released once function retrurned.
  *
- * @param handle      A handle to this module instance
- * @param object_in   Pointer to the input audio data object send to the module
- * @param object_out  Pointer to the output audio data object from the module
- * @param  timeout    Non-negative waiting period to wait for operation to complete
+ * @param handle_tx   A handle to the module to send the input object to
+ * @param handle_rx   A handle to the module to receive an object from
+ * @param object_tx   Pointer to the audio data object to send
+ * @param object_rx   Pointer to the audio data object received
+ * @param timeout     Non-negative waiting period to wait for operation to complete
  *	                  (in milliseconds). Use K_NO_WAIT to return without waiting,
  *	                  or K_FOREVER to wait as long as necessary.
  *
  * @return 0 if successful, error value
  */
-int amod_data_tx_rx(struct amod_handle *handle, struct aobj_object *object_in,
-		    struct aobj_object *object_out, k_timeout_t timeout);
+int amod_data_tx_rx(struct amod_handle handle_tx, struct amod_handle handle_rx,
+		    struct aobj_object *object_tx, struct aobj_object *object_rx,
+		    k_timeout_t timeout);
 
 /**
  * @brief Helper function to configure the thread information for the module

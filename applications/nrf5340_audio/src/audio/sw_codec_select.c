@@ -241,13 +241,13 @@ static int dynamic_memory_allocate(struct amod_parameters *parameters,
 	*handle = (struct amod_handle *)k_malloc(handle_size);
 
 	if (in_msg_num > 0) {
-		*in_msg_mem = k_calloc(in_msg_num, AMOD_IN_MSG_SIZE);
+		*in_msg_mem = k_calloc(in_msg_num, AMOD_MSG_SIZE);
 	} else {
 		*in_msg_mem = NULL;
 	}
 
 	if (out_msg_num > 0) {
-		*out_msg_mem = k_calloc(out_msg_num, AMOD_OUT_MSG_SIZE);
+		*out_msg_mem = k_calloc(out_msg_num, AMOD_MSG_SIZE);
 	} else {
 		*out_msg_mem = NULL;
 	}

@@ -20,71 +20,11 @@ enum aobj_type {
 	/*! The audio data object is raw PCM */
 	AOBJ_TYPE_PCM = 0,
 
-	/*! The audio data object is coded data */
-	AOBJ_TYPE_CODED = 1,
-};
-
-/**
- * @brief Value to define the PCM type carried by the object.
- *
- */
-enum aobj_pcm_type {
-	/*! The audio data object contains samples in linear format */
-	AOBJ_PCM_TYPE_LINEAR = 0,
-
-	/*! The audio data object contains samples in ulaw format */
-	AOBJ_PCM_TYPE_ULAW = 1,
-
-	/*! The audio data object contains samples in Alaw format */
-	AOBJ_PCM_TYPE_ALAW = 2
-};
-
-/**
- * @brief Value to define the coding type carried by the object.
- *
- */
-enum aobj_coding_type {
 	/*! The audio data object is coded in LC3 */
-	AOBJ_CODING_TYPE_LC3 = 0,
+	AOBJ_CODING_TYPE_LC3,
 
 	/*! The audio data object is coded in LC3plus */
-	AOBJ_CODING_TYPE_LC3PLUS = 1,
-};
-
-/**
- * @brief Value to define the PCM alignment.
- *
- */
-enum aobj_alignment {
-	/*! A sample is aligned to the left in the carrier */
-	AOBJ_ALIGNMENT_LEFT = 0,
-
-	/*! A sample is aligned to the right in the carrier */
-	AOBJ_ALIGNMENT_RIGHT = 1
-};
-
-/**
- * @brief Value to define the PCM data sign type.
- *
- */
-enum aobj_sign {
-	/*! A sample is signed data */
-	AOBJ_SIGNED = 0,
-
-	/*! A sample is unsigned data */
-	AOBJ_UNSIGNED = 1
-};
-
-/**
- * @brief Value to define the endiamism for the data in the object.
- *
- */
-enum aobj_endianism {
-	/*! Audio samples are stored in little endian */
-	AOBJ_ENDIAN_LITTLE = 0,
-
-	/*! Audio samples are stored in big endian */
-	AOBJ_ENDIAN_BIG = 1
+	AOBJ_CODING_TYPE_LC3PLUS,
 };
 
 /**
@@ -104,18 +44,6 @@ enum aobj_interleaved {
  *
  */
 struct aobj_format {
-	union {
-		/*! An enum/defines list giving the PCM types
-		 * supported (e.g., linear, Alaw, etc.)
-		 */
-		enum aobj_pcm_type pcm_type;
-
-		/*! An enum/defines list giving the coding types
-		 * supported (e.g., LC3, MP3, etc.)
-		 */
-		enum aobj_coding_type coding_type;
-	} type;
-
 	/*! The PCM sample rate */
 	uint32_t sample_rate;
 
@@ -124,15 +52,6 @@ struct aobj_format {
 
 	/*! Number of bits used to carry a sample of size bits_per_sample*/
 	uint8_t carrier_size;
-
-	/*! Flag indicating the alignment of the sample within the carrier */
-	enum aobj_alignment alignment;
-
-	/*! Flag indicated if the sample is signed or unsigned */
-	enum aobj_sign sign;
-
-	/*! Flag indicating the endianness of the sample */
-	enum aobj_endianism sample_endianism;
 
 	/*! A flag indicating if the PCM object is sample interleaved or not */
 	enum aobj_interleaved interleaved;
@@ -163,7 +82,7 @@ struct aobj_sync {
  *
  */
 struct aobj_object {
-	/*! Indicates the data type of the object coded or samples or user defined */
+	/*! Indicates the data type of the object */
 	enum aobj_type data_type;
 
 	/*! A pointer to the raw or coded data (e.g., PCM, LC3, etc.) */
