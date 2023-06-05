@@ -8,19 +8,14 @@ rsource "Kconfig.defaults"
 
 menu "Audio Modules"
 
-config AMOD_OUTPUT_MODULE_NUM
-	int "Maximum number of connections"
-	default 2
-	help
-	  This is the maximum number of other modules a module can connect to.
+#----------------------------------------------------------------------------#
+menu "Log levels"
 
+module = LC3_DECODER
+module-str = lc3-decoder
+source "subsys/logging/Kconfig.template.log_config"
 
-config AUDIO_MODULE_LOG_LEVEL
-	int "Audio module log level"
-	default 3
-	help
-		Audio module log level
-
+endmenu # Log levels
 #----------------------------------------------------------------------------#
 
 endmenu # Audio Modules

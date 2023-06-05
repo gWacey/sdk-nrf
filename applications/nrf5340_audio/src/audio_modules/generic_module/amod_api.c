@@ -16,7 +16,7 @@
 #include "amod_api_private.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(amod_api, 3); /* CONFIG_AUDIO_MODULE_LOG_LEVEL); */
+LOG_MODULE_REGISTER(module_api, 4); /* CONFIG_MODULE_API_LOG_LEVEL); */
 
 /**
  * @brief Helper function to validate the module description.
@@ -486,13 +486,13 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return -EINVAL;
 	}
 
-	hdl->previous_state = AMOD_STATE_UNKNOWN;
-	hdl->state = AMOD_STATE_UNKNOWN;
+	hdl->previous_state = AMOD_STATE_UNDEFINED;
+	hdl->state = AMOD_STATE_UNDEFINED;
 
 	hdl->context = (struct amod_context *)((char *)handle + WB_UP(sizeof(struct _amod_handle)));
 
 	memcpy(hdl->name, name, AMOD_NAME_SIZE);
-	memcpy(hdl->base_name, parameters->description->name, AMOD_NAME_SIZE);
+	memcpy((void *)hdl->base_name, parameters->description->name, AMOD_NAME_SIZE);
 	hdl->functions = (struct _amod_functions *)parameters->description->functions;
 
 	memcpy(&hdl->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
@@ -729,9 +729,8 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 		return -ENOTSUP;
 	}
 
-	if (hdl->state == AMOD_STATE_UNDEFINED || hdl->state == AMOD_STATE_RUNNING ||
-	    hdl->state == AMOD_STATE_OPEN) {
-		LOG_DBG("A module is an invalid state or type for connecting modules %s to %s",
+	if (hdl_from->state == AMOD_STATE_RUNNING || hdl_to->state == AMOD_STATE_RUNNING) {
+		LOG_DBG("A module is in an invalid state for connecting modules %s to %s",
 			hdl_from->name, hdl_to->name);
 		return -ENOTSUP;
 	}
@@ -762,8 +761,8 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 	}
 
 	if (hdl->type == AMOD_TYPE_OUTPUT || hdl_remove->type == AMOD_TYPE_INPUT) {
-		LOG_DBG("Connections between these modules, %s to %s, is not supported",
-			hdl_from->name, hdl_to->name);
+		LOG_DBG("Connections between these modules, %s to %s, is not supported", hdl->name,
+			hdl_remove->name);
 		return -ENOTSUP;
 	}
 
@@ -776,7 +775,7 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 	k_mutex_lock(&hdl->dest_mutex, K_FOREVER);
 
 	if (!sys_slist_find_and_remove(&hdl->hdl_dest_list, &hdl_remove->node)) {
-		LOG_DBG("Connection to module %s has not been found for module %s",
+		LOG_DBG("Connection of module %s has not been found for module %s",
 			hdl_remove->name, hdl->name);
 		return -EINVAL;
 	}
@@ -890,7 +889,7 @@ int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
  * @brief Retrieve data from the module.
  *
  */
-int amod_data_rx(struct amod_handle *handle, struct aobj_object *object)
+int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeout_t timeout)
 {
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
@@ -919,7 +918,7 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object)
 	}
 
 	ret = data_fifo_pointer_last_filled_get(&hdl->out_msg, (void **)&out_msg, &out_msg_size,
-						K_FOREVER);
+						timeout);
 	if (ret) {
 		LOG_DBG("Failed to retrieve data from module %s, ret %d", hdl->name, ret);
 		return ret;
@@ -942,7 +941,7 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object)
  * @brief Send data and retrieve the processed data from the module.
  */
 int amod_data_rx_tx(struct amod_handle *handle, struct aobj_object *object_in,
-		    struct aobj_object *object_out)
+		    struct aobj_object *object_out, k_timeout_t timeout)
 {
 	int ret;
 	struct _amod_handle *hdl = (struct _amod_handle *)handle;
@@ -982,7 +981,7 @@ int amod_data_rx_tx(struct amod_handle *handle, struct aobj_object *object_in,
 	}
 
 	ret = data_fifo_pointer_last_filled_get(&hdl->out_msg, (void **)&out_msg, &out_msg_size,
-						K_FOREVER);
+						timeout);
 	if (ret) {
 		LOG_DBG("Failed to retrieve data from module %s, ret %d", hdl->name, ret);
 		return ret;
@@ -1007,7 +1006,7 @@ int amod_data_rx_tx(struct amod_handle *handle, struct aobj_object *object_in,
  *
  */
 int amod_parameters_configure(struct amod_parameters *parameters,
-			      const struct amod_description *description, k_thread_stack_t *stack,
+			      struct amod_description *description, k_thread_stack_t *stack,
 			      size_t stack_size, int priority, int in_msg_num, int out_msg_num)
 {
 	if (parameters == NULL) {
@@ -1039,7 +1038,7 @@ int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_n
 		return -EINVAL;
 	}
 
-	if (hdl->state >= AMOD_STATE_UNKNOWN) {
+	if (hdl->state >= AMOD_STATE_UNDEFINED) {
 		LOG_DBG("Module %s is in an invalid state, %d, for get names", hdl->name,
 			hdl->state);
 		return -ENOTSUP;
@@ -1064,7 +1063,7 @@ int amod_state_get(struct amod_handle *handle)
 		return -EINVAL;
 	}
 
-	if (hdl->state >= AMOD_STATE_UNKNOWN) {
+	if (hdl->state >= AMOD_STATE_UNDEFINED) {
 		LOG_DBG("Module %s is in an invalid state, %d, for get names", hdl->name,
 			hdl->state);
 		return -ENOTSUP;

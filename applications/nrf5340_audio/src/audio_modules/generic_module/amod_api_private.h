@@ -109,13 +109,13 @@ struct _amod_handle {
 	char name[AMOD_NAME_SIZE];
 
 	/*! Base module name */
-	const char base_name[AMOD_NAME_SIZE];
+	char base_name[AMOD_NAME_SIZE];
 
 	/*! The module type */
-	const enum amod_type type;
+	enum amod_type type;
 
 	/*! Pointer to the specific module functions */
-	const struct _amod_functions *functions;
+	struct _amod_functions *functions;
 
 	/*! Current state of the module */
 	enum amod_state state;

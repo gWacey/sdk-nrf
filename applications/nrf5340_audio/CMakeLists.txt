@@ -64,7 +64,8 @@ target_sources(app PRIVATE
 zephyr_library_include_directories(
     include
     src/audio
-    src/audio_module
+    src/audio_modules/generic_module
+    src/audio_modules/lc3_decoder
     src/bluetooth
     src/drivers
     src/modules
@@ -77,7 +78,8 @@ zephyr_library_include_directories(app PRIVATE
 
 # Application sources
 add_subdirectory(src/audio)
-add_subdirectory(src/audio_module)
+add_subdirectory(src/audio_modules/generic_module)
+add_subdirectory(src/audio_modules/lc3_decoder)
 add_subdirectory(src/bluetooth)
 add_subdirectory(src/drivers)
 add_subdirectory(src/modules)

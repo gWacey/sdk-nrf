@@ -72,14 +72,14 @@ enum amod_state {
 	AMOD_STATE_RUNNING,
 
 	/*! Module is in the paused state */
-	AMOD_STATE_PAUSED,
+	AMOD_STATE_PAUSED
 };
 
 /**
  * @brief A modules minimum description.
  *
  */
-const struct amod_description {
+struct amod_description {
 	/*! The module base name */
 	char *name;
 
@@ -316,10 +316,13 @@ int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
  *
  * @param handle  A handle to this module instance
  * @param object  Pointer to the audio data object from the module
+ * @param  timeout    Non-negative waiting period to wait for operation to complete
+ *	                  (in milliseconds). Use K_NO_WAIT to return without waiting,
+ *	                  or K_FOREVER to wait as long as necessary.
  *
  * @return 0 if successful, error value
  */
-int amod_data_rx(struct amod_handle *handle, struct aobj_object *object);
+int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeout_t timeout);
 
 /**
  * @brief Send and retrieve data from the module all data is consumed within
@@ -328,11 +331,14 @@ int amod_data_rx(struct amod_handle *handle, struct aobj_object *object);
  * @param handle      A handle to this module instance
  * @param object_in   Pointer to the input audio data object send to the module
  * @param object_out  Pointer to the output audio data object from the module
+ * @param  timeout    Non-negative waiting period to wait for operation to complete
+ *	                  (in milliseconds). Use K_NO_WAIT to return without waiting,
+ *	                  or K_FOREVER to wait as long as necessary.
  *
  * @return 0 if successful, error value
  */
 int amod_data_tx_rx(struct amod_handle *handle, struct aobj_object *object_in,
-		    struct aobj_object *object_out);
+		    struct aobj_object *object_out, k_timeout_t timeout);
 
 /**
  * @brief Helper function to configure the thread information for the module

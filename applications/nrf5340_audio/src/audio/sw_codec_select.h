@@ -63,12 +63,10 @@ struct sw_codec_config {
 	struct sw_codec_decoder decoder; /* Struct containing settings for decoder */
 	struct sw_codec_encoder encoder; /* Struct containing settings for encoder */
 	bool initialized; /* Status of codec */
-#ifdef TEST_LC3_DECODER_MODULE
-	char *lc3_dec1_hdl;
+	struct amod_handle *lc3_dec1_hdl;
 	char *dec1_in_msg_mem;
 	char *dec1_out_msg_mem;
 	char *dec1_data_mem;
-#endif /* TEST_LC3_DECODER_MODULE */
 };
 
 /**@brief	Encode PCM data and output encoded data
