@@ -180,7 +180,7 @@ int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configur
  */
 int lc3_dec_close(struct amod_handle *handle)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 
 	/* Free decoder memory */
@@ -205,7 +205,7 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
 {
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	LC3FrameSize_t framesize;
 	int ret;
@@ -261,7 +261,7 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
  */
 int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
@@ -283,7 +283,7 @@ int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configurat
 int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_in,
 			 struct aobj_object *object_out)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;

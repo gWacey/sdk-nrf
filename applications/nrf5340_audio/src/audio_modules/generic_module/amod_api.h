@@ -248,7 +248,7 @@ struct _amod_message {
 /**
  * @brief Private module handle.
  */
-struct _amod_handle {
+struct amod_handle {
 	/*! Unique name of this module instance */
 	char name[AMOD_NAME_SIZE];
 
@@ -301,6 +301,23 @@ struct _amod_handle {
 	struct amod_thread_configuration thread;
 
 	/*! Private context for the module */
+	struct amod_context *context;
+};
+
+/**
+ * @brief A helper structure for describing the modules in a stream as a table.
+ */
+struct amod_table {
+	/*! A unique name for the module */
+	char *name;
+
+	/*! A unique handle to the module */
+	struct amod_handle handle;
+
+	/*! the modules parameters */
+	amod_parameter params;
+
+	/*! A unique module context */
 	struct amod_context *context;
 };
 
@@ -506,22 +523,40 @@ int amod_state_get(struct amod_handle *handle);
  * @brief Helper function to attach a raw audio data buffer to an audio object.
  *
  * @param object     Pointer to the audio data object to fill
+ * @param data_type  The type of data carried in the object
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
+ * @param format     The format od the data carried in the object
+ * @param syn_data   Data to be used to synchronise the data
+ * @param bad_frame  A flag to indicate there are errors within the data for this object
+ * @param last_flag  A flag to indicate this is the last object in the stream
+ * @param user_data  A pointer to a private area of user data or NULL
  *
  * @return 0 if successful, error value
  */
-int amod_object_data_attach(struct aobj_object *object, char *data, size_t data_size);
+int amod_object_data_attach(struct aobj_object *object, enum aobj_type data_type, char *data,
+			    size_t data_size, struct aobj_format *format,
+			    struct aobj_sync *sync_data, bool bad_frame, bool last_flag,
+			    void *user_data);
 
 /**
  * @brief Helper function to extract the raw audio data buffer from an audio object.
  *
  * @param object     Pointer to the audio data object to fill
+ * @param data_type  The type of data carried in the object
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
+ * @param format     The format od the data carried in the object
+ * @param syn_data   Data to be used to synchronise the data
+ * @param bad_frame  A flag to indicate there are errors within the data for this object
+ * @param last_flag  A flag to indicate this is the last object in the stream
+ * @param user_data  A pointer to a private area of user data or NULL
  *
  * @return 0 if successful, error value
  */
-int amod_object_data_extract(struct aobj_object *object, char *data, size_t *data_size);
+int amod_object_data_extract(struct aobj_object *object, enum aobj_type *data_type, char *data,
+			     size_t *data_size, struct aobj_format *format,
+			     struct aobj_sync *sync_data, bool *bad_frame, bool *last_flag,
+			     void *user_data);
 
 #endif /*_AMOD_API_H_ */

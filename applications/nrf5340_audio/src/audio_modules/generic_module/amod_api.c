@@ -51,7 +51,7 @@ static int validate_parameters(struct amod_parameters *parameters)
  */
 void object_release(struct amod_handle *handle, struct aobj_object *object)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	k_sem_take(&hdl->sem, K_NO_WAIT);
 
@@ -72,7 +72,7 @@ void object_release(struct amod_handle *handle, struct aobj_object *object)
  *
  * @return 0 if successful, error value
  */
-static int data_tx(struct _amod_handle *tx_handle, struct _amod_handle *rx_handle,
+static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
 		   struct aobj_object *object, amod_response_cb data_in_response_cb)
 {
 	int ret;
@@ -108,7 +108,7 @@ static int data_tx(struct _amod_handle *tx_handle, struct _amod_handle *rx_handl
  * @brief Function to clean up items if a procedure fails.
  *
  */
-static void clean_up(struct _amod_handle *hdl, struct _amod_message **in_msg,
+static void clean_up(struct amod_handle *hdl, struct _amod_message **in_msg,
 		     struct _amod_message **out_msg, char **data)
 {
 	if ((*in_msg)->response_cb != NULL) {
@@ -138,8 +138,8 @@ static void clean_up(struct _amod_handle *hdl, struct _amod_message **in_msg,
 static int module_thread_input(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_handle *hdl_to;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct amod_handle *hdl_to;
 	struct _amod_message *in_msg = NULL;
 	struct _amod_message *out_msg;
 	char *data;
@@ -238,7 +238,7 @@ static int module_thread_input(struct amod_handle *handle)
 static int module_thread_output(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct _amod_message *in_msg;
 	struct _amod_message *out_msg = NULL;
 	char *data = NULL;
@@ -295,8 +295,8 @@ static int module_thread_output(struct amod_handle *handle)
 static int module_thread_processor(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_handle *hdl_to;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct amod_handle *hdl_to;
 	struct _amod_message *in_msg;
 	struct _amod_message *out_msg;
 	char *data = NULL;
@@ -428,7 +428,7 @@ int amod_query_resource(struct amod_parameters *parameters,
 		LOG_DBG("No query resource function for module %s", parameters->description->name);
 	}
 
-	size += WB_UP(sizeof(struct _amod_handle));
+	size += WB_UP(sizeof(struct amod_handle));
 
 	return size;
 };
@@ -457,7 +457,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	      size_t data_size, uint32_t data_num, struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Input handle parameter is NULL for module %s in the open function", name);
@@ -475,7 +475,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return ret;
 	}
 
-	memset(handle, 0, sizeof(struct _amod_handle));
+	memset(handle, 0, sizeof(struct amod_handle));
 
 	hdl->description.type = parameters->description->type;
 
@@ -499,7 +499,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	hdl->state = AMOD_STATE_UNDEFINED;
 
 	/* Allocate the context memory */
-	hdl->context = (struct amod_context *)((char *)handle + WB_UP(sizeof(struct _amod_handle)));
+	hdl->context = (struct amod_context *)((char *)handle + WB_UP(sizeof(struct amod_handle)));
 
 	memcpy(hdl->name, name, AMOD_NAME_SIZE);
 	memcpy(&hdl->description, parameters->description, sizeof(struct amod_description));
@@ -617,7 +617,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 int amod_close(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -653,7 +653,7 @@ int amod_close(struct amod_handle *handle)
 int amod_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL || configuration == NULL) {
 		LOG_DBG("Module input parameter error");
@@ -689,7 +689,7 @@ int amod_configuration_set(struct amod_handle *handle, struct amod_configuration
 int amod_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL || configuration == NULL) {
 		LOG_DBG("Module input parameter error");
@@ -722,8 +722,8 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
  */
 int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 {
-	struct _amod_handle *hdl_from = (struct _amod_handle *)handle_from;
-	struct _amod_handle *hdl_to = (struct _amod_handle *)handle_to;
+	struct amod_handle *hdl_from = (struct amod_handle *)handle_from;
+	struct amod_handle *hdl_to = (struct amod_handle *)handle_to;
 
 	if (handle_from == NULL || handle_to == NULL) {
 		LOG_DBG("Invalid paramet for the connection function");
@@ -764,8 +764,8 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
  */
 int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disconnect)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
-	struct _amod_handle *hdl_remove = (struct _amod_handle *)handle_disconnect;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct amod_handle *hdl_remove = (struct amod_handle *)handle_disconnect;
 
 	if (handle == NULL || handle_disconnect == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -806,7 +806,7 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 int amod_start(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -842,7 +842,7 @@ int amod_start(struct amod_handle *handle)
 int amod_pause(struct amod_handle *handle)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -877,7 +877,7 @@ int amod_pause(struct amod_handle *handle)
 int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
 		 amod_response_cb response_cb)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -905,7 +905,7 @@ int amod_data_tx(struct amod_handle *handle, struct aobj_object *object,
 int amod_data_rx(struct amod_handle *handle, struct aobj_object *object, k_timeout_t timeout)
 {
 	int ret;
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct _amod_message *out_msg;
 	size_t out_msg_size;
 
@@ -960,8 +960,8 @@ int amod_data_rx_tx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 		    k_timeout_t timeout)
 {
 	int ret;
-	struct _amod_handle *hdl_tx = (struct _amod_handle *)handle_tx;
-	struct _amod_handle *hdl_rx = (struct _amod_handle *)handle_rx;
+	struct amod_handle *hdl_tx = (struct amod_handle *)handle_tx;
+	struct amod_handle *hdl_rx = (struct amod_handle *)handle_rx;
 	struct _amod_message *out_msg;
 	size_t out_msg_size;
 
@@ -1056,7 +1056,7 @@ int amod_parameters_configure(struct amod_parameters *parameters,
  */
 int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_name)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL || base_name == NULL || instance_name == NULL) {
 		LOG_DBG("Input parameter is NULL");
@@ -1081,7 +1081,7 @@ int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_n
  */
 int amod_state_get(struct amod_handle *handle)
 {
-	struct _amod_handle *hdl = (struct _amod_handle *)handle;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
 	if (handle == NULL) {
 		LOG_DBG("Input parameter is NULL");
@@ -1126,9 +1126,9 @@ int amod_object_fill(struct aobj_object *object, enum aobj_type data_type, char 
  * @brief Helper function to extract the audio data from an audio object.
  *
  */
-int amod_object_data_extract(struct aobj_object *object, enum aobj_type data_type, char *data,
+int amod_object_data_extract(struct aobj_object *object, enum aobj_type *data_type, char *data,
 			     size_t *data_size, struct aobj_format *format,
-			     struct aobj_sync *sync_data, bool bad_frame, bool last_flag,
+			     struct aobj_sync *sync_data, bool *bad_frame, bool *last_flag,
 			     void *user_data)
 {
 	if (object == NULL) {
@@ -1136,13 +1136,13 @@ int amod_object_data_extract(struct aobj_object *object, enum aobj_type data_typ
 		return -EINVAL;
 	}
 
-	data_type = object->data_type;
+	*data_type = object->data_type;
 	data = object->data;
 	*data_size = object->data_size;
 	*format = object->format;
 	*sync_data = object->sync_data;
-	bad_frame = object->bad_frame;
-	last_flag = object->last_flag;
+	*bad_frame = object->bad_frame;
+	*last_flag = object->last_flag;
 	user_data = object->user_data;
 
 	return 0;
