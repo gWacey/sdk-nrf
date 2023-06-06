@@ -182,12 +182,13 @@ int lc3_dec_close(struct amod_handle *handle)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
 
 	/* Free decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
-		if (ctx->lc3_dec_channel[i] != NULL) {
-			LC3DecodeSessionClose(ctx->lc3_dec_channel[i]);
-			ctx->lc3_dec_channel[i] = NULL;
+		if (dec_handles[i] != NULL) {
+			LC3DecodeSessionClose(dec_handles[i]);
+			dec_handles = NULL;
 		}
 	}
 
@@ -207,14 +208,15 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
 		(struct lc3_decoder_configuration *)configuration;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
 	LC3FrameSize_t framesize;
 	int ret;
 
 	/* Free previous decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
-		if (ctx->lc3_dec_channel[i] != NULL) {
-			LC3DecodeSessionClose(ctx->lc3_dec_channel[i]);
-			ctx->lc3_dec_channel[i] = NULL;
+		if (dec_handles[i] != NULL) {
+			LC3DecodeSessionClose(dec_handles[i]);
+			dec_handles[i] = NULL;
 		}
 	}
 
@@ -231,8 +233,8 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
 	}
 
 	for (uint8_t i = 0; i < config->number_channels; i++) {
-		ctx->lc3_dec_channel[i] = LC3DecodeSessionOpen(
-			config->sample_rate, config->bit_depth, framesize, NULL, NULL, &ret);
+		dec_handles[i] = LC3DecodeSessionOpen(config->sample_rate, config->bit_depth,
+						      framesize, NULL, NULL, &ret);
 		if (ret) {
 			LOG_ERR("LC3 decoder channel %d failed to initialise for module %s", i,
 				hdl->name);
@@ -285,6 +287,7 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;
 	size_t session_in_size;
@@ -293,7 +296,7 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in
 	uint8_t *data_out;
 	int ret;
 
-	if (block_in->data_type != AOBJ_CODING_TYPE_LC3) {
+	if (block_in->data_type != AOBJ_TYPE_LC3) {
 		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", hdl->name);
 		return -EINVAL;
 	}
@@ -319,13 +322,12 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in
 						      .bytesWritten = 0,
 						      .PLCCounter = plc_counter };
 
-		if (ctx->lc3_dec_channel[i] == NULL) {
+		if (dec_handles[i] == NULL) {
 			LOG_DBG("LC3 dec ch:%d is not initialized", i);
 			continue;
 		}
 
-		ret = LC3DecodeSessionData(ctx->lc3_dec_channel[i], &LC3DecodeInput,
-					   &LC3DecodeOutput);
+		ret = LC3DecodeSessionData(dec_handles[i], &LC3DecodeInput, &LC3DecodeOutput);
 		if (ret) {
 			/* handle error */
 			LOG_DBG("Error in decoder, ret: %d", ret);

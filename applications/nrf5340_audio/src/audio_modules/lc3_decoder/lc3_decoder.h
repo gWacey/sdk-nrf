@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2018 Nordic Semiconductor ASA
+ * Copyright(c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
@@ -19,6 +19,11 @@
  * @brief Private pointer to the module's parameters.
  */
 extern struct amod_description *lc3_dec_description;
+
+/**
+ * @brief Private pointer to the decoders handle.
+ */
+struct lc3_decoder_handle;
 
 /**
  * @brief The module configuration structure.
@@ -45,7 +50,7 @@ struct lc3_decoder_configuration {
  */
 struct lc3_decoder_context {
 	/* Array of decoder channel handles */
-	LC3DecoderHandle_t *lc3_dec_channel[CONFIG_LC3_DECODER_MAX_CHANNELS];
+	struct lc3_decoder_handle *lc3_dec_channel[CONFIG_LC3_DECODER_MAX_CHANNELS];
 
 	/* Number of decoder channel handles */
 	uint32_t dec_handles_count;

@@ -9,6 +9,7 @@
 
 #include <zephyr/kernel.h>
 #include "channel_assignment.h"
+#include "amod_api.h"
 
 #if (CONFIG_SW_CODEC_LC3)
 #define LC3_MAX_FRAME_SIZE_MS 10
@@ -111,9 +112,10 @@ int sw_codec_uninit(struct sw_codec_config sw_codec_cfg);
  *		and its configuration.
  *
  * @param[in]	sw_codec_cfg	Struct to set up sw_codec
+ * @param[in]   modules         A table describing all the modules in the stream
  *
  * @return	0 if success, error codes depends on sw_codec selected
  */
-int sw_codec_init(struct sw_codec_config sw_codec_cfg);
+int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *modules);
 
 #endif /* _SW_CODEC_SELECT_H_ */

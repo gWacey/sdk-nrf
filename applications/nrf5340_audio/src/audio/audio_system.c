@@ -20,6 +20,9 @@
 #include "pcm_stream_channel_modifier.h"
 #include "audio_usb.h"
 #include "streamctrl.h"
+#include "amod_api.h"
+#include "lc3_decoder.h"
+#include "modules.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(audio_system, CONFIG_AUDIO_SYSTEM_LOG_LEVEL);
@@ -28,6 +31,14 @@ LOG_MODULE_REGISTER(audio_system, CONFIG_AUDIO_SYSTEM_LOG_LEVEL);
 #define FIFO_RX_BLOCK_COUNT (CONFIG_FIFO_FRAME_SPLIT_NUM * CONFIG_FIFO_RX_FRAME_COUNT)
 
 #define DEBUG_INTERVAL_NUM 1000
+
+K_THREAD_STACK_DEFINE(lc3_dec1_thread_stack, CONFIG_ENCODER_STACK_SIZE);
+DATA_FIFO_DEFINE(lc3_dec1_fifo_tx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
+DATA_FIFO_DEFINE(lc3_dec1_fifo_rx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
+K_MEM_SLAB_DEFINE(audio_data_slab, FRAME_SIZE_BYTES, CONFIG_DECODER_DATA_OBJECTS_NUM, 4);
+
+static struct amod_handle handle[MODULES_ID_NUM];
+static struct lc3_decoder_context decoder_context[LC3_DECODER_ID_NUM];
 
 K_THREAD_STACK_DEFINE(encoder_thread_stack, CONFIG_ENCODER_STACK_SIZE);
 
@@ -276,6 +287,20 @@ int audio_decode(void const *const encoded_data, size_t encoded_data_size, bool 
 void audio_system_start(void)
 {
 	int ret;
+	struct amod_table modules[CONFIG_MODULES_NUM] = {
+		{ /* LC3 decoder 1 */
+		  .name = "lc3 dec 1",
+		  .handle = &handle[MODULE_ID_1],
+		  .params.description = lc3_dec_description,
+		  .params.thread.stack = lc3_dec1_thread_stack,
+		  .params.thread.stack_size = CONFIG_DECODER_STACK_SIZE,
+		  .params.thread.priority = CONFIG_DECODER_THREAD_PRIO,
+		  .params.thread.msg_rx = &lc3_dec1_fifo_rx,
+		  .params.thread.msg_tx = &lc3_dec1_fifo_tx,
+		  .params.thread.data_slab = &audio_data_slab,
+		  .params.thread.data_size = FRAME_SIZE_BYTES,
+		  .context = (struct amod_context *)&decoder_context[LC3_DECODER_ID_1] }
+	};
 
 	if (CONFIG_AUDIO_DEV == HEADSET) {
 		audio_headset_configure();
@@ -296,7 +321,7 @@ void audio_system_start(void)
 		ERR_CHK_MSG(ret, "Failed to set up rx FIFO");
 	}
 
-	ret = sw_codec_init(sw_codec_cfg);
+	ret = sw_codec_init(sw_codec_cfg, modules);
 	ERR_CHK_MSG(ret, "Failed to set up codec");
 
 	sw_codec_cfg.initialized = true;

@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2018 Nordic Semiconductor ASA
+ * Copyright(c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
@@ -239,7 +239,7 @@ struct amod_handle {
 	char name[AMOD_NAME_SIZE];
 
 	/* The modules description */
-	struct amod_description description;
+	struct amod_description *description;
 
 	/* Current state of the module */
 	enum amod_state state;
@@ -252,18 +252,6 @@ struct amod_handle {
 
 	/* Thread data */
 	struct k_thread thread_data;
-
-	/* Pointer to a modules data input fifo */
-	struct data_fifo *msg_rx;
-
-	/* Pointer to a modules data input fifo */
-	struct data_fifo *out_msg;
-
-	/* Pointer to a modules data buffer slab */
-	struct k_mem_slab *data_slab;
-
-	/* Size of a data output buffer */
-	size_t data_size;
 
 	/* List node (next pointer) */
 	sys_snode_t node;
@@ -298,7 +286,7 @@ struct amod_table {
 	char *name;
 
 	/* A unique handle to the module */
-	struct amod_handle handle;
+	struct amod_handle *handle;
 
 	/* the modules parameters */
 	struct amod_parameters params;
@@ -340,12 +328,13 @@ int amod_memory_deallocate(void);
  * @param configuration  A pointer to the modules configuration (this must also
  *                       be passed to the #amod_set_configuration() unchanged)
  * @param name           A unique name for this instance of the module
- * @param handle         Pointer to the memory allocated for the module handle
+ * @param handle         Pointer to the module's private handle
+ * @param context        Pointer to the private context for the module
  *
  * @return 0 if successful, error value
  */
 int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      char *name, struct amod_handle *handle);
+	      char *name, struct amod_handle *handle, struct amod_context *context);
 
 /**
  * @brief  Function to close an open module.
@@ -510,7 +499,7 @@ int amod_state_get(struct amod_handle *handle);
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
  * @param format     The format od the data carried in the block
- * @param syn_data   Data to be used to synchronise the data
+ * @param timestamp  Timestamp to be used to synchronise the data
  * @param bad_frame  A flag to indicate there are errors within the data for this block
  * @param last_flag  A flag to indicate this is the last block in the stream
  * @param user_data  A pointer to a private area of user data or NULL
@@ -518,9 +507,8 @@ int amod_state_get(struct amod_handle *handle);
  * @return 0 if successful, error value
  */
 int amod_block_data_attach(struct aobj_block *block, enum aobj_type data_type, char *data,
-			   size_t data_size, struct aobj_format *format,
-			   struct aobj_sync *sync_data, bool bad_frame, bool last_flag,
-			   void *user_data);
+			   size_t data_size, struct aobj_format *format, uint32_t timestamp,
+			   bool bad_frame, bool last_flag, void *user_data);
 
 /**
  * @brief Helper function to extract the raw audio data buffer from an audio block.
@@ -530,7 +518,7 @@ int amod_block_data_attach(struct aobj_block *block, enum aobj_type data_type, c
  * @param data       Pointer to the raw or coded audio data buffer
  * @param data_size  Size of the raw or coded audio data buffer
  * @param format     The format od the data carried in the block
- * @param syn_data   Data to be used to synchronise the data
+ * @param timestamp  Timestamp to be used to synchronise the data
  * @param bad_frame  A flag to indicate there are errors within the data for this block
  * @param last_flag  A flag to indicate this is the last block in the stream
  * @param user_data  A pointer to a private area of user data or NULL
@@ -538,8 +526,7 @@ int amod_block_data_attach(struct aobj_block *block, enum aobj_type data_type, c
  * @return 0 if successful, error value
  */
 int amod_block_data_extract(struct aobj_block *block, enum aobj_type *data_type, char *data,
-			    size_t *data_size, struct aobj_format *format,
-			    struct aobj_sync *sync_data, bool *bad_frame, bool *last_flag,
-			    void *user_data);
+			    size_t *data_size, struct aobj_format *format, uint32_t *timestamp,
+			    bool *bad_frame, bool *last_flag, void *user_data);
 
 #endif /*_AMOD_API_H_ */

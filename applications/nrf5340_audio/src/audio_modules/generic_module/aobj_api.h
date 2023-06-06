@@ -17,16 +17,16 @@
  */
 enum aobj_type {
 	/* The audio data block type is undefined */
-	AOBJ_TYPE_PCM = 0,
+	AOBJ_TYPE_UNDEFINED = 0,
 
 	/* The audio data block is raw PCM */
 	AOBJ_TYPE_PCM,
 
 	/* The audio data block is coded in LC3 */
-	AOBJ_TYPE_CODING_LC3,
+	AOBJ_TYPE_LC3,
 
 	/* The audio data block is coded in LC3plus */
-	AOBJ_TYPEC_ODING_LC3PLUS,
+	AOBJ_TYPE_LC3PLUS,
 };
 
 /**
