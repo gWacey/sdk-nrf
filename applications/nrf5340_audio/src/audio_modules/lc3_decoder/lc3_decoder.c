@@ -277,11 +277,11 @@ int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configurat
 }
 
 /**
- * @brief Process an audio data object in an instance of the LC3 decoder.
+ * @brief Process an audio data block in an instance of the LC3 decoder.
  *
  */
-int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_in,
-			 struct aobj_object *object_out)
+int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in,
+			 struct aobj_block *block_out)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -293,23 +293,23 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_object *object_
 	uint8_t *data_out;
 	int ret;
 
-	if (object_in->data_type != AOBJ_CODING_TYPE_LC3) {
+	if (block_in->data_type != AOBJ_CODING_TYPE_LC3) {
 		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", hdl->name);
 		return -EINVAL;
 	}
 
-	if (object_in->bad_frame) {
+	if (block_in->bad_frame) {
 		frame_status = BadFrame;
 	} else {
 		frame_status = GoodFrame;
 	}
 
-	session_in_size = object_in->data_size / ctx->config.number_channels;
+	session_in_size = block_in->data_size / ctx->config.number_channels;
 	data_out_size = ctx->samples_per_frame * ctx->config.number_channels;
 
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
-		data_in = (uint8_t *)object_in->data + (session_in_size * i);
-		data_out = (uint8_t *)object_out->data + (ctx->samples_per_frame * i);
+		data_in = (uint8_t *)block_in->data + (session_in_size * i);
+		data_out = (uint8_t *)block_out->data + (ctx->samples_per_frame * i);
 
 		LC3DecodeInput_t LC3DecodeInput = { .inputData = data_in,
 						    .inputDataLength = session_in_size,

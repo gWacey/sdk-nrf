@@ -13,103 +13,91 @@
 #include <stdint.h>
 
 /**
- * @brief Value to define the data type carried by the object.
- *
+ * @brief Value to define the data type carried by the block.
  */
 enum aobj_type {
-	/*! The audio data object is raw PCM */
+	/* The audio data block type is undefined */
 	AOBJ_TYPE_PCM = 0,
 
-	/*! The audio data object is coded in LC3 */
-	AOBJ_CODING_TYPE_LC3,
+	/* The audio data block is raw PCM */
+	AOBJ_TYPE_PCM,
 
-	/*! The audio data object is coded in LC3plus */
-	AOBJ_CODING_TYPE_LC3PLUS,
+	/* The audio data block is coded in LC3 */
+	AOBJ_TYPE_CODING_LC3,
+
+	/* The audio data block is coded in LC3plus */
+	AOBJ_TYPEC_ODING_LC3PLUS,
 };
 
 /**
  * @brief Value to define the PCM interleaving type.
- *
  */
 enum aobj_interleaved {
-	/*! Audio samples are deinterleaved within the buffer */
-	AOBJ_DEINTERLEAVED = 0,
+	/* The interleving is undefined */
+	AOBJ_INTERLEAVE_UNDEFINED = 0,
 
-	/*! Audio samples are interleaved within the buffer */
-	AOBJ_INTERLEAVED = 1
+	/* Audio samples are deinterleaved within the buffer */
+	AOBJ_DEINTERLEAVED,
+
+	/* Audio samples are interleaved within the buffer */
+	AOBJ_INTERLEAVED
 };
 
 /**
  * @brief  A structure describing the PCM data format
- *
  */
 struct aobj_format {
-	/*! The PCM sample rate */
+	/* The PCM sample rate */
 	uint32_t sample_rate;
 
-	/*! Number of valid bits for a sample */
+	/* Number of valid bits for a sample */
 	uint8_t bits_per_sample;
 
-	/*! Number of bits used to carry a sample of size bits_per_sample*/
+	/* Number of bits used to carry a sample of size bits_per_sample*/
 	uint8_t carrier_size;
 
-	/*! A flag indicating if the PCM object is sample interleaved or not */
+	/* A flag indicating if the PCM block is sample interleaved or not */
 	enum aobj_interleaved interleaved;
 
-	/*! Number of channels in the PCM object */
+	/* Number of channels in the PCM block */
 	uint8_t number_channels;
 
-	/*! A 32 bit array indicating which channel(s) are contained within
-	 * the PCM object (1 = channel location, 0 = not this channel)
+	/* A 32 bit array indicating which channel(s) are contained within
+	 * the PCM block (1 = channel location, 0 = not this channel)
 	 */
 	uint32_t channel_map;
 };
 
 /**
- * @brief  A structure giving the description of the synchronisation data object
- *
+ * @brief  A structure giving the description of the audio block
  */
-struct aobj_sync {
-	/*! The previous SDU reference position in time */
-	uint32_t previous_sdu_ref_us;
-
-	/*! The current SDU reference position in time */
-	uint32_t current_pres_dly_us;
-};
-
-/**
- * @brief  A structure giving the description of the audio object
- *
- */
-struct aobj_object {
-	/*! Indicates the data type of the object */
+struct aobj_block {
+	/* Indicates the data type of the block */
 	enum aobj_type data_type;
 
-	/*! A pointer to the raw or coded data (e.g., PCM, LC3, etc.) */
+	/* A pointer to the raw or coded data (e.g., PCM, LC3, etc.) */
 	uint8_t *data;
 
-	/*! The size, in bytes of the raw data object */
+	/* The size, in bytes of the raw data block */
 	size_t data_size;
 
-	/*! A structure defining the audio data objects format */
+	/* A structure defining the audio data blocks format */
 	struct aobj_format format;
 
-	/*! A structure holding the data required for synchronised
-	 * audio  (e.g., PTS, buff occupancy, etc.)
-	 */
-	struct aobj_sync sync_data;
+	/* The timestamp for the block */
+	uint32_t timestamp;
 
-	/*! A Boolean flag to indicate this frame has errors in the
+	/* A Boolean flag to indicate this frame has errors in the
 	 * data (::true = bad, fales:: = good)
 	 */
 	bool bad_frame;
 
-	/*! A Boolean flag to indicate the last buffer in the
+	/* A Boolean flag to indicate the last buffer in the
 	 * stream (fales:: = more to come, ::true = last buffer)
 	 */
 	bool last_flag;
 
-	/*! A pointer to private data associated with the data object */
+	/* A pointer to private data associated with the data block */
 	void *user_data;
 };
 
