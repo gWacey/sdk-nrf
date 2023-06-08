@@ -22,7 +22,7 @@
 /**
  * @brief Modules private handle.
  */
-struct amod_handle;
+struct handle;
 
 /**
  * @brief Private context for the module.
@@ -92,7 +92,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*open)(struct amod_handle *handle, struct amod_configuration *configuration);
+	int (*open)(struct handle *handle, struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function to close an open module.
@@ -101,7 +101,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*close)(struct amod_handle *handle);
+	int (*close)(struct handle *handle);
 
 	/**
 	 * @brief  Function to set the configuration of a module.
@@ -111,8 +111,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_set)(struct amod_handle *handle,
-				 struct amod_configuration *configuration);
+	int (*configuration_set)(struct handle *handle, struct amod_configuration *configuration);
 
 	/**
 	 * @brief  Function to get the configuration of a module.
@@ -122,8 +121,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*configuration_get)(struct amod_handle *handle,
-				 struct amod_configuration *configuration);
+	int (*configuration_get)(struct handle *handle, struct amod_configuration *configuration);
 
 	/**
 	 * @brief Start a module processing data.
@@ -132,7 +130,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*start)(struct amod_handle *handle);
+	int (*start)(struct handle *handle);
 
 	/**
 	 * @brief Pause a module processing data.
@@ -141,7 +139,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*pause)(struct amod_handle *handle);
+	int (*pause)(struct handle *handle);
 
 	/**
 	 * @brief The core data processing function for the module. Can be either an
@@ -153,7 +151,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*data_process)(struct amod_handle *handle, struct aobj_block *handle_tx,
+	int (*data_process)(struct handle *handle, struct aobj_block *handle_tx,
 			    struct aobj_block *block_rx);
 };
 
@@ -209,29 +207,6 @@ struct amod_parameters {
 };
 
 /**
- * @brief  Pointer to a response callback function for a response to a data send as
- *         supplied by the module user.
- *
- * @param handle  The handle of the module that sent the data message
- * @param block  The size of the supporting data or 0 if none
- */
-typedef void (*amod_response_cb)(struct amod_handle *handle, struct aobj_block *block);
-
-/**
- * @brief Private structure describing a data in message into the module thread.
- */
-struct amod_message {
-	/* Audio data block to input */
-	struct aobj_block block;
-
-	/* Sending module's handle */
-	struct amod_handle *tx_handle;
-
-	/* Callback for when the data has been consumed */
-	amod_response_cb response_cb;
-};
-
-/**
  * @brief Private module handle.
  */
 struct amod_handle {
@@ -279,6 +254,29 @@ struct amod_handle {
 };
 
 /**
+ * @brief  Pointer to a response callback function for a response to a data send as
+ *         supplied by the module user.
+ *
+ * @param handle  The handle of the module that sent the data message
+ * @param block  The size of the supporting data or 0 if none
+ */
+typedef void (*amod_response_cb)(struct amod_handle *handle, struct aobj_block *block);
+
+/**
+ * @brief Private structure describing a data in message into the module thread.
+ */
+struct amod_message {
+	/* Audio data block to input */
+	struct aobj_block block;
+
+	/* Sending module's handle */
+	struct amod_handle *tx_handle;
+
+	/* Callback for when the data has been consumed */
+	amod_response_cb response_cb;
+};
+
+/**
  * @brief A helper structure for describing the modules in a stream as a table.
  */
 struct amod_table {
@@ -287,6 +285,9 @@ struct amod_table {
 
 	/* A unique handle to the module */
 	struct amod_handle *handle;
+
+	/* A unique handle to the module */
+	struct amod_configuration *initial_config;
 
 	/* the modules parameters */
 	struct amod_parameters params;
@@ -306,20 +307,6 @@ struct amod_table {
  */
 int amod_query_resource(struct amod_parameters *parameters,
 			struct amod_configuration *configuration);
-
-/**
- * @brief  Function for allocating memory for the module.
- *
- * @return 0 if successful, error value
- */
-int amod_memory_allocate(void);
-
-/**
- * @brief  Function for de-allocating memory for the module.
- *
- * @return 0 if successful, error value
- */
-int amod_memory_deallocate(void);
 
 /**
  * @brief  Function for opening a module.
@@ -494,39 +481,42 @@ int amod_state_get(struct amod_handle *handle);
 /**
  * @brief Helper function to attach a raw audio data buffer to an audio block.
  *
- * @param block     Pointer to the audio data block to fill
- * @param data_type  The type of data carried in the block
- * @param data       Pointer to the raw or coded audio data buffer
- * @param data_size  Size of the raw or coded audio data buffer
- * @param format     The format od the data carried in the block
- * @param timestamp  Timestamp to be used to synchronise the data
- * @param bad_frame  A flag to indicate there are errors within the data for this block
- * @param last_flag  A flag to indicate this is the last block in the stream
- * @param user_data  A pointer to a private area of user data or NULL
+ * @param block        Pointer to the audio data block to fill
+ * @param data_type    The type of data carried in the block
+ * @param data         Pointer to the raw or coded audio data buffer
+ * @param data_size    Size of the raw or coded audio data buffer
+ * @param format       The format od the data carried in the block
+ * @param reference_ts Reference timestamp to be used to synchronise the data
+ * @param block_rx_ts  Block received timestamp to be used to synchronise the data
+ * @param bad_frame    A flag to indicate there are errors within the data for this block
+ * @param last_flag    A flag to indicate this is the last block in the stream
+ * @param user_data    A pointer to a private area of user data or NULL
  *
  * @return 0 if successful, error value
  */
 int amod_block_data_attach(struct aobj_block *block, enum aobj_type data_type, char *data,
-			   size_t data_size, struct aobj_format *format, uint32_t timestamp,
-			   bool bad_frame, bool last_flag, void *user_data);
+			   size_t data_size, struct aobj_format *format, uint32_t *reference_ts,
+			   uint32_t *block_rx_ts, bool bad_frame, bool last_flag, void *user_data);
 
 /**
  * @brief Helper function to extract the raw audio data buffer from an audio block.
  *
- * @param block     Pointer to the audio data block to fill
- * @param data_type  The type of data carried in the block
- * @param data       Pointer to the raw or coded audio data buffer
- * @param data_size  Size of the raw or coded audio data buffer
- * @param format     The format od the data carried in the block
- * @param timestamp  Timestamp to be used to synchronise the data
- * @param bad_frame  A flag to indicate there are errors within the data for this block
- * @param last_flag  A flag to indicate this is the last block in the stream
- * @param user_data  A pointer to a private area of user data or NULL
+ * @param block        Pointer to the audio data block to fill
+ * @param data_type    The type of data carried in the block
+ * @param data         Pointer to the raw or coded audio data buffer
+ * @param data_size    Size of the raw or coded audio data buffer
+ * @param format       The format od the data carried in the block
+ * @param reference_ts Reference timestamp to be used to synchronise the data
+ * @param block_rx_ts  Block received timestamp to be used to synchronise the data
+ * @param bad_frame    A flag to indicate there are errors within the data for this block
+ * @param last_flag    A flag to indicate this is the last block in the stream
+ * @param user_data    A pointer to a private area of user data or NULL
  *
  * @return 0 if successful, error value
  */
 int amod_block_data_extract(struct aobj_block *block, enum aobj_type *data_type, char *data,
-			    size_t *data_size, struct aobj_format *format, uint32_t *timestamp,
-			    bool *bad_frame, bool *last_flag, void *user_data);
+			    size_t *data_size, struct aobj_format *format, uint32_t *reference_ts,
+			    uint32_t *block_rx_ts, bool *bad_frame, bool *last_flag,
+			    void *user_data);
 
 #endif /*_AMOD_API_H_ */

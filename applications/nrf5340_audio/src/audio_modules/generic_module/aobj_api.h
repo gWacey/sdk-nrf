@@ -84,8 +84,16 @@ struct aobj_block {
 	/* A structure defining the audio data blocks format */
 	struct aobj_format format;
 
-	/* The timestamp for the block */
-	uint32_t timestamp;
+	/* Bit rate of the block */
+	uint8_t bitrate;
+
+	/* Reference time stamp (e.g. ISO timestamp
+	 * reference from BLE controller)
+	 */
+	uint32_t reference_ts;
+
+	/* The timestamp for when the block was received */
+	uint32_t block_rx_ts;
 
 	/* A Boolean flag to indicate this frame has errors in the
 	 * data (::true = bad, fales:: = good)
