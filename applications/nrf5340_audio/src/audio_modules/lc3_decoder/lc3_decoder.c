@@ -11,6 +11,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <errno.h>
+#include "channel_assignment.h"
+#include "pcm_stream_channel_modifier.h"
 #include "aobj_api.h"
 #include "amod_api.h"
 #include "LC3API.h"
@@ -25,34 +27,81 @@ LOG_MODULE_REGISTER(lc3_decoder, 4); /* CONFIG_LC3_DECODER_LOG_LEVEL); */
 #define LC3_DECODER_US_IN_A_SECOND (1000000)
 
 /**
+ * @brief  Function for opening a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules configuration to set.
+ *
+ * @return 0 if successful, error value
+ */
+static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration);
+
+/**
+ * @brief  Function close an open module.
+ *
+ * @param handle  A pointer to the modules handle.
+ *
+ * @return 0 if successful, error value
+ */
+static int lc3_dec_t2_close(struct handle *handle);
+
+/**
+ * @brief  Function to set the configuration of a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules configuration to set.
+ *
+ * @return 0 if successful, error value
+ */
+static int lc3_dec_t2_configuration_set(struct handle *handle,
+						  struct amod_configuration *configuration);
+
+/**
+ * @brief  Function to set the configuration of a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules current configuration.
+ *
+ * @return 0 if successful, error value
+ */
+static int lc3_dec_t2_configuration_get(struct handle *handle,
+						  struct amod_configuration *configuration);
+
+/**
+ * @brief This processes the input block into the output block.
+ *
+ * @param handle	 A handle to this module instance
+ * @param block_in   Pointer to the input audio block or NULL for an input module
+ * @param block_out  Pointer to the output audio block or NULL for an output module
+ *
+ * @return 0 if successful, error value
+ */
+static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
+			 struct aobj_block *block_out);
+/**
  * @brief Table of the LC3 decoder module functions.
  *
  */
-struct amod_functions lc3_dec_functions = {
-	/**
-	 * @brief  Function for querying the resources required for LC3 decoder.
-	 */
-	.query_resource = lc3_dec_query_resource,
-
-	/**
+struct amod_functions lc3_dec_t2_functions = {
+/**
 	 * @brief  Function to an open the LC3 decoder module.
 	 */
-	.open = lc3_dec_open,
+	.open = lc3_dec_t2_open,
 
 	/**
 	 * @brief  Function to close the LC3 decoder module.
 	 */
-	.close = lc3_dec_close,
+	.close = lc3_dec_t2_close,
 
 	/**
 	 * @brief  Function to set the configuration of the LC3 decoder module.
 	 */
-	.configuration_set = lc3_dec_configuration_set,
+	.configuration_set = lc3_dec_t2_configuration_set,
 
 	/**
 	 * @brief  Function to get the configuration of the LC3 decoder module.
 	 */
-	.configuration_get = lc3_dec_configuration_get,
+	.configuration_get = lc3_dec_t2_configuration_get,
 
 	/**
 	 * @brief Start a module processing data.
@@ -69,16 +118,17 @@ struct amod_functions lc3_dec_functions = {
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.
 	 */
-	.data_process = lc3_dec_data_process,
-};
+	.data_process = lc3_dec_t2_data_process,
+}
+;
 
 /**
  * @brief The set-up parameters for the LC3 decoder.
  *
  */
 struct amod_description lc3_dec_dept = { .name = "LC3 Dcoder",
-					 .type = AMOD_TYPE_PROCESSOR,
-					 .functions = (struct amod_functions *)&lc3_dec_functions };
+			.type = AMOD_TYPE_PROCESSOR,
+			.functions = (struct amod_functions *)&lc3_dec_t2_functions };
 
 /**
  * @brief A private pointer to the LC3 decoder set-up parameters.
@@ -87,28 +137,23 @@ struct amod_description lc3_dec_dept = { .name = "LC3 Dcoder",
 struct amod_description *lc3_dec_description = &lc3_dec_dept;
 
 /**
- * @brief  Function for querying the resources required for the LC3 decoder
- *		   module with the given configuration.
- *
- */
-int lc3_dec_query_resource(struct amod_configuration *configuration)
-{
-	return sizeof(struct lc3_decoder_context);
-}
-
-/**
  * @brief Open an instance of the LC3 decoder
  *
  */
-int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configuration)
+static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration)
 {
+	int ret;
+	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
 	uint8_t enc_sample_rates = 0;
 	uint8_t dec_sample_rates = 0;
 	uint8_t unique_session = 0;
 	LC3FrameSize_t framesize;
-	int ret;
+
+	/* Clear the context */
+	memset(ctx, 0, sizeof(struct lc3_decoder_context));
 
 	/* Set unique session to 0 for using the default sharing memory setting.
 	 *
@@ -178,7 +223,7 @@ int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configur
  * @brief  Function close an instance of the LC3 decoder.
  *
  */
-int lc3_dec_close(struct amod_handle *handle)
+static int lc3_dec_t2_close(struct handle *handle)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -192,9 +237,6 @@ int lc3_dec_close(struct amod_handle *handle)
 		}
 	}
 
-	/* Clear handle */
-	ctx = NULL;
-
 	return 0;
 }
 
@@ -202,15 +244,22 @@ int lc3_dec_close(struct amod_handle *handle)
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration)
+static int lc3_dec_t2_configuration_set(struct handle *handle,
+						  struct amod_configuration *configuration)
 {
-	struct lc3_decoder_configuration *config =
-		(struct lc3_decoder_configuration *)configuration;
+	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
+	struct lc3_decoder_configuration *config =
+		(struct lc3_decoder_configuration *)configuration;
 	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
 	LC3FrameSize_t framesize;
-	int ret;
+	uint16_t coded_bytes_req;
+
+	if (ctx->dec_handles_count) {
+		LOG_ERR("LC3 decoder instance %s already initialised", hdl->name);
+		return -EALREADY;
+	}
 
 	/* Free previous decoder memory */
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
@@ -232,6 +281,13 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
 		return -EINVAL;
 	}
 
+	coded_bytes_req = LC3BitstreamBuffersize(ctx->config.sample_rate, ctx->config.max_bitrate,
+						 framesize, &ret);
+	if (coded_bytes_req == 0) {
+		LOG_ERR("Required coded bytes to LC3 encode instance %s is zero", hdl->name);
+		return -EPERM;
+	}
+
 	for (uint8_t i = 0; i < config->number_channels; i++) {
 		dec_handles[i] = LC3DecodeSessionOpen(config->sample_rate, config->bit_depth,
 						      framesize, NULL, NULL, &ret);
@@ -240,12 +296,13 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
 				hdl->name);
 			return ret;
 		}
-	}
 
-	ctx->config.number_channels = config->number_channels;
+		ctx->dec_handles_count += 1;
+	}
 
 	memcpy(&ctx->config, config, sizeof(struct lc3_decoder_configuration));
 
+	ctx->coded_bytes_req = coded_bytes_req;
 	ctx->samples_per_frame =
 		(ctx->config.duration_us * ctx->config.sample_rate) / LC3_DECODER_US_IN_A_SECOND;
 
@@ -261,7 +318,8 @@ int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configurat
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration)
+static int lc3_dec_t2_configuration_get(struct handle *handle,
+						  struct amod_configuration *configuration)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -282,19 +340,18 @@ int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configurat
  * @brief Process an audio data block in an instance of the LC3 decoder.
  *
  */
-int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in,
+static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
 			 struct aobj_block *block_out)
 {
+	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;
 	size_t session_in_size;
-	size_t data_out_size;
 	uint8_t *data_in;
 	uint8_t *data_out;
-	int ret;
 
 	if (block_in->data_type != AOBJ_TYPE_LC3) {
 		LOG_DBG("Input to LC3 decoder module %s in not LC3 data", hdl->name);
@@ -305,14 +362,20 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in
 		frame_status = BadFrame;
 	} else {
 		frame_status = GoodFrame;
+		ctx->plc_count = 0;
 	}
 
-	session_in_size = block_in->data_size / ctx->config.number_channels;
-	data_out_size = ctx->samples_per_frame * ctx->config.number_channels;
+	session_in_size = block_in->data_size / block_in->format.number_channels;
+	if (session_in_size < ctx->coded_bytes_req) {
+		LOG_ERR("Too few coded bytes to decode. Bytes required %d, input framesize is %d",
+			ctx->coded_bytes_req, session_in_size);
+		return -EINVAL;
+	}
+
+	data_out = (uint8_t *)block_out->data;
 
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
 		data_in = (uint8_t *)block_in->data + (session_in_size * i);
-		data_out = (uint8_t *)block_out->data + (ctx->samples_per_frame * i);
 
 		LC3DecodeInput_t LC3DecodeInput = { .inputData = data_in,
 						    .inputDataLength = session_in_size,
@@ -343,7 +406,20 @@ int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in
 			/* Clear this channel as it is not correct */
 			memset(data_out, 0, LC3DecodeOutput.bytesWritten);
 		}
+
+		data_out += LC3DecodeOutput.bytesWritten;
 	}
+
+	ctx->plc_count = plc_counter;
+
+	block_out->data_size = block_out->data_size - (block_out->data - data_out);
+	block_out->data_type = AOBJ_TYPE_PCM;
+	block_out->format = block_in->format;
+	block_out->format.interleaved = AOBJ_DEINTERLEAVED;
+	block_out->bitrate = block_in->bitrate;
+	block_out->bad_frame = block_in->bad_frame;
+	block_out->last_flag = false;
+	block_out->user_data = NULL;
 
 	return 0;
 }

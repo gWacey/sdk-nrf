@@ -14,12 +14,6 @@
 #include "aobj_api.h"
 
 /**
- * @brief Maximum size for module naming in characters.
- *
- */
-#define AMOD_NAME_SIZE (20)
-
-/**
  * @brief Modules private handle.
  */
 struct handle;
@@ -48,7 +42,7 @@ enum amod_type {
 	AMOD_TYPE_OUTPUT,
 
 	/* This is an input/output processing module */
-	AMOD_TYPE_PROCESSOR,
+	AMOD_TYPE_IN_OUT
 };
 
 /**
@@ -75,15 +69,6 @@ enum amod_state {
  * @brief Private pointer to a modules functions.
  */
 struct amod_functions {
-	/** @brief  Function for querying the resources required for a module.
-	 *
-	 * @param configuration  A pointer to the modules configuration
-	 * @param size			 The size of the memory buffer required
-	 *
-	 * @return If successful the value will be 0 or greater, otherwise error value
-	 */
-	int (*query_resource)(struct amod_configuration *configuration);
-
 	/**
 	 * @brief  Function for opening a module.
 	 *
@@ -211,7 +196,7 @@ struct amod_parameters {
  */
 struct amod_handle {
 	/* Unique name of this module instance */
-	char name[AMOD_NAME_SIZE];
+	char name[CONFIG_AMOD_NAME_SIZE];
 
 	/* The modules description */
 	struct amod_description *description;
@@ -231,6 +216,9 @@ struct amod_handle {
 	/* List node (next pointer) */
 	sys_snode_t node;
 
+	/* Flag to indicate the module should send data block to its TX fifo */
+	bool data_tx;
+
 	/* A singley linked-list of the handles the module is connected to */
 	sys_slist_t hdl_dest_list;
 
@@ -242,9 +230,6 @@ struct amod_handle {
 
 	/* Mutex to make the above destinations list thread safe */
 	struct k_mutex dest_mutex;
-
-	/* If set, return the data block on the module's output message queue */
-	bool msg_out;
 
 	/* Modules thread configuration */
 	struct amod_thread_configuration thread;
@@ -295,18 +280,6 @@ struct amod_table {
 	/* A unique module context */
 	struct amod_context *context;
 };
-
-/**
- * @brief  Function for querying the resources required for a module.
- *
- * @param parameters     Pointer to the module parameters
- * @param configuration  A pointer to the modules configuration (this must also
- *                       be passed to the #amod_set_configuration() unchanged)
- *
- * @return If successful the value will be 0 or greater, otherwise error value
- */
-int amod_query_resource(struct amod_parameters *parameters,
-			struct amod_configuration *configuration);
 
 /**
  * @brief  Function for opening a module.
@@ -390,7 +363,7 @@ int amod_start(struct amod_handle *handle);
  *
  * @return 0 if successful, error value
  */
-int amod_pause(struct amod_handle *handle);
+int amod_stop(struct amod_handle *handle);
 
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.

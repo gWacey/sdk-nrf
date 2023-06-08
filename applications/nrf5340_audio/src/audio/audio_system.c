@@ -8,6 +8,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/bluetooth/audio/audio.h>
 
 #include "macros_common.h"
 #include "sw_codec_select.h"
@@ -32,21 +33,17 @@ LOG_MODULE_REGISTER(audio_system, CONFIG_AUDIO_SYSTEM_LOG_LEVEL);
 
 #define DEBUG_INTERVAL_NUM 1000
 
+/* Allocate audio memory */
 K_THREAD_STACK_DEFINE(lc3_dec1_thread_stack, CONFIG_ENCODER_STACK_SIZE);
 DATA_FIFO_DEFINE(lc3_dec1_fifo_tx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(lc3_dec1_fifo_rx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
-K_MEM_SLAB_DEFINE(audio_data_slab, FRAME_SIZE_BYTES, CONFIG_DECODER_DATA_OBJECTS_NUM, 4);
+DATA_FIFO_DEFINE(lc3_enc1_fifo_tx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
+DATA_FIFO_DEFINE(lc3_enc1_fifo_rx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
+K_MEM_SLAB_DEFINE(audio_pcm_data_slab, FRAME_SIZE_BYTES, CONFIG_PCM_DATA_OBJECTS_NUM, 4);
+K_MEM_SLAB_DEFINE(audio_coded_data_slab, FRAME_SIZE_BYTES, CONFIG_CODED_DATA_OBJECTS_NUM, 4);
 
-static struct amod_handle handle[MODULES_ID_NUM];
+static struct amod_handle handles[MODULES_ID_NUM];
 static struct lc3_decoder_context decoder_context[LC3_DECODER_ID_NUM];
-
-K_THREAD_STACK_DEFINE(encoder_thread_stack, CONFIG_ENCODER_STACK_SIZE);
-
-DATA_FIFO_DEFINE(fifo_tx, FIFO_TX_BLOCK_COUNT, WB_UP(BLOCK_SIZE_BYTES));
-DATA_FIFO_DEFINE(fifo_rx, FIFO_RX_BLOCK_COUNT, WB_UP(BLOCK_SIZE_BYTES));
-
-static struct k_thread encoder_thread_data;
-static k_tid_t encoder_thread_id;
 
 static struct sw_codec_config sw_codec_cfg;
 /* Buffer which can hold max 1 period test tone at 1000 Hz */
@@ -104,81 +101,6 @@ static void audio_headset_configure(void)
 	sw_codec_cfg.decoder.enabled = true;
 }
 
-static void encoder_thread(void *arg1, void *arg2, void *arg3)
-{
-	int ret;
-	uint32_t blocks_alloced_num;
-	uint32_t blocks_locked_num;
-
-	int debug_trans_count = 0;
-	size_t encoded_data_size = 0;
-
-	void *tmp_pcm_raw_data[CONFIG_FIFO_FRAME_SPLIT_NUM];
-	char pcm_raw_data[FRAME_SIZE_BYTES];
-
-	static uint8_t *encoded_data;
-	static size_t pcm_block_size;
-	static uint32_t test_tone_finite_pos;
-
-	while (1) {
-		/* Get PCM data from I2S */
-		/* Since one audio frame is divided into a number of
-		 * blocks, we need to fetch the pointers to all of these
-		 * blocks before copying it to a continuous area of memory
-		 * before sending it to the encoder
-		 */
-		for (int i = 0; i < CONFIG_FIFO_FRAME_SPLIT_NUM; i++) {
-			ret = data_fifo_pointer_last_filled_get(&fifo_rx, &tmp_pcm_raw_data[i],
-								&pcm_block_size, K_FOREVER);
-			ERR_CHK(ret);
-			memcpy(pcm_raw_data + (i * BLOCK_SIZE_BYTES), tmp_pcm_raw_data[i],
-			       pcm_block_size);
-
-			data_fifo_block_free(&fifo_rx, &tmp_pcm_raw_data[i]);
-		}
-
-		if (sw_codec_cfg.encoder.enabled) {
-			if (test_tone_size) {
-				/* Test tone takes over audio stream */
-				uint32_t num_bytes;
-				char tmp[FRAME_SIZE_BYTES / 2];
-
-				ret = contin_array_create(tmp, FRAME_SIZE_BYTES / 2, test_tone_buf,
-							  test_tone_size, &test_tone_finite_pos);
-				ERR_CHK(ret);
-
-				ret = pscm_copy_pad(tmp, FRAME_SIZE_BYTES / 2,
-						    CONFIG_AUDIO_BIT_DEPTH_BITS, pcm_raw_data,
-						    &num_bytes);
-				ERR_CHK(ret);
-			}
-
-			ret = sw_codec_encode(pcm_raw_data, FRAME_SIZE_BYTES, &encoded_data,
-					      &encoded_data_size);
-
-			ERR_CHK_MSG(ret, "Encode failed");
-		}
-
-		/* Print block usage */
-		if (debug_trans_count == DEBUG_INTERVAL_NUM) {
-			ret = data_fifo_num_used_get(&fifo_rx, &blocks_alloced_num,
-						     &blocks_locked_num);
-			ERR_CHK(ret);
-			LOG_DBG(COLOR_CYAN "RX alloced: %d, locked: %d" COLOR_RESET,
-				blocks_alloced_num, blocks_locked_num);
-			debug_trans_count = 0;
-		} else {
-			debug_trans_count++;
-		}
-
-		if (sw_codec_cfg.encoder.enabled) {
-			streamctrl_encoded_data_send(encoded_data, encoded_data_size,
-						     sw_codec_cfg.encoder.num_ch);
-		}
-		STACK_USAGE_PRINT("encoder_thread", &encoder_thread_data);
-	}
-}
-
 int audio_encode_test_tone_set(uint32_t freq)
 {
 	int ret;
@@ -198,109 +120,58 @@ int audio_encode_test_tone_set(uint32_t freq)
 	return 0;
 }
 
-/* This function is only used on gateway using USB as audio source and bidirectional stream */
-int audio_decode(void const *const encoded_data, size_t encoded_data_size, bool bad_frame)
-{
-	int ret;
-	uint32_t blocks_alloced_num;
-	uint32_t blocks_locked_num;
-	static int debug_trans_count;
-	static void *tmp_pcm_raw_data[CONFIG_FIFO_FRAME_SPLIT_NUM];
-	static void *pcm_raw_data;
-	size_t pcm_block_size;
-
-	if (!sw_codec_cfg.initialized) {
-		/* Throw away data */
-		/* This can happen when using play/pause since there might be
-		 * some packages left in the buffers
-		 */
-		LOG_DBG("Trying to decode while codec is not initialized");
-		return -EPERM;
-	}
-
-	ret = data_fifo_num_used_get(&fifo_tx, &blocks_alloced_num, &blocks_locked_num);
-	if (ret) {
-		return ret;
-	}
-
-	uint8_t free_blocks_num = FIFO_TX_BLOCK_COUNT - blocks_locked_num;
-
-	/* If not enough space for a full frame, remove oldest samples to make room */
-	if (free_blocks_num < CONFIG_FIFO_FRAME_SPLIT_NUM) {
-		void *old_data;
-		size_t size;
-
-		for (int i = 0; i < (CONFIG_FIFO_FRAME_SPLIT_NUM - free_blocks_num); i++) {
-			ret = data_fifo_pointer_last_filled_get(&fifo_tx, &old_data, &size,
-								K_NO_WAIT);
-			if (ret == -ENOMSG) {
-				/* If there are no more blocks in FIFO, break */
-				break;
-			}
-
-			data_fifo_block_free(&fifo_tx, &old_data);
-		}
-	}
-
-	for (int i = 0; i < CONFIG_FIFO_FRAME_SPLIT_NUM; i++) {
-		ret = data_fifo_pointer_first_vacant_get(&fifo_tx, &tmp_pcm_raw_data[i], K_FOREVER);
-		if (ret) {
-			return ret;
-		}
-	}
-
-	ret = sw_codec_decode(encoded_data, encoded_data_size, bad_frame, &pcm_raw_data,
-			      &pcm_block_size);
-	if (ret) {
-		LOG_ERR("Failed to decode");
-		return ret;
-	}
-
-	/* Split decoded frame into CONFIG_FIFO_FRAME_SPLIT_NUM blocks */
-	for (int i = 0; i < CONFIG_FIFO_FRAME_SPLIT_NUM; i++) {
-		memcpy(tmp_pcm_raw_data[i], (char *)pcm_raw_data + (i * (BLOCK_SIZE_BYTES)),
-		       BLOCK_SIZE_BYTES);
-
-		ret = data_fifo_block_lock(&fifo_tx, &tmp_pcm_raw_data[i], BLOCK_SIZE_BYTES);
-		if (ret) {
-			LOG_ERR("Failed to lock block");
-			return ret;
-		}
-	}
-	if (debug_trans_count == DEBUG_INTERVAL_NUM) {
-		ret = data_fifo_num_used_get(&fifo_tx, &blocks_alloced_num, &blocks_locked_num);
-		if (ret) {
-			return ret;
-		}
-		LOG_DBG(COLOR_MAGENTA "TX alloced: %d, locked: %d" COLOR_RESET, blocks_alloced_num,
-			blocks_locked_num);
-		debug_trans_count = 0;
-	} else {
-		debug_trans_count++;
-	}
-
-	return 0;
-}
-
 /**@brief Initializes the FIFOs, the codec, and starts the I2S
  */
 void audio_system_start(void)
 {
 	int ret;
+	int i, j;
+	struct lc3_decoder_configuration lc3_dec_initial_config = {
+		.sample_rate = CONFIG_AUDIO_SAMPLE_RATE_HZ,
+		.bit_depth = CONFIG_AUDIO_BIT_DEPTH_BITS,
+		.duration_us = CONFIG_AUDIO_FRAME_DURATION_US,
+		.number_channels = sw_codec_cfg.decoder.num_ch,
+		.channel_map = (BT_AUDIO_LOCATION_FRONT_LEFT || BT_AUDIO_LOCATION_FRONT_RIGHT)};
+
+	struct lc3_decoder_configuration lc3_enc_initial_config = {
+		.sample_rate = CONFIG_AUDIO_SAMPLE_RATE_HZ,
+		.bit_depth = CONFIG_AUDIO_BIT_DEPTH_BITS,
+		.duration_us = CONFIG_AUDIO_FRAME_DURATION_US,
+		.number_channels = sw_codec_cfg.encoder.num_ch,
+		.channel_map = (BT_AUDIO_LOCATION_FRONT_LEFT || BT_AUDIO_LOCATION_FRONT_RIGHT)};
+
 	struct amod_table modules[CONFIG_MODULES_NUM] = {
-		{ /* LC3 decoder 1 */
-		  .name = "lc3 dec 1",
-		  .handle = &handle[MODULE_ID_1],
-		  .params.description = lc3_dec_description,
-		  .params.thread.stack = lc3_dec1_thread_stack,
-		  .params.thread.stack_size = CONFIG_DECODER_STACK_SIZE,
-		  .params.thread.priority = CONFIG_DECODER_THREAD_PRIO,
-		  .params.thread.msg_rx = &lc3_dec1_fifo_rx,
-		  .params.thread.msg_tx = &lc3_dec1_fifo_tx,
-		  .params.thread.data_slab = &audio_data_slab,
-		  .params.thread.data_size = FRAME_SIZE_BYTES,
-		  .context = (struct amod_context *)&decoder_context[LC3_DECODER_ID_1] }
-	};
+		{/* LC3 decoder 1 */
+		 .name = "lc3 dec 1",
+		 .handle = &handles[MODULE_ID_1],
+		 .initial_config = (struct amod_configuration *)&lc3_dec_initial_config,
+		 .params.description = lc3_dec_description,
+		 .params.thread.stack = lc3_dec1_thread_stack,
+		 .params.thread.stack_size = CONFIG_DECODER_STACK_SIZE,
+		 .params.thread.priority = CONFIG_DECODER_THREAD_PRIO,
+		 .params.thread.msg_rx = &lc3_dec1_fifo_rx,
+		 .params.thread.msg_tx = &lc3_dec1_fifo_tx,
+		 .params.thread.data_slab = &audio_coded_data_slab,
+		 .params.thread.data_size = FRAME_SIZE_BYTES,
+		 .context = (struct amod_context *)&decoder_context[LC3_DECODER_ID_1]},
+
+		{/* LC3 encoder 1 */
+		 .name = "lc3 enc 1",
+		 .handle = &handles[MODULE_ID_2],
+		 .initial_config = (struct amod_configuration *)&lc3_enc_initial_config,
+		 .params.description = lc3_enc_description,
+		 .params.thread.stack = lc3_enc1_thread_stack,
+		 .params.thread.stack_size = CONFIG_ENCODER_STACK_SIZE,
+		 .params.thread.priority = CONFIG_ENCODER_THREAD_PRIO,
+		 .params.thread.msg_rx = &lc3_enc1_fifo_rx,
+		 .params.thread.msg_tx = &lc3_enc1_fifo_tx,
+		 .params.thread.data_slab = &audio_pcm_data_slab,
+		 .params.thread.data_size = FRAME_SIZE_BYTES,
+		 .context = (struct amod_context *)&decoder_context[LC3_ENCODER_ID_1]}};
+	bool connections[CONFIG_MODULES_NUM][CONFIG_MODULES_NUM] = {
+		/* Decoder 1 */ {true, false, true},
+		/* Encoder 1 */ {false, true, false},
+		/* I2S I/O   */ {false, true, false}};
 
 	if (CONFIG_AUDIO_DEV == HEADSET) {
 		audio_headset_configure();
@@ -321,10 +192,30 @@ void audio_system_start(void)
 		ERR_CHK_MSG(ret, "Failed to set up rx FIFO");
 	}
 
-	ret = sw_codec_init(sw_codec_cfg, modules);
-	ERR_CHK_MSG(ret, "Failed to set up codec");
+	/* Audio module(s) configure */
+	for (i = 0; i < CONFIG_MODULES_NUM; i++) {
+		ret = amod_open(&modules[i].params, modules[i].initial_config, modules[i].name,
+				modules[i].handle, modules[i].context);
+		if (ret) {
+			LOG_DBG("Failed to open the decoder module, ret %d", ret);
+			return ret;
+		}
 
-	sw_codec_cfg.initialized = true;
+		ret = amod_configuration_set(modules[i].handle, modules[i].initial_config);
+		if (ret) {
+			LOG_DBG("Failed to configure the decoder module, ret %d", ret);
+			return ret;
+		}
+	}
+
+	/* Connect the stream(s) */
+	for (j = 0; j < CONFIG_MODULES_NUM; j++) {
+		for (i = 0; i < CONFIG_MODULES_NUM; i++) {
+			if (connections[j][i]) {
+				ret = amod_connect(modules[j].handle, modules[i].handle);
+			}
+		}
+	}
 
 	if (sw_codec_cfg.encoder.enabled && encoder_thread_id == NULL) {
 		encoder_thread_id = k_thread_create(
@@ -368,12 +259,22 @@ void audio_system_stop(void)
 	ERR_CHK(ret);
 #endif /* ((CONFIG_AUDIO_DEV == GATEWAY) && CONFIG_AUDIO_SOURCE_USB) */
 
-	ret = sw_codec_uninit(sw_codec_cfg);
-	ERR_CHK_MSG(ret, "Failed to uninit codec");
+	for (int i = 0; i < CONFIG_MODULES_NUM; i++) {
+		ret = amod_stop(&handles[i]);
+		if (ret) {
+			LOG_WRN("Module failed of stop, ret %d", ret);
+		}
+
+		ret = amod_close(&handles[i]);
+		if (ret) {
+			LOG_WRN("Module may not have closed, ret %d", ret);
+		}
+	}
+
 	sw_codec_cfg.initialized = false;
 
-	data_fifo_empty(&fifo_rx);
-	data_fifo_empty(&fifo_tx);
+	data_fifo_empty(&lc3_dec1_fifo_tx);
+	data_fifo_empty(&lc3_dec1_fifo_rx);
 }
 
 int audio_system_fifo_rx_block_drop(void)

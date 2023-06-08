@@ -855,7 +855,7 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		LOG_WRN("SW codec decode error: %d", ret);
 	}
 
-	if (pcm_size != (BLK_STEREO_SIZE_OCTETS * NUM_BLKS_IN_FRAME)) {
+	if (size != (BLK_STEREO_SIZE_OCTETS * NUM_BLKS_IN_FRAME)) {
 		LOG_WRN("Decoded audio has wrong size");
 		/* Discard frame */
 		return;

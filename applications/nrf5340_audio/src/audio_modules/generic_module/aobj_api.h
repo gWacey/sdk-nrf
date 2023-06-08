@@ -23,10 +23,7 @@ enum aobj_type {
 	AOBJ_TYPE_PCM,
 
 	/* The audio data block is coded in LC3 */
-	AOBJ_TYPE_LC3,
-
-	/* The audio data block is coded in LC3plus */
-	AOBJ_TYPE_LC3PLUS,
+	AOBJ_TYPE_LC3
 };
 
 /**
@@ -62,8 +59,8 @@ struct aobj_format {
 	/* Number of channels in the PCM block */
 	uint8_t number_channels;
 
-	/* A 32 bit array indicating which channel(s) are contained within
-	 * the PCM block (1 = channel location, 0 = not this channel)
+	/* A 32 bit value indicating which channel(s) are active within
+	 * the PCM block. A bit set indicates the channel is active.
 	 */
 	uint32_t channel_map;
 };

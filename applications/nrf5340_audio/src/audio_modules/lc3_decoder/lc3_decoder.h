@@ -9,11 +9,30 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "audio_defines.h"
 #include "amod_api.h"
 #include "aobj_api.h"
 #include "LC3API.h"
 
-#define CONFIG_LC3_DECODER_MAX_CHANNELS (2)
+#if (CONFIG_SW_CODEC_LC3)
+#define LC3_MAX_FRAME_SIZE_MS 10
+#define LC3_ENC_MONO_FRAME_SIZE (CONFIG_LC3_BITRATE * LC3_MAX_FRAME_SIZE_MS / (8 * 1000))
+
+#define LC3_PCM_NUM_BYTES_MONO                                                                     \
+	(CONFIG_AUDIO_SAMPLE_RATE_HZ * CONFIG_AUDIO_BIT_DEPTH_OCTETS * LC3_MAX_FRAME_SIZE_MS / 1000)
+#define LC3_ENC_TIME_US 3000
+#define LC3_DEC_TIME_US 1500
+#else
+#define LC3_ENC_MONO_FRAME_SIZE 0
+#define LC3_PCM_NUM_BYTES_MONO 0
+#define LC3_ENC_TIME_US 0
+#define LC3_DEC_TIME_US 0
+#endif /* CONFIG_SW_CODEC_LC3 */
+
+/* Max will be used when multiple codecs are supported */
+#define DEC_TIME_US MAX(LC3_DEC_TIME_US, 0)
+#define DEC_PCM_NUM_BYTES_MONO MAX(LC3_PCM_NUM_BYTES_MONO, 0)
+#define DEC_PCM_NUM_BYTES_MULTI_CHAN (DEC_PCM_NUM_BYTES_MONO * CONFIG_LC3_DEC_CHANNELS_MAX)
 
 /**
  * @brief Private pointer to the module's parameters.
@@ -35,6 +54,9 @@ struct lc3_decoder_configuration {
 	/* Bit depth for this decoder instance */
 	uint32_t bit_depth;
 
+	/* Maximum bit rate for this decoder instance */
+	uint32_t max_bitrate;
+
 	/* Frame duration for this decoder instance */
 	uint32_t duration_us;
 
@@ -50,7 +72,7 @@ struct lc3_decoder_configuration {
  */
 struct lc3_decoder_context {
 	/* Array of decoder channel handles */
-	struct lc3_decoder_handle *lc3_dec_channel[CONFIG_LC3_DECODER_MAX_CHANNELS];
+	struct lc3_decoder_handle *lc3_dec_channel[AUDIO_CH_NUM];
 
 	/* Number of decoder channel handles */
 	uint32_t dec_handles_count;
@@ -58,74 +80,19 @@ struct lc3_decoder_context {
 	/* The decoder cnfiguration */
 	struct lc3_decoder_configuration config;
 
+	/* Minimum coded bytes required for this decoder instance */
+	uint16_t coded_bytes_req;
+
 	/* Audio samples per frame */
 	size_t samples_per_frame;
+
+	/* Number of successive frames to which PLC has been applied */
+	uint16_t plc_count;
 };
 
 /**
  * @brief Size of the decoder's private context.
  */
 #define LC3_DECODER_CONTEXT_SIZE (sizeof(struct lc3_decoder_context))
-
-/**
- * @brief  Function for querying the resources required for a module.
- *
- * @param configuration  A pointer to the modules configuration to set.
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_query_resource(struct amod_configuration *configuration);
-
-/**
- * @brief  Function for opening a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules configuration to set.
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_open(struct amod_handle *handle, struct amod_configuration *configuration);
-
-/**
- * @brief  Function close an open module.
- *
- * @param handle  A pointer to the modules handle.
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_close(struct amod_handle *handle);
-
-/**
- * @brief  Function to set the configuration of a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules configuration to set.
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_configuration_set(struct amod_handle *handle, struct amod_configuration *configuration);
-
-/**
- * @brief  Function to set the configuration of a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules current configuration.
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration);
-
-/**
- * @brief An event will fire when a new data block is available to pull out
- *        of the audio system. This can then be called to retrieve the data.
- *
- * @param handle	 A handle to this module instance
- * @param block_in   Pointer to the input audio block or NULL for an input module
- * @param block_out  Pointer to the output audio block or NULL for an output module
- *
- * @return 0 if successful, error value
- */
-int lc3_dec_data_process(struct amod_handle *handle, struct aobj_block *block_in,
-			 struct aobj_block *block_out);
 
 #endif /* _LC3_DECODER_H_ */

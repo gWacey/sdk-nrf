@@ -377,8 +377,12 @@ config DECODER_MSG_QUEUE_SIZE
 	int "Queue size for decoder messages"
 	default 4
 
-config DECODER_DATA_OBJECTS_NUM
-	int "Number of objects for the decoder"
+config CONFIG_PCM_DATA_OBJECTS_NUM
+	int "Number of PCM buffers"
+	default 4
+
+config CONFIG_CODED_DATA_OBJECTS_NUM
+	int "Number of coded buffers"
 	default 4
 
 endmenu # Message queues

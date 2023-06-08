@@ -19,17 +19,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sw_codec_select, 4); /* CONFIG_SW_CODEC_SELECT_LOG_LEVEL); */
 
-#define TEST_LC3_DECODER_MODULE
-
-#ifdef TEST_LC3_DECODER_MODULE
-#include "aobj_api.h"
-#include "amod_api.h"
-#include "lc3_decoder.h"
-#include "modules.h"
-#endif /* TEST_LC3_DECODER_MODULE */
-
 #if ((CONFIG_AUDIO_FRAME_DURATION_US == 7500) && CONFIG_SW_CODEC_LC3)
-
 #define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 15 / 2) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
 #else
 #define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 10) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
@@ -240,17 +230,11 @@ int sw_codec_uninit(struct sw_codec_config sw_codec_cfg)
 				LOG_WRN("Trying to uninit decoder, it has not been initialized");
 				return -EALREADY;
 			}
-#ifdef TEST_LC3_DECODER_MODULE
-			ret = amod_close((struct amod_handle *)sw_codec_cfg.lc3_dec1_hdl);
-			if (ret) {
-				return ret;
-			}
-#else
+
 			ret = sw_codec_lc3_dec_uninit_all();
 			if (ret) {
 				return ret;
 			}
-#endif /* TEST_LC3_DECODER_MODULE */
 			m_config.decoder.enabled = false;
 		}
 #endif /* (CONFIG_SW_CODEC_LC3) */
@@ -288,6 +272,7 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *module
 				CONFIG_AUDIO_SAMPLE_RATE_HZ, CONFIG_AUDIO_BIT_DEPTH_BITS,
 				CONFIG_AUDIO_FRAME_DURATION_US, sw_codec_cfg.encoder.bitrate,
 				sw_codec_cfg.encoder.num_ch);
+
 			ret = sw_codec_lc3_enc_init(
 				CONFIG_AUDIO_SAMPLE_RATE_HZ, CONFIG_AUDIO_BIT_DEPTH_BITS,
 				CONFIG_AUDIO_FRAME_DURATION_US, sw_codec_cfg.encoder.bitrate,
@@ -315,14 +300,13 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *module
 			if (ret) {
 				return ret;
 			}
-#endif /* TEST_LC3_DECODER_MODULE */
 		}
 		break;
-#else
+
 		LOG_ERR("LC3 is not compiled in, please open menuconfig and select LC3");
 		return -ENODEV;
-#endif /* (CONFIG_SW_CODEC_LC3) */
 	}
+
 	default:
 		LOG_ERR("Unsupported codec: %d", sw_codec_cfg.sw_codec);
 		return false;
