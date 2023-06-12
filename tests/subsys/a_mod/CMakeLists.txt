@@ -14,5 +14,7 @@ target_sources(app PRIVATE ${app_sources})
 
  target_include_directories(app
   PRIVATE
-  ${ZEPHYR_NRF_MODULE_DIR}/applications/nrf5340_audio/src/audio_modules/generic_module/
+  
   )
+
+  #${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/

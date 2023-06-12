@@ -11,7 +11,6 @@
 #include <ctype.h>
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
-#include <nrfx_clock.h>
 #include "data_fifo.h"
 
 #include <zephyr/logging/log.h>
@@ -31,7 +30,8 @@ static int validate_parameters(struct amod_parameters *parameters)
 		return -EINVAL;
 	}
 
-	if (parameters->description == NULL || (parameters->description->type != AMOD_TYPE_INPUT &&
+	if (parameters->description == NULL ||
+	    (parameters->description->type != AMOD_TYPE_INPUT &&
 	     parameters->description->type != AMOD_TYPE_OUTPUT &&
 	     parameters->description->type != AMOD_TYPE_IN_OUT) ||
 	    parameters->description->name == NULL || parameters->description->functions == NULL) {
@@ -40,9 +40,9 @@ static int validate_parameters(struct amod_parameters *parameters)
 	}
 
 	if (parameters->thread == NULL || parameters->thread.stack == NULL ||
-		 parameters->thread.stack_size == 0 || parameters->thread.msg_rx == NULL ||
-		 parameters->thread.msg_tx == NULL || parameters->thread.data_slab == NULL ||
-		parameters->thread.data_size == 0) {
+	    parameters->thread.stack_size == 0 || parameters->thread.msg_rx == NULL ||
+	    parameters->thread.msg_tx == NULL || parameters->thread.data_slab == NULL ||
+	    parameters->thread.data_size == 0) {
 		LOG_DBG("Error in thread settings for module");
 		return -EINVAL;
 	}
@@ -431,8 +431,8 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 {
 	int ret;
 
-	if (parameters == NULL || configuration == NULL ||
-		name == NULL || handle == NULL || context == NULL) {
+	if (parameters == NULL || configuration == NULL || name == NULL || handle == NULL ||
+	    context == NULL) {
 		LOG_DBG("Parameter is NULL for module open function");
 		return -EINVAL;
 	}
@@ -475,11 +475,10 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 
 	switch (handle->description->type) {
 	case AMOD_TYPE_INPUT:
-		handle->thread_id =
-			k_thread_create(&handle->thread_data, handle->thread.stack,
-					handle->thread.stack_size,
-					(k_thread_entry_t)module_thread_input, handle, NULL, NULL,
-					K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+		handle->thread_id = k_thread_create(
+			&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
+			(k_thread_entry_t)module_thread_input, handle, NULL, NULL,
+			K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
 
 		ret = k_thread_name_set(handle->thread_id, handle->name);
 		if (ret) {
@@ -491,11 +490,10 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		break;
 
 	case AMOD_TYPE_OUTPUT:
-		handle->thread_id =
-			k_thread_create(&handle->thread_data, handle->thread.stack,
-					handle->thread.stack_size,
-					(k_thread_entry_t)module_thread_output, handle, NULL, NULL,
-					K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+		handle->thread_id = k_thread_create(
+			&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
+			(k_thread_entry_t)module_thread_output, handle, NULL, NULL,
+			K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
 
 		ret = k_thread_name_set(handle->thread_id, handle->name);
 		if (ret) {

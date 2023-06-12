@@ -10,8 +10,11 @@ menu "Audio"
 
 menu "Modules"
 
+config A_MOD
+	bool "Enable the audio module"
+
 config AMOD_NAME_SIZE
-	int " Maximum size for module naming in characters"
+	int "Maximum size for module naming in characters"
 	default 20
 
 endmenu # Modules

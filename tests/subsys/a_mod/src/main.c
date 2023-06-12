@@ -6,9 +6,9 @@
 
 #include <zephyr/ztest.h>
 #include <errno.h>
-#include "amod_api.h"
+// #include "amod_api.h"
 
-ZTEST(suite_a_mod, test_a_mod_init_fail)
+ZTEST(suite_a_mod, test_a_mod_init_bad_params)
 {
 	// int ret;
 
