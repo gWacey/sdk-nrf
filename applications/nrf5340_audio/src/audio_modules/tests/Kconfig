@@ -6,3 +6,4 @@ module-str = a-mod
 source "subsys/logging/Kconfig.template.log_config"
 
 source "Kconfig.zephyr"
+rsource "/home/koffe/ncs/nrf/applications/nrf5340_audio/src/audio_modules/generic_module/Kconfig"
