@@ -1,0 +1,8 @@
+# Copyright (c) 2022 Nordic Semiconductor ASA
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+module = A_MOD
+module-str = a-mod
+source "subsys/logging/Kconfig.template.log_config"
+
+source "Kconfig.zephyr"
