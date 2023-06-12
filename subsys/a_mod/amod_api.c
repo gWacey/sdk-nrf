@@ -39,10 +39,9 @@ static int validate_parameters(struct amod_parameters *parameters)
 		return -EINVAL;
 	}
 
-	if (parameters->thread == NULL || parameters->thread.stack == NULL ||
-	    parameters->thread.stack_size == 0 || parameters->thread.msg_rx == NULL ||
-	    parameters->thread.msg_tx == NULL || parameters->thread.data_slab == NULL ||
-	    parameters->thread.data_size == 0) {
+	if (parameters->thread.stack == NULL || parameters->thread.stack_size == 0 ||
+	    parameters->thread.msg_rx == NULL || parameters->thread.msg_tx == NULL ||
+	    parameters->thread.data_slab == NULL || parameters->thread.data_size == 0) {
 		LOG_DBG("Error in thread settings for module");
 		return -EINVAL;
 	}
@@ -162,7 +161,7 @@ static int send_to_tx_fifo(struct amod_handle *handle, char *data, struct aobj_b
 	if (ret) {
 		LOG_DBG("Failed to send block to output of module %s, ret %d", handle->name, ret);
 
-		data_fifo_block_free(handle->thread.msg_tx, (void **)(*msg_tx));
+		data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
 
 		k_sem_take(&handle->sem, K_NO_WAIT);
 
@@ -183,11 +182,12 @@ static int send_to_tx_fifo(struct amod_handle *handle, char *data, struct aobj_b
 static int send_to_connected(struct amod_handle *handle, struct aobj_block *block)
 {
 	int ret;
+	struct amod_handle *handle_to;
 
-	k_mutex_lock(handle->dest_mutex, K_FOREVER);
-	k_sem_init(handle->sem, handle->dest_count, handle->dest_count);
+	k_mutex_lock(&handle->dest_mutex, K_FOREVER);
+	k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
 
-	SYS_SLIST_FOR_EACH_CONTAINER(handle->hdl_dest_list, handle_to, node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_to, node) {
 		ret = data_tx(handle, handle_to, block, &block_release);
 		if (ret) {
 			LOG_DBG("Failed to send to module %s from %s, ret %d", handle_to->name,
@@ -212,8 +212,6 @@ static int send_to_connected(struct amod_handle *handle, struct aobj_block *bloc
 static int module_thread_input(struct amod_handle *handle)
 {
 	int ret;
-
-	struct amod_handle *handle_to;
 	struct amod_message *msg_rx = NULL;
 	struct aobj_block block;
 	char *data;
@@ -225,7 +223,6 @@ static int module_thread_input(struct amod_handle *handle)
 
 	/* Execute thread */
 	while (1) {
-		msg_tx = NULL;
 		data = NULL;
 
 		if (handle->description->functions->data_process != NULL) {
@@ -259,7 +256,7 @@ static int module_thread_input(struct amod_handle *handle)
 				send_to_connected(handle, &block);
 			}
 
-			if (handle->thread.msg_tx) {
+			if (handle->data_tx && handle->thread.msg_tx) {
 				ret = send_to_tx_fifo(handle, data, &block);
 				if (ret) {
 					continue;
@@ -286,7 +283,6 @@ static int module_thread_output(struct amod_handle *handle)
 	int ret;
 
 	struct amod_message *msg_rx;
-	struct amod_message *msg_tx = NULL;
 	char *data = NULL;
 	size_t size;
 
@@ -343,11 +339,9 @@ static int module_thread_output(struct amod_handle *handle)
 static int module_thread_in_out(struct amod_handle *handle)
 {
 	int ret;
-
-	struct amod_handle *handle_to;
 	struct amod_message *msg_rx;
-	struct amod_message *msg_tx;
-	char *data = NULL;
+	struct aobj_block block;
+	char *data;
 	size_t size;
 
 	if (handle == NULL) {
@@ -357,7 +351,6 @@ static int module_thread_in_out(struct amod_handle *handle)
 
 	/* Execute thread */
 	while (1) {
-		msg_rx = NULL;
 		data = NULL;
 
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
@@ -379,12 +372,12 @@ static int module_thread_in_out(struct amod_handle *handle)
 			}
 
 			/* Configure new audio block */
-			msg_tx->block.data = data;
-			msg_tx->block.data_size = handle->thread.data_size;
+			block.data = data;
+			block.data_size = handle->thread.data_size;
 
 			/* Process the input audio block into the output audio block */
-			ret = handle->description->functions->data_process(
-				(struct handle *)handle, &msg_rx->block, &msg_tx->block);
+			ret = handle->description->functions->data_process((struct handle *)handle,
+									   &msg_rx->block, &block);
 			if (ret) {
 				clean_up(handle, &msg_rx, &data);
 
@@ -398,7 +391,7 @@ static int module_thread_in_out(struct amod_handle *handle)
 				send_to_connected(handle, &block);
 			}
 
-			if (data_tx && handle->thread.msg_tx) {
+			if (handle->data_tx && handle->thread.msg_tx) {
 				ret = send_to_tx_fifo(handle, data, &block);
 				if (ret) {
 					continue;
@@ -437,7 +430,12 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_OPEN) {
+	if (strlen(name) > CONFIG_AMOD_NAME_SIZE) {
+		LOG_DBG("Module %s is already open", handle->name);
+		return -EINVAL;
+	}
+
+	if (handle->state != AMOD_STATE_UNDEFINED) {
 		LOG_DBG("Module %s is already open", handle->name);
 		return -EALREADY;
 	}
@@ -469,6 +467,16 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		ret = handle->description->functions->open((struct handle *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
+			return ret;
+		}
+	}
+
+	if (handle->description->functions->configuration_set != NULL) {
+		ret = handle->description->functions->configuration_set((struct handle *)handle,
+									configuration);
+		if (ret) {
+			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
+				ret);
 			return ret;
 		}
 	}
@@ -527,7 +535,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 
 	k_thread_start(handle->thread_id);
 
-	handle->state = AMOD_STATE_OPEN;
+	handle->state = AMOD_STATE_CONFIGURED;
 
 	LOG_DBG("Module %s is now open", handle->name);
 
@@ -546,29 +554,30 @@ int amod_close(struct amod_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_RUNNING) {
+	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
 		LOG_DBG("Module %s in an invalid state, %d, for close", handle->name,
 			handle->state);
 		return -ENOTSUP;
 	}
 
-	if (handle->description->functions->close != NULL) {
-		ret = handle->description->functions->close((struct handle *)handle);
-		if (ret) {
-			LOG_DBG("Failed close call to module %s, returned %d", handle->name, ret);
-			return ret;
+	if (handle->state) {
+		if (handle->description->functions->close != NULL) {
+			ret = handle->description->functions->close((struct handle *)handle);
+			if (ret) {
+				LOG_DBG("Failed close call to module %s, returned %d", handle->name,
+					ret);
+				return ret;
+			}
 		}
-	} else {
-		LOG_DBG("Module %s has no close function", handle->name);
+
+		data_fifo_empty(handle->thread.msg_rx);
+		data_fifo_empty(handle->thread.msg_tx);
+		/* Howto return all the data to the slab? */
+
+		k_thread_abort(handle->thread_id);
+
+		handle->state = AMOD_STATE_UNDEFINED;
 	}
-
-	data_fifo_empty(handle->thread.msg_rx);
-	data_fifo_empty(handle->thread.msg_tx);
-	/* Howto return all the data to the slab? */
-
-	k_thread_abort(handle->thread_id);
-
-	handle->state = AMOD_STATE_UNDEFINED;
 
 	return 0;
 };
@@ -599,8 +608,6 @@ int amod_configuration_set(struct amod_handle *handle, struct amod_configuration
 				ret);
 			return ret;
 		}
-	} else {
-		LOG_DBG("No set configuration function for module %s", handle->name);
 	}
 
 	handle->previous_state = handle->state;
@@ -621,7 +628,7 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_OPEN) {
+	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
 		LOG_DBG("Module %s in an invalid state, %d, for getting the configuration",
 			handle->name, handle->state);
 		return -ENOTSUP;
@@ -635,9 +642,6 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
 				ret);
 			return ret;
 		}
-	} else {
-		LOG_DBG("No get configuration function for module %s", handle->name);
-		return -ENOSYS;
 	}
 
 	return 0;
@@ -654,7 +658,9 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 		return -EINVAL;
 	}
 
-	if (handle_from->description->type == AMOD_TYPE_OUTPUT ||
+	if (handle_from->description->type == AMOD_TYPE_UNDEFINED ||
+	    handle_from->description->type == AMOD_TYPE_OUTPUT ||
+	    handle_to->description->type == AMOD_TYPE_UNDEFINED ||
 	    handle_to->description->type == AMOD_TYPE_INPUT) {
 		LOG_DBG("Connections between these modules, %s to %s, is not supported",
 			handle_from->name, handle_to->name);
@@ -694,14 +700,16 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 		return -EINVAL;
 	}
 
-	if (handle->description->type == AMOD_TYPE_OUTPUT ||
+	if (handle->description->type == AMOD_TYPE_UNDEFINED ||
+	    handle->description->type == AMOD_TYPE_OUTPUT ||
+	    handle_disconnect->description->type == AMOD_TYPE_UNDEFINED ||
 	    handle_disconnect->description->type == AMOD_TYPE_INPUT) {
 		LOG_DBG("Connections between these modules, %s to %s, is not supported",
 			handle->name, handle_disconnect->name);
 		return -ENOTSUP;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_OPEN) {
+	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
 		LOG_DBG("A module is an invalid state or type for disconnection");
 		return -ENOTSUP;
 	}
@@ -733,8 +741,7 @@ int amod_start(struct amod_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING ||
-	    handle->state == AMOD_STATE_OPEN) {
+	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
 		LOG_DBG("Module %s in an invalid state, %d, for set configuration", handle->name,
 			handle->state);
 		return -ENOTSUP;
@@ -746,8 +753,6 @@ int amod_start(struct amod_handle *handle)
 			LOG_DBG("Failed user start for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
-	} else {
-		LOG_DBG("No user start function for module %s", handle->name);
 	}
 
 	handle->previous_state = handle->state;
@@ -774,18 +779,16 @@ int amod_stop(struct amod_handle *handle)
 		return -ENOTSUP;
 	}
 
-	if (handle->description->functions->pause != NULL) {
-		ret = handle->description->functions->pause((struct handle *)handle);
+	if (handle->description->functions->stop != NULL) {
+		ret = handle->description->functions->stop((struct handle *)handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user pause for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
-	} else {
-		LOG_DBG("No user pause function for module %s", handle->name);
 	}
 
 	handle->previous_state = handle->state;
-	handle->state = AMOD_STATE_PAUSED;
+	handle->state = AMOD_STATE_STOPPED;
 
 	return 0;
 }

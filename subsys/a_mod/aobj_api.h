@@ -59,7 +59,7 @@ struct aobj_format {
 	/* Number of channels in the PCM block */
 	uint8_t number_channels;
 
-	/* A 32 bit value indicating which channel(s) are active within
+	/* A 32 bit mask indicating which channel(s) are active within
 	 * the PCM block. A bit set indicates the channel is active.
 	 */
 	uint32_t channel_map;

@@ -52,17 +52,14 @@ enum amod_state {
 	/* Module state undefined */
 	AMOD_STATE_UNDEFINED = 0,
 
-	/* Module is in the open state */
-	AMOD_STATE_OPEN,
-
 	/* Module is in the configured state */
 	AMOD_STATE_CONFIGURED,
 
 	/* Module is in the running state */
 	AMOD_STATE_RUNNING,
 
-	/* Module is in the paused state */
-	AMOD_STATE_PAUSED
+	/* Module is in the stopped state */
+	AMOD_STATE_STOPPED
 };
 
 /**
@@ -118,13 +115,13 @@ struct amod_functions {
 	int (*start)(struct handle *handle);
 
 	/**
-	 * @brief Pause a module processing data.
+	 * @brief Stop a module processing data.
 	 *
-	 * @param handle  The handle for the module to pause
+	 * @param handle  The handle for the module to stop
 	 *
 	 * @return 0 if successful, error value
 	 */
-	int (*pause)(struct handle *handle);
+	int (*stop)(struct handle *handle);
 
 	/**
 	 * @brief The core data processing function for the module. Can be either an
@@ -151,7 +148,7 @@ struct amod_description {
 	enum amod_type type;
 
 	/* A pointer to the functions to implment the module */
-	struct amod_functions *functions;
+	const struct amod_functions *functions;
 };
 
 /**
@@ -213,11 +210,11 @@ struct amod_handle {
 	/* Thread data */
 	struct k_thread thread_data;
 
-	/* List node (next pointer) */
-	sys_snode_t node;
-
 	/* Flag to indicate the module should send data block to its TX fifo */
 	bool data_tx;
+
+	/* List node (next pointer) */
+	sys_snode_t node;
 
 	/* A singley linked-list of the handles the module is connected to */
 	sys_slist_t hdl_dest_list;
@@ -357,9 +354,9 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 int amod_start(struct amod_handle *handle);
 
 /**
- * @brief Pause a module processing data.
+ * @brief Stop a module processing data.
  *
- * @param handle  The handle for the module to pause
+ * @param handle  The handle for the module to be stopped
  *
  * @return 0 if successful, error value
  */
