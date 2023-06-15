@@ -15,7 +15,7 @@
 #include "LC3API.h"
 
 #if (CONFIG_SW_CODEC_LC3)
-#define LC3_MAX_FRAME_SIZE_MS 10
+#define LC3_MAX_FRAME_SIZE_MS	10
 #define LC3_ENC_MONO_FRAME_SIZE (CONFIG_LC3_BITRATE * LC3_MAX_FRAME_SIZE_MS / (8 * 1000))
 
 #define LC3_PCM_NUM_BYTES_MONO                                                                     \
@@ -24,14 +24,14 @@
 #define LC3_DEC_TIME_US 1500
 #else
 #define LC3_ENC_MONO_FRAME_SIZE 0
-#define LC3_PCM_NUM_BYTES_MONO 0
-#define LC3_ENC_TIME_US 0
-#define LC3_DEC_TIME_US 0
+#define LC3_PCM_NUM_BYTES_MONO	0
+#define LC3_ENC_TIME_US		0
+#define LC3_DEC_TIME_US		0
 #endif /* CONFIG_SW_CODEC_LC3 */
 
 /* Max will be used when multiple codecs are supported */
-#define DEC_TIME_US MAX(LC3_DEC_TIME_US, 0)
-#define DEC_PCM_NUM_BYTES_MONO MAX(LC3_PCM_NUM_BYTES_MONO, 0)
+#define DEC_TIME_US		     MAX(LC3_DEC_TIME_US, 0)
+#define DEC_PCM_NUM_BYTES_MONO	     MAX(LC3_PCM_NUM_BYTES_MONO, 0)
 #define DEC_PCM_NUM_BYTES_MULTI_CHAN (DEC_PCM_NUM_BYTES_MONO * CONFIG_LC3_DEC_CHANNELS_MAX)
 
 /**
@@ -56,6 +56,9 @@ struct lc3_decoder_configuration {
 
 	/* Maximum bit rate for this decoder instance */
 	uint32_t max_bitrate;
+
+	/* The packing format for the output PCM buffer */
+	enum aobj_interleaved packing;
 
 	/* Frame duration for this decoder instance */
 	uint32_t duration_us;

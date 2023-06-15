@@ -41,33 +41,28 @@ DATA_FIFO_DEFINE(mod_fifo_tx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(mod_fifo_rx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 K_MEM_SLAB_DEFINE(mod_data_slab, MOD_DATA_SIZE, PCM_DATA_OBJECTS_NUM, 4);
 
-ZTEST(suite_a_mod, test_a_mod_stop_state)
+ZTEST(suite_a_mod, test_stop_bad_state)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST stop"};
 
 	handle.state = AMOD_STATE_UNDEFINED;
 	ret = amod_stop(&handle);
 	zassert_equal(ret, -ENOTSUP, "Stop function did not return -ENOTSUP (-129)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Stop returns with incorrect state");
+	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Stop returns with incorrect state");
 
 	handle.state = AMOD_STATE_CONFIGURED;
 	ret = amod_stop(&handle);
 	zassert_equal(ret, -ENOTSUP, "Stop function did not return -ENOTSUP (-129)");
-	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Stop returns with incorrect state");
-
-	handle.state = AMOD_STATE_RUNNING;
-	ret = amod_stop(&handle);
-	zassert_equal(ret, 0, "Stop function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Stop returns with incorrect state");
+	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Stop returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
 	ret = amod_stop(&handle);
-	zassert_equal(ret, -ENOTSUP, "Stop function did not return -ENOTSUP (-129)");
+	zassert_equal(ret, -EALREADY, "Stop function did not return -ENOTSUP (-114)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Stop returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_stop_null)
+ZTEST(suite_a_mod, test_stop_null)
 {
 	int ret;
 	struct amod_handle handle = {0};
@@ -77,54 +72,44 @@ ZTEST(suite_a_mod, test_a_mod_stop_null)
 
 	handle.state = AMOD_STATE_RUNNING;
 	ret = amod_start(NULL);
-	zassert_equal(ret, 0, "Stop function did not return successfully (0)");
+	zassert_equal(ret, -EINVAL, "Stop function did not return successfully (-22)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Stop returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_start_state)
+ZTEST(suite_a_mod, test_start_bad_state)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST start"};
 
 	handle.state = AMOD_STATE_UNDEFINED;
 	ret = amod_start(&handle);
 	zassert_equal(ret, -ENOTSUP, "Start function did not return -ENOTSUP (-129)");
-	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Start returns with incorrect state");
-
-	handle.state = AMOD_STATE_CONFIGURED;
-	ret = amod_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Start returns with incorrect state");
+	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Start returns with incorrect state");
 
 	handle.state = AMOD_STATE_RUNNING;
 	ret = amod_start(&handle);
-	zassert_equal(ret, -ENOTSUP, "Start function did not return -ENOTSUP (-129)");
+	zassert_equal(ret, -EALREADY, "Start function did not return -ENOTSUP (-114)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Start returns with incorrect state");
-
-	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Start returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_start_null)
+ZTEST(suite_a_mod, test_start_null)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST start"};
 
 	ret = amod_start(NULL);
 	zassert_equal(ret, -EINVAL, "Start function did not return -EINVAL (-22)");
 
 	handle.state = AMOD_STATE_STOPPED;
 	ret = amod_start(NULL);
-	zassert_equal(ret, 0, "Start function did not return successfully (0)");
+	zassert_equal(ret, -EINVAL, "Start function did not return successfully (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Start returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_get_config_state)
+ZTEST(suite_a_mod, test_get_config_bad_state)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST get config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
@@ -132,30 +117,12 @@ ZTEST(suite_a_mod, test_a_mod_get_config_state)
 	ret = amod_configuration_get(&handle, config);
 	zassert_equal(ret, -ENOTSUP, "Configuration get function did not return -ENOTSUP (129)");
 	handle.state = AMOD_STATE_UNDEFINED;
-
-	handle.state = AMOD_STATE_CONFIGURED;
-	ret = amod_configuration_get(&handle, config);
-	zassert_equal(ret, 0, "Configuration get function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Configuration get returns with incorrect state");
-
-	handle.state = AMOD_STATE_RUNNING;
-	ret = amod_configuration_get(&handle, config);
-	zassert_equal(ret, 0, "Configuration get function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Configuration get returns with incorrect state");
-
-	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_get(&handle, config);
-	zassert_equal(ret, 0, "Configuration get function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Configuration get returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_get_config_null)
+ZTEST(suite_a_mod, test_get_config_null)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST get config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
@@ -187,10 +154,10 @@ ZTEST(suite_a_mod, test_a_mod_get_config_null)
 		      "Configuration get returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_set_config_state)
+ZTEST(suite_a_mod, test_set_config_bad_state)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST set config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
@@ -200,29 +167,17 @@ ZTEST(suite_a_mod, test_a_mod_set_config_state)
 	zassert_equal(handle.state, AMOD_STATE_UNDEFINED,
 		      "Configuration set returns with incorrect state");
 
-	handle.state = AMOD_STATE_CONFIGURED;
-	ret = amod_configuration_set(&handle, config);
-	zassert_equal(ret, 0, "Configuration set function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Configuration set returns with incorrect state");
-
 	handle.state = AMOD_STATE_RUNNING;
 	ret = amod_configuration_set(&handle, config);
 	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING,
 		      "Configuration set returns with incorrect state");
-
-	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_set(&handle, config);
-	zassert_equal(ret, 0, "Configuration set function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Configuration set returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_set_config_null)
+ZTEST(suite_a_mod, test_set_config_null)
 {
 	int ret;
-	struct amod_handle handle = {0};
+	struct amod_handle handle = {.name = "TEST set config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
@@ -257,50 +212,42 @@ ZTEST(suite_a_mod, test_a_mod_set_config_null)
 		      "Configuration set returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_close_state)
+ZTEST(suite_a_mod, test_close_bad_state)
 {
 	int ret;
+	char *inst_name = "TEST close";
 	struct amod_handle handle = {0};
+
+	memcpy(&handle.name, inst_name, sizeof(inst_name));
+
+	handle.state = AMOD_STATE_CONFIGURED;
+	ret = amod_close(NULL);
+	zassert_equal(ret, -EINVAL, "Close function did not return -EALREADY (-22)");
+	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Close returns with incorrect state");
 
 	handle.state = AMOD_STATE_UNDEFINED;
 	ret = amod_close(&handle);
 	zassert_equal(ret, -ENOTSUP, "Close function did not return -ENOTSUP (-129)");
 	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Close returns with incorrect state");
 
-	handle.state = AMOD_STATE_CONFIGURED;
-	ret = amod_close(&handle);
-	zassert_equal(ret, 0, " did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Close returns with incorrect state");
-
 	handle.state = AMOD_STATE_RUNNING;
 	ret = amod_close(&handle);
-	zassert_equal(ret, 0, " did not return -ENOTSUP (-129)");
+	zassert_equal(ret, -ENOTSUP, " did not return -ENOTSUP (-129)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Close returns with incorrect state");
-
-	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_close(&handle);
-	zassert_equal(ret, 0, "Close did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Close returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_close_null)
+ZTEST(suite_a_mod, test_close_null)
 {
 	int ret;
-	struct amod_handle handle = {0};
 
 	ret = amod_close(NULL);
 	zassert_equal(ret, -EINVAL, "Close function did not return -EINVAL (-22)");
-
-	handle.state = AMOD_STATE_CONFIGURED;
-	ret = amod_close(NULL);
-	zassert_equal(ret, -EINVAL, "Close function did not return -EALREADY (-22)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Close returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_open_thread)
+ZTEST(suite_a_mod, test_open_bad_thread)
 {
 	int ret;
-	char *inst_name = "Test Module";
+	char *inst_name = "TEST open";
 	struct amod_description test_description = {0};
 	struct amod_parameters test_params_thread = {.description = &test_description};
 	struct mod_config configuration = {0};
@@ -355,46 +302,21 @@ ZTEST(suite_a_mod, test_a_mod_open_thread)
 	ret = amod_open(&test_params_thread, config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
-
-	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = MOD_STACK_SIZE;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = &mod_fifo_rx;
-	test_params_thread.thread.msg_tx = &mod_fifo_tx;
-	test_params_thread.thread.data_slab = NULL;
-	test_params_thread.thread.data_size = MOD_DATA_SIZE;
-
-	ret = amod_open(&test_params_thread, config, inst_name, &handle,
-			(struct amod_context *)&context);
-	zassert_equal(ret, 0, "Open function did not return successfully (0)");
-
-	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = MOD_STACK_SIZE;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = &mod_fifo_rx;
-	test_params_thread.thread.msg_tx = &mod_fifo_tx;
-	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = 0;
-
-	ret = amod_open(&test_params_thread, config, inst_name, &handle,
-			(struct amod_context *)&context);
-	zassert_equal(ret, 0, "Open function did not return successfully (0)");
 }
 
-ZTEST(suite_a_mod, test_a_mod_open_description)
+ZTEST(suite_a_mod, test_open_bad_description)
 {
 	int ret;
-	char *inst_name = "Test Module";
+	char *inst_name = "TEST open";
 	struct amod_description test_description = {0};
 	struct amod_parameters test_params_desc = {0};
-	struct mod_config configuration = {0};
-	struct amod_configuration *config = (struct amod_configuration *)&configuration;
+	struct mod_config config = {0};
 	struct amod_handle handle = {0};
 	struct mod_context context = {0};
 
 	test_params_desc.description = NULL;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
@@ -403,7 +325,7 @@ ZTEST(suite_a_mod, test_a_mod_open_description)
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
@@ -412,7 +334,7 @@ ZTEST(suite_a_mod, test_a_mod_open_description)
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
@@ -421,7 +343,7 @@ ZTEST(suite_a_mod, test_a_mod_open_description)
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
@@ -430,7 +352,7 @@ ZTEST(suite_a_mod, test_a_mod_open_description)
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
@@ -439,15 +361,15 @@ ZTEST(suite_a_mod, test_a_mod_open_description)
 	test_params_desc.description->functions = NULL;
 	test_params_desc.description = &test_description;
 
-	ret = amod_open(&test_params_desc, config, inst_name, &handle,
+	ret = amod_open(&test_params_desc, (struct amod_configuration *)&config, inst_name, &handle,
 			(struct amod_context *)&context);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 }
 
-ZTEST(suite_a_mod, test_a_mod_open_state)
+ZTEST(suite_a_mod, test_open_bad_state)
 {
 	int ret;
-	char *inst_name = "Test Module";
+	char *inst_name = "TEST open";
 	struct amod_description test_description = {
 		.name = "Module 1", .type = AMOD_TYPE_IN_OUT, .functions = &mod_1_functions};
 	struct amod_parameters test_params = {.description = &test_description};
@@ -456,31 +378,26 @@ ZTEST(suite_a_mod, test_a_mod_open_state)
 	struct amod_handle handle = {0};
 	struct mod_context context = {0};
 
-	handle.state = AMOD_STATE_UNDEFINED;
-	ret = amod_open(&test_params, config, inst_name, &handle, (struct amod_context *)&context);
-	zassert_equal(ret, 0, "Open function did not return successfully (0)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Open returns with incorrect state");
-
 	handle.state = AMOD_STATE_CONFIGURED;
 	ret = amod_open(&test_params, config, inst_name, &handle, (struct amod_context *)&context);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-103)");
+	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-114)");
 	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Open returns with incorrect state");
 
 	handle.state = AMOD_STATE_RUNNING;
 	ret = amod_open(&test_params, config, inst_name, &handle, (struct amod_context *)&context);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-103)");
+	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-114)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING, "Open returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
 	ret = amod_open(&test_params, config, inst_name, &handle, (struct amod_context *)&context);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-103)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Open returns with incorrect state");
+	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (-114)");
+	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Open returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_a_mod_open_null)
+ZTEST(suite_a_mod, test_open_null)
 {
 	int ret;
-	char *inst_name = "Test Module";
+	char *inst_name = "TEST open";
 	struct amod_description test_description = {
 		.name = "Module 1", .type = AMOD_TYPE_IN_OUT, .functions = &mod_1_functions};
 	struct amod_parameters test_params = {.description = &test_description};
@@ -511,7 +428,7 @@ ZTEST(suite_a_mod, test_a_mod_open_null)
 	handle.state = AMOD_STATE_UNDEFINED;
 	ret = amod_open(NULL, NULL, NULL, NULL, NULL);
 	zassert_equal(ret, -EINVAL, "Open function did not return -EALREADY (-22)");
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED, "Open returns with incorrect state");
+	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Open returns with incorrect state");
 }
 
 ZTEST_SUITE(suite_a_mod, NULL, NULL, NULL, NULL, NULL);

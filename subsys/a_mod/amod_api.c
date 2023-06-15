@@ -570,9 +570,15 @@ int amod_close(struct amod_handle *handle)
 			}
 		}
 
-		data_fifo_empty(handle->thread.msg_rx);
-		data_fifo_empty(handle->thread.msg_tx);
-		/* Howto return all the data to the slab? */
+		if (handle->thread.msg_rx != NULL) {
+			data_fifo_empty(handle->thread.msg_rx);
+		}
+
+		if (handle->thread.msg_tx != NULL) {
+			data_fifo_empty(handle->thread.msg_tx);
+		}
+
+		/* How to return all the data to the slab? */
 
 		k_thread_abort(handle->thread_id);
 
@@ -741,10 +747,15 @@ int amod_start(struct amod_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
-		LOG_DBG("Module %s in an invalid state, %d, for set configuration", handle->name,
+	if (handle->state == AMOD_STATE_UNDEFINED) {
+		LOG_DBG("Module %s in an invalid state, %d, for start", handle->name,
 			handle->state);
 		return -ENOTSUP;
+	}
+
+	if (handle->state == AMOD_STATE_RUNNING) {
+		LOG_DBG("Module %s already running", handle->name);
+		return -EALREADY;
 	}
 
 	if (handle->description->functions->start != NULL) {
@@ -773,9 +784,13 @@ int amod_stop(struct amod_handle *handle)
 		return -EINVAL;
 	}
 
+	if (handle->state == AMOD_STATE_STOPPED) {
+		LOG_DBG("Module %s already stopped", handle->name);
+		return -EALREADY;
+	}
+
 	if (handle->state != AMOD_STATE_RUNNING) {
-		LOG_DBG("Module %s in an invalid state, %d, for set configuration", handle->name,
-			handle->state);
+		LOG_DBG("Module %s in an invalid state, %d, for stop", handle->name, handle->state);
 		return -ENOTSUP;
 	}
 
