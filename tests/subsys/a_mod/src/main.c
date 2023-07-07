@@ -41,6 +41,56 @@ DATA_FIFO_DEFINE(mod_fifo_tx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(mod_fifo_rx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 K_MEM_SLAB_DEFINE(mod_data_slab, MOD_DATA_SIZE, PCM_DATA_OBJECTS_NUM, 4);
 
+ZTEST(suite_a_mod, test_number_channels_calculate_null)
+{
+	int ret;
+	struct ablk_block block = {0};
+	uint8_t number_channels;
+
+	ret = amod_number_channels_calculate(NULL, &number_channels);
+	zassert_equal(ret, -EINVAL,
+		      "Calculate number of channels function did not return -EINVAL (-22)");
+
+	ret = amod_number_channels_calculate(&block, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Calculate number of channels function did not return -EINVAL (-22)");
+}
+
+ZTEST(suite_a_mod, test_state_get_null)
+{
+	int ret;
+	struct amod_handle handle = {0};
+	enum amod_state state;
+
+	ret = amod_state_get(NULL, &state);
+	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");
+
+	ret = amod_state_get(&handle, NULL);
+	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");
+}
+
+ZTEST(suite_a_mod, test_names_get_null)
+{
+	int ret;
+	struct amod_handle handle = {0};
+	char base_name[CONFIG_AMOD_NAME_SIZE];
+	char instance_name[CONFIG_AMOD_NAME_SIZE];
+
+	ret = amod_names_get(NULL, &base_name[0], &instance_name[0]);
+	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");
+
+	ret = amod_names_get(&handle, NULL, &instance_name[0]);
+	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");
+
+	ret = amod_names_get(&handle, &base_name[0], NULL);
+	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");
+
+	handle.state = AMOD_STATE_UNDEFINED;
+	ret = amod_names_get(&handle, &base_name[0], &instance_name[0]);
+	zassert_equal(ret, -ENOTSUP, "Get names function did not return successfully (-129)");
+	zassert_equal(handle.state, AMOD_STATE_UNDEFINED, "Get names returns with incorrect state");
+}
+
 ZTEST(suite_a_mod, test_stop_bad_state)
 {
 	int ret;
@@ -106,7 +156,7 @@ ZTEST(suite_a_mod, test_start_null)
 	zassert_equal(handle.state, AMOD_STATE_STOPPED, "Start returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_get_config_bad_state)
+ZTEST(suite_a_mod, test_config_get_bad_state)
 {
 	int ret;
 	struct amod_handle handle = {.name = "TEST get config"};
@@ -114,47 +164,237 @@ ZTEST(suite_a_mod, test_get_config_bad_state)
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
 	handle.state = AMOD_STATE_UNDEFINED;
-	ret = amod_configuration_get(&handle, config);
+	ret = amod_reconfigure(&handle, config);
 	zassert_equal(ret, -ENOTSUP, "Configuration get function did not return -ENOTSUP (129)");
 	handle.state = AMOD_STATE_UNDEFINED;
 }
 
-ZTEST(suite_a_mod, test_get_config_null)
+ZTEST(suite_a_mod, test_config_get_null)
 {
 	int ret;
 	struct amod_handle handle = {.name = "TEST get config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
-	ret = amod_configuration_get(NULL, NULL);
+	ret = amod_reconfigure(NULL, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 
-	ret = amod_configuration_get(NULL, config);
+	ret = amod_reconfigure(NULL, config);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 
-	ret = amod_configuration_get(&handle, NULL);
+	ret = amod_reconfigure(&handle, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_get(NULL, config);
+	ret = amod_reconfigure(NULL, config);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration get returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_get(&handle, NULL);
+	ret = amod_reconfigure(&handle, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration get returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_get(NULL, NULL);
+	ret = amod_reconfigure(NULL, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration get function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration get returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_set_config_bad_state)
+ZTEST(suite_a_mod, test_disconnect_bad_type)
+{
+	int ret;
+	struct amod_description test_description_1 = {
+		.name = "Module 1", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+
+	struct amod_description test_description_2 = {
+		.name = "Module 1", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_TYPE_UNDEFINED,
+					.description = &test_description_1};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_TYPE_UNDEFINED,
+					.description = &test_description_2};
+
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	test_description_1.type = AMOD_TYPE_PROCESS;
+	test_description_1.type = AMOD_TYPE_UNDEFINED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_UNDEFINED;
+	handle_rx.state = AMOD_TYPE_PROCESS;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	test_description_1.type = AMOD_TYPE_INPUT;
+	test_description_1.type = AMOD_TYPE_INPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_OUTPUT;
+	handle_rx.state = AMOD_TYPE_INPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_PROCESS;
+	handle_rx.state = AMOD_TYPE_OUTPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+}
+
+ZTEST(suite_a_mod, test_disconnect_bad_state)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_STATE_UNDEFINED,
+					.description = &test_description};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_STATE_UNDEFINED,
+					.description = &test_description};
+
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_STATE_CONFIGURED;
+	handle_rx.state = AMOD_STATE_UNDEFINED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_STATE_UNDEFINED;
+	handle_rx.state = AMOD_STATE_CONFIGURED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+}
+
+ZTEST(suite_a_mod, test_disconnect_null)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_STATE_CONFIGURED,
+					.description = &test_description};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_STATE_CONFIGURED,
+					.description = &test_description};
+
+	ret = amod_connect(NULL, NULL);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+
+	ret = amod_connect(NULL, &handle_rx);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+
+	ret = amod_connect(&handle_tx, NULL);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+}
+
+ZTEST(suite_a_mod, test_connect_bad_type)
+{
+	int ret;
+	struct amod_description test_description_1 = {
+		.name = "Module 1", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+
+	struct amod_description test_description_2 = {
+		.name = "Module 1", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_TYPE_UNDEFINED,
+					.description = &test_description_1};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_TYPE_UNDEFINED,
+					.description = &test_description_2};
+
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	test_description_1.type = AMOD_TYPE_PROCESS;
+	test_description_1.type = AMOD_TYPE_UNDEFINED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_UNDEFINED;
+	handle_rx.state = AMOD_TYPE_PROCESS;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	test_description_1.type = AMOD_TYPE_INPUT;
+	test_description_1.type = AMOD_TYPE_INPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_OUTPUT;
+	handle_rx.state = AMOD_TYPE_INPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+
+	handle_tx.state = AMOD_TYPE_PROCESS;
+	handle_rx.state = AMOD_TYPE_OUTPUT;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
+}
+
+ZTEST(suite_a_mod, test_connect_bad_state)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_STATE_UNDEFINED,
+					.description = &test_description};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_STATE_UNDEFINED,
+					.description = &test_description};
+
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -EINVAL (-129)");
+
+	handle_tx.state = AMOD_STATE_CONFIGURED;
+	handle_rx.state = AMOD_STATE_UNDEFINED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -EINVAL (-129)");
+
+	handle_tx.state = AMOD_STATE_UNDEFINED;
+	handle_rx.state = AMOD_STATE_CONFIGURED;
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -EINVAL (-129)");
+}
+
+ZTEST(suite_a_mod, test_connect_null)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+
+	struct amod_handle handle_tx = {.name = "TEST connect 1",
+					.state = AMOD_STATE_CONFIGURED,
+					.description = &test_description};
+	struct amod_handle handle_rx = {.name = "TEST connect 2",
+					.state = AMOD_STATE_CONFIGURED,
+					.description = &test_description};
+
+	ret = amod_connect(NULL, NULL);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+
+	ret = amod_connect(NULL, &handle_rx);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+
+	ret = amod_connect(&handle_tx, NULL);
+	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
+}
+
+ZTEST(suite_a_mod, test_reconfig_bad_state)
 {
 	int ret;
 	struct amod_handle handle = {.name = "TEST set config"};
@@ -162,51 +402,51 @@ ZTEST(suite_a_mod, test_set_config_bad_state)
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
 	handle.state = AMOD_STATE_UNDEFINED;
-	ret = amod_configuration_set(&handle, config);
+	ret = amod_reconfigure(&handle, config);
 	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
 	zassert_equal(handle.state, AMOD_STATE_UNDEFINED,
 		      "Configuration set returns with incorrect state");
 
 	handle.state = AMOD_STATE_RUNNING;
-	ret = amod_configuration_set(&handle, config);
+	ret = amod_reconfigure(&handle, config);
 	zassert_equal(ret, -ENOTSUP, "Configuration set function did not return -ENOTSUP (-129)");
 	zassert_equal(handle.state, AMOD_STATE_RUNNING,
 		      "Configuration set returns with incorrect state");
 }
 
-ZTEST(suite_a_mod, test_set_config_null)
+ZTEST(suite_a_mod, test_reconfig_null)
 {
 	int ret;
 	struct amod_handle handle = {.name = "TEST set config"};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 
-	ret = amod_configuration_set(NULL, NULL);
+	ret = amod_reconfigure(NULL, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 
-	ret = amod_configuration_set(NULL, config);
+	ret = amod_reconfigure(NULL, config);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 
-	ret = amod_configuration_set(&handle, NULL);
+	ret = amod_reconfigure(&handle, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 
-	ret = amod_configuration_set(&handle, NULL);
+	ret = amod_reconfigure(&handle, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_set(NULL, NULL);
+	ret = amod_reconfigure(NULL, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration set returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_set(NULL, config);
+	ret = amod_reconfigure(NULL, config);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration set returns with incorrect state");
 
 	handle.state = AMOD_STATE_STOPPED;
-	ret = amod_configuration_set(&handle, NULL);
+	ret = amod_reconfigure(&handle, NULL);
 	zassert_equal(ret, -EINVAL, "Configuration set function did not return -EINVAL (-22)");
 	zassert_equal(handle.state, AMOD_STATE_STOPPED,
 		      "Configuration set returns with incorrect state");
@@ -348,7 +588,7 @@ ZTEST(suite_a_mod, test_open_bad_description)
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
 	test_description.name = NULL;
-	test_description.type = AMOD_TYPE_IN_OUT;
+	test_description.type = AMOD_TYPE_PROCESS;
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 
@@ -357,7 +597,7 @@ ZTEST(suite_a_mod, test_open_bad_description)
 	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (-22)");
 
 	test_params_desc.description->name = "Module 1";
-	test_description.type = AMOD_TYPE_IN_OUT;
+	test_description.type = AMOD_TYPE_PROCESS;
 	test_params_desc.description->functions = NULL;
 	test_params_desc.description = &test_description;
 
@@ -371,7 +611,7 @@ ZTEST(suite_a_mod, test_open_bad_state)
 	int ret;
 	char *inst_name = "TEST open";
 	struct amod_description test_description = {
-		.name = "Module 1", .type = AMOD_TYPE_IN_OUT, .functions = &mod_1_functions};
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_parameters test_params = {.description = &test_description};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
@@ -399,7 +639,7 @@ ZTEST(suite_a_mod, test_open_null)
 	int ret;
 	char *inst_name = "TEST open";
 	struct amod_description test_description = {
-		.name = "Module 1", .type = AMOD_TYPE_IN_OUT, .functions = &mod_1_functions};
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_parameters test_params = {.description = &test_description};
 	struct mod_config configuration = {0};
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;

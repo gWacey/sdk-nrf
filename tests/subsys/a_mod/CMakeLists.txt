@@ -12,4 +12,4 @@ project(a_mod)
 FILE(GLOB app_sources src/*.c)
 target_sources(app PRIVATE ${app_sources} ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/amod_api.c)
 
-target_include_directories(app PRIVATE ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/ include)
+target_include_directories(app PRIVATE ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/ ${ZEPHYR_NRF_MODULE_DIR}/include)
