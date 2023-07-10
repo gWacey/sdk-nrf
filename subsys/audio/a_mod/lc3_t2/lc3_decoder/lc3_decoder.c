@@ -146,7 +146,7 @@ struct amod_functions lc3_dec_t2_functions = {
 	 * @brief Pause a module processing data.
 	 *
 	 */
-	.pause = NULL,
+	.stop = NULL,
 
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.

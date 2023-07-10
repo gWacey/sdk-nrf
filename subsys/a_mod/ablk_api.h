@@ -42,15 +42,20 @@ enum ablk_interleaved {
  */
 struct ablk_pcm_format {
 	/* The PCM sample rate in Hz */
-	uint32_t sample_rate_Hz;
+	uint32_t sample_rate_hz;
 
 	/* Number of valid bits for a sample */
 	uint8_t bits_per_sample;
 
-	/* Number of bits used to carry a sample of size bits_per_sample */
+	/* Number of bits used to carry a sample of size bits_per_sample.
+	 * For example, say we have a 24 bit sample stored in a 32 bit
+	 * word (int32_t), then:
+	 *     bits_per_sample = 24
+	 *     carrier_size    = 32
+	 */
 	uint8_t carrier_size;
 
-	/* A flag indicating if the PCM block is sample interleaved or not */
+	/* A flag indicating if the samples are interleaved or not */
 	enum ablk_interleaved interleaved;
 
 	/* A 32 bit mask indicating which channel(s) are active within
@@ -89,8 +94,8 @@ struct ablk_block {
 	 */
 	uint32_t reference_ts;
 
-	/* The timestamp for when the block was received */
-	uint32_t block_rx_ts;
+	/* The timestamp for when the data was received */
+	uint32_t data_rx_ts;
 
 	/* A Boolean flag to indicate this frame has errors in the
 	 * data (true = bad, false = good).

@@ -8,6 +8,7 @@
 #include <errno.h>
 #include "amod_api.h"
 
+#define MOD_NAME_SIZE	       (20)
 #define MOD_STACK_SIZE	       (1024)
 #define MOD_MSG_QUEUE_SIZE     (4)
 #define MOD_MSG_QUEUE_SIZE     (4)
@@ -41,6 +42,87 @@ DATA_FIFO_DEFINE(mod_fifo_tx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(mod_fifo_rx, MOD_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 K_MEM_SLAB_DEFINE(mod_data_slab, MOD_DATA_SIZE, PCM_DATA_OBJECTS_NUM, 4);
 
+ZTEST(suite_a_mod, test_block_extract_null)
+{
+	int ret;
+	struct ablk_block block = {0};
+	enum ablk_type data_type;
+	char data[MOD_DATA_SIZE] = {0};
+	size_t data_size;
+	struct ablk_pcm_format format = {0};
+	uint32_t reference_ts;
+	uint32_t data_rx_ts;
+	bool bad_frame;
+
+	ret = amod_block_data_extract(NULL, &data_type, &data[0], &data_size, &format,
+				      &reference_ts, &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, NULL, &data[0], &data_size, &format, &reference_ts,
+				      &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, NULL, &data_size, &format, &reference_ts,
+				      &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, &data[0], NULL, &format, &reference_ts,
+				      &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, &data[0], &data_size, NULL, &reference_ts,
+				      &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, &data[0], &data_size, &format, NULL,
+				      &data_rx_ts, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, &data[0], &data_size, &format,
+				      &reference_ts, NULL, &bad_frame, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_extract(&block, &data_type, &data[0], &data_size, &format,
+				      &reference_ts, &data_rx_ts, NULL, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Block data extract block function did not return -EINVAL (-22)");
+}
+
+ZTEST(suite_a_mod, test_block_attach_null)
+{
+	int ret;
+	struct ablk_block block = {0};
+	char data[MOD_DATA_SIZE] = {0};
+	struct ablk_pcm_format format = {0};
+
+	ret = amod_block_data_attach(NULL, ABLK_TYPE_LC3, &data[0], sizeof(data), &format, 0, 0,
+				     false, NULL);
+	zassert_equal(ret, -EINVAL, "Attach to block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_attach(&block, ABLK_TYPE_UNDEFINED, &data[0], sizeof(data), &format,
+				     0, 0, false, NULL);
+	zassert_equal(ret, -ENOTSUP, "Attach to block function did not return -EINVAL (-129)");
+
+	ret = amod_block_data_attach(&block, ABLK_TYPE_LC3, NULL, sizeof(data), &format, 0, 0,
+				     false, NULL);
+	zassert_equal(ret, -EINVAL, "Attach to block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_attach(&block, ABLK_TYPE_LC3, &data[0], 0, &format, 0, 0, false,
+				     NULL);
+	zassert_equal(ret, -EINVAL, "Attach to block function did not return -EINVAL (-22)");
+
+	ret = amod_block_data_attach(&block, ABLK_TYPE_LC3, &data[0], sizeof(data), NULL, 0, 0,
+				     false, NULL);
+	zassert_equal(ret, -EINVAL, "Attach to block function did not return -EINVAL (-22)");
+}
+
 ZTEST(suite_a_mod, test_number_channels_calculate_null)
 {
 	int ret;
@@ -73,8 +155,8 @@ ZTEST(suite_a_mod, test_names_get_null)
 {
 	int ret;
 	struct amod_handle handle = {0};
-	char base_name[CONFIG_AMOD_NAME_SIZE];
-	char instance_name[CONFIG_AMOD_NAME_SIZE];
+	char base_name[MOD_NAME_SIZE];
+	char instance_name[MOD_NAME_SIZE];
 
 	ret = amod_names_get(NULL, &base_name[0], &instance_name[0]);
 	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (-22)");

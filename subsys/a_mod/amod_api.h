@@ -272,7 +272,7 @@ struct amod_message {
 /**
  * @brief A helper structure for describing the modules in a stream as a table.
  */
-struct amod_table {
+struct amod_table_entry {
 	/* A unique name for the module */
 	char *name;
 
@@ -471,15 +471,15 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state);
  * @param data_size     Size of the audio data buffer
  * @param format        The format od the data carried in the block
  * @param reference_ts  Reference timestamp to be used to synchronise the data
- * @param block_rx_ts   Block received timestamp to be used to synchronise the data
+ * @param data_rx_ts    Data received timestamp to be used to synchronise the data
  * @param bad_frame     Flag to indicate there are errors within the data for this block
  * @param user_data     Pointer to a private area of user data or NULL
  *
  * @return 0 if successful, error otherwise
  */
 int amod_block_data_attach(struct ablk_block *block, enum ablk_type data_type, char *data,
-			   size_t data_size, struct ablk_pcm_format *format, uint32_t *reference_ts,
-			   uint32_t *block_rx_ts, bool bad_frame, void *user_data);
+			   size_t data_size, struct ablk_pcm_format *format, uint32_t reference_ts,
+			   uint32_t data_rx_ts, bool bad_frame, void *user_data);
 
 /**
  * @brief Helper function to extract the audio data buffer from an audio block.
@@ -490,7 +490,7 @@ int amod_block_data_attach(struct ablk_block *block, enum ablk_type data_type, c
  * @param data_size     Size of the audio data buffer
  * @param format        The format of the data carried in the block
  * @param reference_ts  Reference timestamp to be used to synchronise the data
- * @param block_rx_ts   Block received timestamp to be used to synchronise the data
+ * @param data_rx_ts    Data received timestamp to be used to synchronise the data
  * @param bad_frame     Flag to indicate there are errors within the data for this block
  * @param user_data     Pointer to a private area of user data or NULL
  *
@@ -498,7 +498,7 @@ int amod_block_data_attach(struct ablk_block *block, enum ablk_type data_type, c
  */
 int amod_block_data_extract(struct ablk_block *block, enum ablk_type *data_type, char *data,
 			    size_t *data_size, struct ablk_pcm_format *format,
-			    uint32_t *reference_ts, uint32_t *block_rx_ts, bool *bad_frame,
+			    uint32_t *reference_ts, uint32_t *data_rx_ts, bool *bad_frame,
 			    void *user_data);
 
 /**

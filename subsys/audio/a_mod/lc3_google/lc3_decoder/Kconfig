@@ -6,25 +6,16 @@
 
 rsource "Kconfig.defaults"
 
-menu "Audio"
-
-menu "Modules"
-
-config A_MOD
-	bool "Enable the audio module"
-
-config AMOD_NAME_SIZE
-	int "Maximum size for module naming in characters"
-	default 20
-
-endmenu # Modules
+menu "Audio Modules"
 
 #----------------------------------------------------------------------------#
 menu "Log levels"
 
-module = MODULE_API
-module-str = module-api
+module = LC3_DECODER
+module-str = lc3-decoder
 source "subsys/logging/Kconfig.template.log_config"
 
 endmenu # Log levels
-endmenu # Audio
+#----------------------------------------------------------------------------#
+
+endmenu # Audio Modules

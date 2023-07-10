@@ -133,7 +133,7 @@ void audio_system_start(void)
 		.number_channels = sw_codec_cfg.decoder.num_ch,
 		.channel_map = (BT_AUDIO_LOCATION_FRONT_LEFT || BT_AUDIO_LOCATION_FRONT_RIGHT)};
 
-	struct lc3_decoder_configuration lc3_enc_initial_config = {
+	struct lc3_encoder_configuration lc3_enc_initial_config = {
 		.sample_rate = CONFIG_AUDIO_SAMPLE_RATE_HZ,
 		.bit_depth = CONFIG_AUDIO_BIT_DEPTH_BITS,
 		.duration_us = CONFIG_AUDIO_FRAME_DURATION_US,

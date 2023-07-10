@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2018 Nordic Semiconductor ASA
+ * Copyright(c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
@@ -1043,13 +1043,18 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state)
  * @brief Helper function to attach an audio data buffer to an audio block.
  *
  */
-int amod_block_fill(struct ablk_block *block, enum ablk_type data_type, char *data,
-		    size_t data_size, struct ablk_pcm_format *format, uint32_t reference_ts,
-		    uint32_t block_rx_ts, bool bad_frame, void *user_data)
+int amod_block_data_attach(struct ablk_block *block, enum ablk_type data_type, char *data,
+			   size_t data_size, struct ablk_pcm_format *format, uint32_t reference_ts,
+			   uint32_t data_rx_ts, bool bad_frame, void *user_data)
 {
-	if (block == NULL) {
-		LOG_DBG("Input block parameter is NULL");
+	if (block == NULL || data == NULL || format == NULL || data_size == 0) {
+		LOG_DBG("Invalid input parameter");
 		return -EINVAL;
+	}
+
+	if (data_type == ABLK_TYPE_UNDEFINED || data_type > ABLK_TYPE_LC3) {
+		LOG_DBG("Data type %d not supported", data_type);
+		return -ENOTSUP;
 	}
 
 	block->data_type = data_type;
@@ -1057,7 +1062,7 @@ int amod_block_fill(struct ablk_block *block, enum ablk_type data_type, char *da
 	block->data_size = data_size;
 	block->format = *format;
 	block->reference_ts = reference_ts;
-	block->block_rx_ts = block_rx_ts;
+	block->data_rx_ts = data_rx_ts;
 	block->bad_frame = bad_frame;
 	block->user_data = user_data;
 
@@ -1070,11 +1075,12 @@ int amod_block_fill(struct ablk_block *block, enum ablk_type data_type, char *da
  */
 int amod_block_data_extract(struct ablk_block *block, enum ablk_type *data_type, char *data,
 			    size_t *data_size, struct ablk_pcm_format *format,
-			    uint32_t *reference_ts, uint32_t *block_rx_ts, bool *bad_frame,
+			    uint32_t *reference_ts, uint32_t *data_rx_ts, bool *bad_frame,
 			    void *user_data)
 {
-	if (block == NULL) {
-		LOG_DBG("Input block parameter is NULL");
+	if (block == NULL || data_type == NULL || data == NULL || data_size == NULL ||
+	    format == NULL || reference_ts == NULL || data_rx_ts == NULL || bad_frame == NULL) {
+		LOG_DBG("Invalid input parameter");
 		return -EINVAL;
 	}
 
@@ -1083,7 +1089,7 @@ int amod_block_data_extract(struct ablk_block *block, enum ablk_type *data_type,
 	*data_size = block->data_size;
 	*format = block->format;
 	*reference_ts = block->reference_ts;
-	*block_rx_ts = block->block_rx_ts;
+	*data_rx_ts = block->data_rx_ts;
 	*bad_frame = block->bad_frame;
 	user_data = block->user_data;
 
