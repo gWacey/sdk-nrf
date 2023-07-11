@@ -64,7 +64,7 @@ void interleave(void const *const input, size_t input_size, uint8_t channel, uin
  *
  * @return 0 if successful, error value
  */
-static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration);
+static int lc3_dec_google_open(struct handle *handle, struct amod_configuration *configuration);
 
 /**
  * @brief  Function close an open module.
@@ -73,7 +73,7 @@ static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *con
  *
  * @return 0 if successful, error value
  */
-static int lc3_dec_t2_close(struct handle *handle);
+static int lc3_dec_google_close(struct handle *handle);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -83,8 +83,8 @@ static int lc3_dec_t2_close(struct handle *handle);
  *
  * @return 0 if successful, error value
  */
-static int lc3_dec_t2_configuration_set(struct handle *handle,
-					struct amod_configuration *configuration);
+static int lc3_dec_google_configuration_set(struct handle *handle,
+					    struct amod_configuration *configuration);
 
 /**
  * @brief  Function to set the configuration of a module.
@@ -94,8 +94,8 @@ static int lc3_dec_t2_configuration_set(struct handle *handle,
  *
  * @return 0 if successful, error value
  */
-static int lc3_dec_t2_configuration_get(struct handle *handle,
-					struct amod_configuration *configuration);
+static int lc3_dec_google_configuration_get(struct handle *handle,
+					    struct amod_configuration *configuration);
 
 /**
  * @brief This processes the input block into the output block.
@@ -106,32 +106,32 @@ static int lc3_dec_t2_configuration_get(struct handle *handle,
  *
  * @return 0 if successful, error value
  */
-static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
-				   struct aobj_block *block_out);
+static int lc3_dec_google_data_process(struct handle *handle, struct aobj_block *block_in,
+				       struct aobj_block *block_out);
 /**
  * @brief Table of the LC3 decoder module functions.
  *
  */
-struct amod_functions lc3_dec_t2_functions = {
+struct amod_functions lc3_dec_google_functions = {
 	/**
 	 * @brief  Function to an open the LC3 decoder module.
 	 */
-	.open = lc3_dec_t2_open,
+	.open = lc3_dec_google_open,
 
 	/**
 	 * @brief  Function to close the LC3 decoder module.
 	 */
-	.close = lc3_dec_t2_close,
+	.close = lc3_dec_google_close,
 
 	/**
 	 * @brief  Function to set the configuration of the LC3 decoder module.
 	 */
-	.configuration_set = lc3_dec_t2_configuration_set,
+	.configuration_set = lc3_dec_google_configuration_set,
 
 	/**
 	 * @brief  Function to get the configuration of the LC3 decoder module.
 	 */
-	.configuration_get = lc3_dec_t2_configuration_get,
+	.configuration_get = lc3_dec_google_configuration_get,
 
 	/**
 	 * @brief Start a module processing data.
@@ -148,7 +148,7 @@ struct amod_functions lc3_dec_t2_functions = {
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.
 	 */
-	.data_process = lc3_dec_t2_data_process,
+	.data_process = lc3_dec_google_data_process,
 };
 
 /**
@@ -158,7 +158,7 @@ struct amod_functions lc3_dec_t2_functions = {
 struct amod_description lc3_dec_dept = {.name = "LC3 Dcoder",
 					.type = AMOD_TYPE_PROCESSOR,
 					.functions =
-						(struct amod_functions *)&lc3_dec_t2_functions};
+						(struct amod_functions *)&lc3_dec_google_functions};
 
 /**
  * @brief A private pointer to the LC3 decoder set-up parameters.
@@ -170,81 +170,18 @@ struct amod_description *lc3_dec_description = &lc3_dec_dept;
  * @brief Open an instance of the LC3 decoder
  *
  */
-static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration)
+static int lc3_dec_google_open(struct handle *handle, struct amod_configuration *configuration)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	uint8_t enc_sample_rates = 0;
-	uint8_t dec_sample_rates = 0;
-	uint8_t unique_session = 0;
-	LC3FrameSize_t framesize;
 
 	/* Clear the context */
 	memset(ctx, 0, sizeof(struct lc3_decoder_context));
 
-	/* Set unique session to 0 for using the default sharing memory setting.
-	 *
-	 * This could lead to higher heap consumtion, but is able to manipulate
-	 * different sample rate setting between encoder/decoder.
-	 */
-
-	/* Check supported sample rates for encoder */
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_8KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_8_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_16KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_16_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_24KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_24_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_32KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_32_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_441KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_441_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_48KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_48_KHZ;
-	}
-
-	/* Check supported sample rates for decoder */
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_8KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_8_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_16KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_16_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_24KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_24_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_32KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_32_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_441KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_441_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_48KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_48_KHZ;
-	}
-
-	switch (config->duration_us) {
-	case 7500:
-		framesize = LC3FrameSize7_5Ms;
-		break;
-	case 10000:
-		framesize = LC3FrameSize10Ms;
-		break;
-	default:
-		LOG_ERR("Unsupported framesize: %d", config->duration_us);
-		return -EINVAL;
-	}
-
-	ret = LC3Initialize(enc_sample_rates, dec_sample_rates, framesize, unique_session, NULL,
-			    NULL);
+	ret = lc3_init();
 
 	return ret;
 }
@@ -253,19 +190,13 @@ static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *con
  * @brief  Function close an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_close(struct handle *handle)
+static int lc3_dec_google_close(struct handle *handle)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
+	lc3_dec *dec_handles = (lc3_dec *)ctx->lc3_dec_channel;
 
-	/* Close decoder sessions */
-	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
-		if (dec_handles[i] != NULL) {
-			LC3DecodeSessionClose(dec_handles[i]);
-			dec_handles = NULL;
-		}
-	}
+	/* Close decoder */
 
 	return 0;
 }
@@ -274,61 +205,21 @@ static int lc3_dec_t2_close(struct handle *handle)
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_configuration_set(struct handle *handle,
-					struct amod_configuration *configuration)
+static int lc3_dec_google_configuration_set(struct handle *handle,
+					    struct amod_configuration *configuration)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
-	LC3FrameSize_t framesize;
-	uint16_t coded_bytes_req;
 
 	if (ctx->dec_handles_count) {
 		LOG_ERR("LC3 decoder instance %s already initialised", hdl->name);
 		return -EALREADY;
 	}
 
-	/* Free previous decoder memory */
-	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
-		if (dec_handles[i] != NULL) {
-			LC3DecodeSessionClose(dec_handles[i]);
-			dec_handles[i] = NULL;
-		}
-	}
-
-	switch (config->duration_us) {
-	case 7500:
-		framesize = LC3FrameSize7_5Ms;
-		break;
-	case 10000:
-		framesize = LC3FrameSize10Ms;
-		break;
-	default:
-		LOG_ERR("Unsupported framesize: %d", config->duration_us);
-		return -EINVAL;
-	}
-
-	coded_bytes_req = LC3BitstreamBuffersize(ctx->config.sample_rate, ctx->config.max_bitrate,
-						 framesize, &ret);
-	if (coded_bytes_req == 0) {
-		LOG_ERR("Required coded bytes to LC3 encode instance %s is zero", hdl->name);
-		return -EPERM;
-	}
-
-	for (uint8_t i = 0; i < config->number_channels; i++) {
-		dec_handles[i] = LC3DecodeSessionOpen(config->sample_rate, config->bit_depth,
-						      framesize, NULL, NULL, &ret);
-		if (ret) {
-			LOG_ERR("LC3 decoder channel %d failed to initialise for module %s", i,
-				hdl->name);
-			return ret;
-		}
-
-		ctx->dec_handles_count += 1;
-	}
+	/* Open the decoder */
 
 	memcpy(&ctx->config, config, sizeof(struct lc3_decoder_configuration));
 
@@ -348,8 +239,8 @@ static int lc3_dec_t2_configuration_set(struct handle *handle,
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_configuration_get(struct handle *handle,
-					struct amod_configuration *configuration)
+static int lc3_dec_google_configuration_get(struct handle *handle,
+					    struct amod_configuration *configuration)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -370,8 +261,8 @@ static int lc3_dec_t2_configuration_get(struct handle *handle,
  * @brief Process an audio data block in an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
-				   struct aobj_block *block_out)
+static int lc3_dec_google_data_process(struct handle *handle, struct aobj_block *block_in,
+				       struct aobj_block *block_out)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;

@@ -15,7 +15,7 @@
 #include "data_fifo.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(module_api, CONFIG_MODULE_API_LOG_LEVEL);
+LOG_MODULE_REGISTER(module_api, 4); /* CONFIG_MODULE_API_LOG_LEVEL);*/
 
 /**
  * @brief Helper function to validate the module description.
@@ -57,13 +57,15 @@ static int validate_parameters(struct amod_parameters *parameters)
  * @param handle  The handle of the sending modules instance
  * @param block   Pointer to the audio data block to send to the module
  */
-void block_release_cb(struct amod_handle *handle, struct ablk_block *block)
+static void block_release_cb(struct amod_handle_private *handle, struct ablk_block *block)
 {
-	k_sem_take(&handle->sem, K_NO_WAIT);
+	struct amod_handle *hdl = (struct amod_handle *)handle;
 
-	if (k_sem_count_get(&handle->sem) == 0) {
+	k_sem_take(&hdl->sem, K_NO_WAIT);
+
+	if (k_sem_count_get(&hdl->sem) == 0) {
 		/* Object data has been consumed by all modules so now can free the memory */
-		k_mem_slab_free(handle->thread.data_slab, (void **)block->data);
+		k_mem_slab_free(hdl->thread.data_slab, (void **)block->data);
 	}
 }
 
@@ -102,12 +104,12 @@ static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
 		if (ret) {
 			data_fifo_block_free(rx_handle->thread.msg_rx, (void **)&data_msg_rx);
 
-			LOG_DBG("Module %s failed to return output buffer, ret %d", rx_handle->name,
+			LOG_DBG("Module %s failed to queue the block, ret %d", rx_handle->name,
 				ret);
 			return ret;
 		}
 
-		LOG_DBG("Data sent to module %s", rx_handle->name);
+		LOG_DBG("Block sent to module %s", rx_handle->name);
 
 	} else {
 		LOG_DBG("Recieving module %s is in an invalid state %d", rx_handle->name,
@@ -125,7 +127,8 @@ static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
 static void clean_up(struct amod_handle *handle, struct amod_message **msg_rx, char **data)
 {
 	if ((*msg_rx)->response_cb != NULL) {
-		(*msg_rx)->response_cb((*msg_rx)->tx_handle, &(*msg_rx)->block);
+		(*msg_rx)->response_cb((struct amod_handle_private *)(*msg_rx)->tx_handle,
+				       &(*msg_rx)->block);
 	}
 
 	if ((*msg_rx) != NULL) {
@@ -193,7 +196,7 @@ static int send_to_connected(struct amod_handle *handle, struct ablk_block *bloc
 	struct amod_handle *handle_to;
 
 	if (handle->dest_count == 0) {
-		LOG_DBG("No where to send the data from module %s so release it", handle_to->name);
+		LOG_DBG("No where to send the data from module %s so releasing it", handle->name);
 
 		k_mem_slab_free(handle->thread.data_slab, (void **)block->data);
 
@@ -265,8 +268,8 @@ static int module_thread_input(struct amod_handle *handle)
 			block.data_size = handle->thread.data_size;
 
 			/* Process the input audio block */
-			ret = handle->description->functions->data_process((struct handle *)handle,
-									   NULL, &block);
+			ret = handle->description->functions->data_process(
+				(struct amod_handle_private *)handle, NULL, &block);
 			if (ret) {
 				clean_up(handle, &msg_rx, &data);
 
@@ -276,9 +279,8 @@ static int module_thread_input(struct amod_handle *handle)
 			}
 
 			/* Send input audio block to next module(s) */
-			if (!sys_slist_is_empty(&handle->hdl_dest_list)) {
-				send_to_connected(handle, &block);
-			}
+			send_to_connected(handle, &block);
+
 		} else {
 			LOG_DBG("No process function for module %s, no input", handle->name);
 		}
@@ -320,8 +322,8 @@ static int module_thread_output(struct amod_handle *handle)
 
 		if (handle->description->functions->data_process != NULL) {
 			/* Process the input audio block and output from the audio system */
-			ret = handle->description->functions->data_process((struct handle *)handle,
-									   &msg_rx->block, NULL);
+			ret = handle->description->functions->data_process(
+				(struct amod_handle_private *)handle, &msg_rx->block, NULL);
 			if (ret) {
 				clean_up(handle, &msg_rx, &data);
 
@@ -331,7 +333,8 @@ static int module_thread_output(struct amod_handle *handle)
 			}
 
 			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb(msg_rx->tx_handle, &msg_rx->block);
+				msg_rx->response_cb((struct amod_handle_private *)msg_rx->tx_handle,
+						    &msg_rx->block);
 			}
 
 		} else {
@@ -392,8 +395,8 @@ static int module_thread_in_out(struct amod_handle *handle)
 			block.data_size = handle->thread.data_size;
 
 			/* Process the input audio block into the output audio block */
-			ret = handle->description->functions->data_process((struct handle *)handle,
-									   &msg_rx->block, &block);
+			ret = handle->description->functions->data_process(
+				(struct amod_handle_private *)handle, &msg_rx->block, &block);
 			if (ret) {
 				clean_up(handle, &msg_rx, &data);
 
@@ -403,12 +406,11 @@ static int module_thread_in_out(struct amod_handle *handle)
 			}
 
 			/* Send input audio block to next module(s) */
-			if (!sys_slist_is_empty(&handle->hdl_dest_list)) {
-				send_to_connected(handle, &block);
-			}
+			send_to_connected(handle, &block);
 
 			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb(msg_rx->tx_handle, &msg_rx->block);
+				msg_rx->response_cb((struct amod_handle_private *)msg_rx->tx_handle,
+						    &msg_rx->block);
 			}
 
 		} else {
@@ -426,7 +428,7 @@ static int module_thread_in_out(struct amod_handle *handle)
  * @brief  Function for opening a module.
  */
 int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      char *name, struct amod_handle *handle, struct amod_context *context)
+	      char *name, struct amod_context *context, struct amod_handle *handle)
 {
 	int ret;
 
@@ -464,7 +466,8 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	memcpy(&handle->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
 
 	if (handle->description->functions->open != NULL) {
-		ret = handle->description->functions->open((struct handle *)handle, configuration);
+		ret = handle->description->functions->open((struct amod_handle_private *)handle,
+							   configuration);
 		if (ret) {
 			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
 			return ret;
@@ -472,8 +475,8 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	}
 
 	if (handle->description->functions->configuration_set != NULL) {
-		ret = handle->description->functions->configuration_set((struct handle *)handle,
-									configuration);
+		ret = handle->description->functions->configuration_set(
+			(struct amod_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
 				ret);
@@ -567,7 +570,7 @@ int amod_close(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->close != NULL) {
-		ret = handle->description->functions->close((struct handle *)handle);
+		ret = handle->description->functions->close((struct amod_handle_private *)handle);
 		if (ret) {
 			LOG_DBG("Failed close call to module %s, returned %d", handle->name, ret);
 			return ret;
@@ -611,16 +614,22 @@ int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *conf
 	}
 
 	if (handle->description->functions->configuration_set != NULL) {
-		ret = handle->description->functions->configuration_set((struct handle *)handle,
-									configuration);
+		ret = handle->description->functions->configuration_set(
+			(struct amod_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
 				ret);
 			return ret;
 		}
+	} else {
+		LOG_DBG("Reconfiguration for module %s has no set configuration function",
+			handle->name);
 	}
 
-	handle->previous_state = handle->state;
+	if (handle->state != AMOD_STATE_CONFIGURED) {
+		handle->previous_state = handle->state;
+	}
+
 	handle->state = AMOD_STATE_CONFIGURED;
 
 	return 0;
@@ -645,13 +654,16 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
 	}
 
 	if (handle->description->functions->configuration_get != NULL) {
-		ret = handle->description->functions->configuration_get((struct handle *)handle,
-									configuration);
+		ret = handle->description->functions->configuration_get(
+			(struct amod_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Get configuration for module %s failed, ret %d", handle->name,
 				ret);
 			return ret;
 		}
+	} else {
+		LOG_DBG("Get configuration for module %s has no get configuration function",
+			handle->name);
 	}
 
 	return 0;
@@ -768,7 +780,7 @@ int amod_start(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->start != NULL) {
-		ret = handle->description->functions->start((struct handle *)handle);
+		ret = handle->description->functions->start((struct amod_handle_private *)handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user start for module %s, ret %d", handle->name, ret);
 			return ret;
@@ -804,7 +816,7 @@ int amod_stop(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->stop != NULL) {
-		ret = handle->description->functions->stop((struct handle *)handle);
+		ret = handle->description->functions->stop((struct amod_handle_private *)handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user pause for module %s, ret %d", handle->name, ret);
 			return ret;
@@ -888,7 +900,7 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
 		ret = 0;
 	}
 
-	block_release_cb(handle, &msg_tx->block);
+	block_release_cb((struct amod_handle_private *)handle, &msg_tx->block);
 
 	data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
 
@@ -964,7 +976,7 @@ int amod_data_rx_tx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 		ret = 0;
 	}
 
-	block_release_cb(handle_rx, &msg_tx->block);
+	block_release_cb((struct amod_handle_private *)handle_rx, &msg_tx->block);
 
 	data_fifo_block_free(handle_rx->thread.msg_tx, (void **)&msg_tx);
 
@@ -972,39 +984,11 @@ int amod_data_rx_tx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 };
 
 /**
- * @brief Helper function to configure the module's parameter structure with
- *        the module's description and thread information.
- *
- */
-int amod_parameters_configure(struct amod_parameters *parameters,
-			      struct amod_description *description, k_thread_stack_t *stack,
-			      size_t stack_size, int priority, struct data_fifo *msg_rx,
-			      struct data_fifo *msg_tx, struct k_mem_slab *data_slab,
-			      size_t data_size)
-{
-	if (parameters == NULL) {
-		LOG_DBG("Parameters pointer is NULL");
-		return -EINVAL;
-	}
-
-	parameters->description = description;
-	parameters->thread.stack = stack;
-	parameters->thread.stack_size = stack_size;
-	parameters->thread.priority = priority;
-	parameters->thread.msg_rx = msg_rx;
-	parameters->thread.msg_tx = msg_tx;
-	parameters->thread.data_slab = data_slab;
-	parameters->thread.data_size = data_size;
-
-	return 0;
-}
-
-/**
  * @brief Helper function to return the base and instance names for a given
  *        module handle.
  *
  */
-int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_name)
+int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_name)
 {
 	if (handle == NULL || base_name == NULL || instance_name == NULL) {
 		LOG_DBG("Input parameter is NULL");
@@ -1017,8 +1001,8 @@ int amod_names_get(struct amod_handle *handle, char *base_name, char *instance_n
 		return -ENOTSUP;
 	}
 
-	memcpy(base_name, &handle->description->name, sizeof(handle->description->name));
-	memcpy(instance_name, &handle->name, sizeof(handle->name));
+	*base_name = handle->description->name;
+	memcpy(instance_name, &handle->name, CONFIG_AMOD_NAME_SIZE);
 
 	return 0;
 }
@@ -1034,67 +1018,15 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state)
 		return -EINVAL;
 	}
 
+	if (handle->state > AMOD_STATE_STOPPED) {
+		LOG_DBG("Module state is invalid");
+		return -EINVAL;
+	}
+
 	*state = handle->state;
 
 	return 0;
 };
-
-/**
- * @brief Helper function to attach an audio data buffer to an audio block.
- *
- */
-int amod_block_data_attach(struct ablk_block *block, enum ablk_type data_type, char *data,
-			   size_t data_size, struct ablk_pcm_format *format, uint32_t reference_ts,
-			   uint32_t data_rx_ts, bool bad_frame, void *user_data)
-{
-	if (block == NULL || data == NULL || format == NULL || data_size == 0) {
-		LOG_DBG("Invalid input parameter");
-		return -EINVAL;
-	}
-
-	if (data_type == ABLK_TYPE_UNDEFINED || data_type > ABLK_TYPE_LC3) {
-		LOG_DBG("Data type %d not supported", data_type);
-		return -ENOTSUP;
-	}
-
-	block->data_type = data_type;
-	block->data = data;
-	block->data_size = data_size;
-	block->format = *format;
-	block->reference_ts = reference_ts;
-	block->data_rx_ts = data_rx_ts;
-	block->bad_frame = bad_frame;
-	block->user_data = user_data;
-
-	return 0;
-};
-
-/**
- * @brief Helper function to extract the audio data buffer from an audio block.
- *
- */
-int amod_block_data_extract(struct ablk_block *block, enum ablk_type *data_type, char *data,
-			    size_t *data_size, struct ablk_pcm_format *format,
-			    uint32_t *reference_ts, uint32_t *data_rx_ts, bool *bad_frame,
-			    void *user_data)
-{
-	if (block == NULL || data_type == NULL || data == NULL || data_size == NULL ||
-	    format == NULL || reference_ts == NULL || data_rx_ts == NULL || bad_frame == NULL) {
-		LOG_DBG("Invalid input parameter");
-		return -EINVAL;
-	}
-
-	*data_type = block->data_type;
-	data = block->data;
-	*data_size = block->data_size;
-	*format = block->format;
-	*reference_ts = block->reference_ts;
-	*data_rx_ts = block->data_rx_ts;
-	*bad_frame = block->bad_frame;
-	user_data = block->user_data;
-
-	return 0;
-}
 
 /**
  * @brief Calculate the number of channels from the channel map for the given module handle.
@@ -1111,7 +1043,7 @@ int amod_number_channels_calculate(struct ablk_block *block, int8_t *number_chan
 
 	chan_map = block->format.channel_map;
 	*number_channels = 0;
-	for (int i = 0; i < sizeof(uint32_t); i++) {
+	for (int i = 0; i < AMOD_BITS_IN_CHANNEL_MAP; i++) {
 		*number_channels += chan_map & 1;
 		chan_map >>= 1;
 	}

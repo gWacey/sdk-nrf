@@ -7,9 +7,11 @@
 cmake_minimum_required(VERSION 3.20.0)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(a_mod)
+project("Audio module")
 
-FILE(GLOB app_sources src/*.c)
-target_sources(app PRIVATE ${app_sources} ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/amod_api.c)
+target_sources(app PRIVATE src/main.c src/bad_param_test.c src/functional_test.c)
 
-target_include_directories(app PRIVATE ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod/ ${ZEPHYR_NRF_MODULE_DIR}/include)
+target_include_directories(app PRIVATE ${ZEPHYR_NRF_MODULE_DIR}/include)
+
+zephyr_library_include_directories( ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod)
+zephyr_library_include_directories(src/modules)

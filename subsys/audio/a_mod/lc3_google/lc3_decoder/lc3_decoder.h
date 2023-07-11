@@ -9,7 +9,7 @@
 #include "audio_defines.h"
 #include "ablk_api.h"
 #include "amod_api.h"
-#include "LC3API.h"
+#include "lc3.h"
 
 #if (CONFIG_SW_CODEC_LC3)
 #define LC3_MAX_FRAME_SIZE_MS	10
