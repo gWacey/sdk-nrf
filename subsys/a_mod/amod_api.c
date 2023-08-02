@@ -675,8 +675,10 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
  */
 int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 {
+	struct amod_handle *handle;
+
 	if (handle_from == NULL || handle_to == NULL) {
-		LOG_DBG("Invalid paramet for the connection function");
+		LOG_DBG("Invalid parameter for the connection function");
 		return -EINVAL;
 	}
 
@@ -696,6 +698,13 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 		return -ENOTSUP;
 	}
 
+	SYS_SLIST_FOR_EACH_CONTAINER(&handle_from->hdl_dest_list, handle, node) {
+		if (handle_to == handle) {
+			LOG_DBG("Already attached %s to %s", handle_to->name, handle_from->name);
+			return -EALREADY;
+		}
+	}
+
 	k_mutex_lock(&handle_from->dest_mutex, K_FOREVER);
 
 	if (handle_from == handle_to) {
@@ -707,6 +716,9 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
 	}
 
 	k_mutex_unlock(&handle_from->dest_mutex);
+
+	LOG_DBG("Connected the output of %s to the input of %s", handle_from->name,
+		handle_to->name);
 
 	return 0;
 }
@@ -726,8 +738,8 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 	    handle->description->type == AMOD_TYPE_OUTPUT ||
 	    handle_disconnect->description->type == AMOD_TYPE_UNDEFINED ||
 	    handle_disconnect->description->type == AMOD_TYPE_INPUT) {
-		LOG_DBG("Connections between these modules, %s to %s, is not supported",
-			handle->name, handle_disconnect->name);
+		LOG_DBG("Disonnection of modules %s from %s, is not supported",
+			handle_disconnect->name, handle->name);
 		return -ENOTSUP;
 	}
 
@@ -744,9 +756,12 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 		handle->dest_count -= 1;
 	} else {
 		if (!sys_slist_find_and_remove(&handle->hdl_dest_list, &handle_disconnect->node)) {
-			LOG_DBG("Connection of module %s has not been found for module %s",
+			LOG_DBG("Connection to module %s has not been found for module %s",
 				handle_disconnect->name, handle->name);
+			return -EALREADY;
 		} else {
+			LOG_DBG("Disconnect module %s from module %s", handle_disconnect->name,
+				handle->name);
 			handle->dest_count -= 1;
 		}
 	}

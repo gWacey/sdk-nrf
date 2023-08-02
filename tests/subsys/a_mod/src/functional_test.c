@@ -9,6 +9,8 @@
 #include "data_fifo.h"
 #include "amod_api.h"
 
+#define TEST_NUM_CONNECTIONS 5
+
 struct mod_config {
 	int test_int1;
 	int test_int2;
@@ -100,6 +102,69 @@ static int test_stop_start(struct amod_handle_private *handle)
 
 	ctx->test_string = test_string;
 	ctx->test_uint32 = test_uint32;
+
+	return 0;
+}
+
+/**
+ * @brief Initialise a list of connections.
+ *
+ * @param handle_from[in/out]  The handle for the module to initialise the list
+ * @param handles_to[in]       Pointer to an array of handles to initislise the list with
+ * @param list_size[in]        The number of handles to initialise the list with
+ * @param data_tx[in]          The state to set for data_tx in the handle
+ *
+ * @return Number of destinations
+ */
+static int test_initialise_connection_list(struct amod_handle *handle_from,
+					   struct amod_handle *handles_to, size_t list_size,
+					   bool data_tx)
+{
+	for (int i = 0; i < list_size; i++) {
+		sys_slist_append(&handle_from->hdl_dest_list, &handles_to->node);
+		handle_from->dest_count += 1;
+		handles_to += 1;
+	}
+
+	handle_from->data_tx = data_tx;
+
+	if (handle_from->data_tx) {
+		handle_from->dest_count += 1;
+	}
+
+	return handle_from->dest_count;
+}
+
+/**
+ * @brief Test a list of connections, both that the handle is in the list and that the list is in
+ *        the correct order.
+ *
+ * @param handle[in]      The handle for the module to test the list
+ * @param handles_to[in]  Pointer to an array of handles that should be in the list and are in the
+ *                        order expected
+ * @param list_size[in]   The number of handles expected in the list
+ * @param data_tx[in]     The expected state of data_tx in the handle
+ *
+ * @return 0 if successful, assert otherwise
+ */
+static int test_list(struct amod_handle *handle, struct amod_handle *handles_to, size_t list_size,
+		     bool data_tx)
+{
+	struct amod_handle *handle_get;
+	int i = 0;
+
+	zassert_equal(handle->dest_count, list_size,
+		      "List is the incorrect size, it is %d but should be %d", handle->dest_count,
+		      list_size);
+
+	zassert_equal(handle->data_tx, data_tx,
+		      "List is the incorrect, data_tx flag is %d but should be %d", handle->data_tx,
+		      data_tx);
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_get, node) {
+		zassert_equal_ptr(&handles_to[i], handle_get, "List is incorrect for item %d", i);
+		i += 1;
+	}
 
 	return 0;
 }
@@ -888,4 +953,312 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 		      AMOD_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&test_context, handle_context, sizeof(struct mod_context),
 			  "Failed start");
+}
+
+ZTEST(suite_a_mod_functional, test_disconnect)
+{
+	int ret;
+	int i, j, k;
+	int num_destionations;
+	char *test_base_name = "Test base name";
+	char *test_inst_from_name = "TEST instance from";
+	char *test_inst_to_name = "TEST instance";
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = NULL};
+	struct amod_description test_from_description = {.name = test_base_name,
+							 .functions = &mod_functions};
+	struct amod_handle handle_from;
+	struct amod_handle handles_to[TEST_NUM_CONNECTIONS];
+	struct amod_description test_to_description = {.name = test_base_name,
+						       .functions = &mod_functions};
+
+	for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+		test_initialise_handle(&handles_to[k], &test_to_description, NULL, NULL);
+		snprintf(handles_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d", test_inst_to_name, k);
+	}
+
+	test_from_description.type = AMOD_TYPE_INPUT;
+	test_to_description.type = AMOD_TYPE_OUTPUT;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+			num_destionations = test_initialise_connection_list(
+				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, false);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+				ret = amod_disconnect(&handle_from, &handles_to[k]);
+
+				zassert_equal(
+					ret, 0,
+					"Disconnect function did not return successfully (0): "
+					"ret %d (%d)",
+					ret, k);
+
+				num_destionations -= 1;
+
+				zassert_equal(handle_from.dest_count, num_destionations,
+					      "Destination count should be %d, but is %d",
+					      num_destionations, handle_from.dest_count);
+
+				test_list(&handle_from, &handles_to[k + 1], num_destionations,
+					  false);
+			}
+		}
+	}
+
+	test_from_description.type = AMOD_TYPE_INPUT;
+	test_to_description.type = AMOD_TYPE_PROCESS;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+			num_destionations = test_initialise_connection_list(
+				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, false);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+				ret = amod_disconnect(&handle_from, &handles_to[k]);
+
+				zassert_equal(
+					ret, 0,
+					"Disconnect function did not return successfully (0): "
+					"ret %d (%d)",
+					ret, k);
+
+				num_destionations -= 1;
+
+				zassert_equal(handle_from.dest_count, num_destionations,
+					      "Destination count should be %d, but is %d",
+					      num_destionations, handle_from.dest_count);
+
+				test_list(&handle_from, &handles_to[k + 1], num_destionations,
+					  false);
+			}
+		}
+	}
+
+	test_from_description.type = AMOD_TYPE_PROCESS;
+	test_to_description.type = AMOD_TYPE_OUTPUT;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+			num_destionations = test_initialise_connection_list(
+				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, true);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+				ret = amod_disconnect(&handle_from, &handles_to[k]);
+
+				zassert_equal(
+					ret, 0,
+					"Disconnect function did not return successfully (0): "
+					"ret %d (%d)",
+					ret, k);
+
+				num_destionations -= 1;
+
+				zassert_equal(handle_from.dest_count, num_destionations,
+					      "Destination count should be %d, but is %d",
+					      num_destionations, handle_from.dest_count);
+
+				test_list(&handle_from, &handles_to[k + 1], num_destionations,
+					  true);
+			}
+		}
+
+		ret = amod_disconnect(&handle_from, &handle_from);
+		zassert_equal(ret, 0, "Disconnect function did not return successfully (0): ret %d",
+			      ret);
+
+		num_destionations -= 1;
+
+		zassert_equal(handle_from.dest_count, 0, "Destination count is not %d, %d", 0,
+			      handle_from.dest_count);
+		zassert_equal(handle_from.data_tx, false,
+			      "Flag for retuning data from module not false, %d",
+			      handle_from.data_tx);
+	}
+
+	test_from_description.type = AMOD_TYPE_PROCESS;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+		handle_from.state = i;
+		sys_slist_init(&handle_from.hdl_dest_list);
+		k_mutex_init(&handle_from.dest_mutex);
+		num_destionations = test_initialise_connection_list(&handle_from, NULL, 0, true);
+
+		ret = amod_disconnect(&handle_from, &handle_from);
+
+		zassert_equal(ret, 0,
+			      "Disconnect function did not return successfully (0): "
+			      "ret %d",
+			      ret);
+		zassert_equal(handle_from.dest_count, 0,
+			      "Destination count should be %d, but is %d", 0,
+			      handle_from.dest_count);
+		zassert_equal(handle_from.data_tx, false,
+			      "Flag for retuning data from module not false, %d",
+			      handle_from.data_tx);
+	}
+}
+
+ZTEST(suite_a_mod_functional, test_connect)
+{
+	int ret;
+	int i, j, k;
+	char *test_base_name = "Test base name";
+	char *test_inst_from_name = "TEST instance from";
+	char *test_inst_to_name = "TEST instance";
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = NULL};
+	struct amod_description test_from_description = {.name = test_base_name,
+							 .functions = &mod_functions};
+	struct amod_handle handle_from;
+	struct amod_handle handle_to[TEST_NUM_CONNECTIONS];
+	struct amod_description test_to_description = {.name = test_base_name,
+						       .functions = &mod_functions};
+
+	test_from_description.type = AMOD_TYPE_INPUT;
+	test_to_description.type = AMOD_TYPE_OUTPUT;
+
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
+						       NULL);
+				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+					 test_inst_to_name, k);
+				handle_to[k].state = j;
+
+				ret = amod_connect(&handle_from, &handle_to[k]);
+
+				zassert_equal(ret, 0,
+					      "Connect function did not return successfully (0): "
+					      "ret %d (%d)",
+					      ret, k);
+				zassert_equal(handle_from.dest_count, k + 1,
+					      "Destination count is not %d, %d", k + 1,
+					      handle_from.dest_count);
+			}
+
+			test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, false);
+		}
+	}
+
+	test_from_description.type = AMOD_TYPE_INPUT;
+	test_to_description.type = AMOD_TYPE_PROCESS;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
+						       NULL);
+				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+					 test_inst_to_name, k);
+				handle_to[k].state = j;
+
+				ret = amod_connect(&handle_from, &handle_to[k]);
+
+				zassert_equal(ret, 0,
+					      "Connect function did not return "
+					      "successfully (0): ret %d",
+					      ret);
+				zassert_equal(handle_from.dest_count, k + 1,
+					      "Destination count is not %d, %d", k + 1,
+					      handle_from.dest_count);
+			}
+
+			test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, false);
+		}
+	}
+
+	test_from_description.type = AMOD_TYPE_PROCESS;
+	test_to_description.type = AMOD_TYPE_OUTPUT;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			handle_from.state = i;
+			sys_slist_init(&handle_from.hdl_dest_list);
+			k_mutex_init(&handle_from.dest_mutex);
+
+			for (k = 0; k < TEST_NUM_CONNECTIONS - 1; k++) {
+				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
+						       NULL);
+				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+					 test_inst_to_name, k);
+				handle_to[k].state = j;
+
+				ret = amod_connect(&handle_from, &handle_to[k]);
+
+				zassert_equal(ret, 0,
+					      "Connect function did not return "
+					      "successfully (0): ret %d",
+					      ret);
+				zassert_equal(handle_from.dest_count, k + 1,
+					      "Destination count is not %d, %d", k + 1,
+					      handle_from.dest_count);
+			}
+
+			ret = amod_connect(&handle_from, &handle_from);
+			zassert_equal(ret, 0,
+				      "Connect function did not return successfully (0): ret %d",
+				      ret);
+			zassert_equal(handle_from.dest_count, TEST_NUM_CONNECTIONS,
+				      "Destination count is not %d, %d", TEST_NUM_CONNECTIONS,
+				      handle_from.dest_count);
+		}
+
+		test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, true);
+	}
+
+	test_from_description.type = AMOD_TYPE_PROCESS;
+	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+		handle_from.state = i;
+		sys_slist_init(&handle_from.hdl_dest_list);
+		k_mutex_init(&handle_from.dest_mutex);
+
+		ret = amod_connect(&handle_from, &handle_from);
+
+		zassert_equal(ret, 0, "Connect function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(handle_from.data_tx, true,
+			      "Flag for retuning data from module not true, %d",
+			      handle_from.data_tx);
+		zassert_equal(handle_from.dest_count, 1, "Destination count is not 1, %d",
+			      handle_from.dest_count);
+	}
 }

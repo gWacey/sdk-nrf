@@ -468,30 +468,38 @@ ZTEST(suite_a_mod_bad_param, test_connect_bad_state)
 ZTEST(suite_a_mod_bad_param, test_connect_null)
 {
 	int ret;
+	char *test_inst_name_1 = "TEST instance 1";
+	char *test_inst_name_2 = "TEST instance 2";
 	struct amod_description test_description = {
 		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
 
-	struct amod_handle handle_tx = {.name = "TEST connect 1",
-					.state = AMOD_STATE_CONFIGURED,
-					.description = &test_description};
-	struct amod_handle handle_rx = {.name = "TEST connect 2",
-					.state = AMOD_STATE_CONFIGURED,
-					.description = &test_description};
+	struct amod_handle handle_tx = {0};
+	struct amod_handle handle_rx = {0};
+
+	memcpy(&handle_tx.name, test_inst_name_1, CONFIG_AMOD_NAME_SIZE);
+	handle_tx.state = AMOD_STATE_CONFIGURED;
+	handle_tx.description = &test_description;
+	memcpy(&handle_rx.name, test_inst_name_2, CONFIG_AMOD_NAME_SIZE);
+	handle_rx.state = AMOD_STATE_CONFIGURED;
+	handle_rx.description = &test_description;
 
 	ret = amod_connect(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
+	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
 
 	ret = amod_connect(NULL, &handle_rx);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
+	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
 
 	ret = amod_connect(&handle_tx, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Connectt function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
+
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, 0, "Connect function did not return 0L (0): ret %d", ret);
+	ret = amod_connect(&handle_tx, &handle_rx);
+	zassert_equal(ret, -EALREADY, "Connect function did not return -EALREADY (%d): ret %d",
+		      -EALREADY, ret);
 }
 
 ZTEST(suite_a_mod_bad_param, test_reconfig_bad_state)
