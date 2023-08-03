@@ -95,4 +95,57 @@ struct lc3_decoder_context {
  */
 #define LC3_DECODER_CONTEXT_SIZE (sizeof(struct lc3_decoder_context))
 
+/**
+ * @brief  Function for opening a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules configuration to set.
+ *
+ * @return 0 if successful, error value
+ */
+int lc3_dec_t2_open(struct amod_handle_private *handle, struct amod_configuration *configuration);
+
+/**
+ * @brief  Function close an open module.
+ *
+ * @param handle  A pointer to the modules handle.
+ *
+ * @return 0 if successful, error value
+ */
+int lc3_dec_t2_close(struct amod_handle_private *handle);
+
+/**
+ * @brief  Function to set the configuration of a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules configuration to set.
+ *
+ * @return 0 if successful, error value
+ */
+int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
+				 struct amod_configuration *configuration);
+
+/**
+ * @brief  Function to set the configuration of a module.
+ *
+ * @param handle         A pointer to the modules handle.
+ * @param configuration  A pointer to the modules current configuration.
+ *
+ * @return 0 if successful, error value
+ */
+int lc3_dec_t2_configuration_get(struct amod_handle_private *handle,
+				 struct amod_configuration *configuration);
+
+/**
+ * @brief This processes the input block into the output block.
+ *
+ * @param handle	 A handle to this module instance
+ * @param block_in   Pointer to the input audio block or NULL for an input module
+ * @param block_out  Pointer to the output audio block or NULL for an output module
+ *
+ * @return 0 if successful, error value
+ */
+int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct aobj_block *block_in,
+			    struct aobj_block *block_out);
+
 #endif /* _LC3_DECODER_H_ */

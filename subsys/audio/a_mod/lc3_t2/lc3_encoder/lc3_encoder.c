@@ -61,7 +61,7 @@ struct amod_functions lc3_enc_functions = {
 	 * @brief Pause a module processing data.
 	 *
 	 */
-	.pause = NULL,
+	.stop = NULL,
 
 	/**
 	 * @brief The core data processing function in the LC3 encoder module.
@@ -73,9 +73,9 @@ struct amod_functions lc3_enc_functions = {
  * @brief The set-up parameters for the LC3 encoder.
  *
  */
-struct amod_description lc3_enc_dept = { .name = "LC3 Encoder",
-					 .type = AMOD_TYPE_PROCESSOR,
-					 .functions = (struct amod_functions *)&lc3_enc_functions };
+struct amod_description lc3_enc_dept = {.name = "LC3 Encoder",
+					.type = AMOD_TYPE_PROCESSOR,
+					.functions = (struct amod_functions *)&lc3_enc_functions};
 
 /**
  * @brief A private pointer to the LC3 encoder set-up parameters.
@@ -292,7 +292,7 @@ int lc3_enc_data_process(struct handle *handle, struct aobj_block *block_in,
 	uint8_t *data_out;
 	uint32_t encodeBitrate;
 	uint8_t *deinterleaved_pcm;
-	uint8_t pcm_block[ENC_PCM_NUM_BYTES_MULTI_CHAN] = { 0 };
+	uint8_t pcm_block[ENC_PCM_NUM_BYTES_MULTI_CHAN] = {0};
 	size_t pcm_block_size;
 	uint16_t bytes_read = 0;
 
@@ -311,10 +311,9 @@ int lc3_enc_data_process(struct handle *handle, struct aobj_block *block_in,
 	 */
 	if (block_in->format.interleaved == AOBJ_INTERLEAVED &&
 	    block_in->format.number_channels > 1) {
-		ret = pscm_deinterleave(block_in->data, block_in->data_size,
-					block_in->format.bits_per_sample,
-					block_in->format.number_channels, &pcm_block[0],
-					&pcm_block_size);
+		ret = pscm_deinterleave(
+			block_in->data, block_in->data_size, block_in->format.bits_per_sample,
+			block_in->format.number_channels, &pcm_block[0], &pcm_block_size);
 		if (ret) {
 			return ret;
 		}
@@ -344,14 +343,14 @@ int lc3_enc_data_process(struct handle *handle, struct aobj_block *block_in,
 	for (uint8_t i = 0; i < ctx->config.number_channels; i++) {
 		data_in = (uint8_t *)block_in->data + (session_in_size * i);
 
-		LC3EncodeInput_t LC3EncodeInput = { .PCMData = (void *)data_in,
-						    .PCMDataLength = session_in_size,
-						    .encodeBitrate = encodeBitrate,
-						    .bytesRead = bytes_read };
+		LC3EncodeInput_t LC3EncodeInput = {.PCMData = (void *)data_in,
+						   .PCMDataLength = session_in_size,
+						   .encodeBitrate = encodeBitrate,
+						   .bytesRead = bytes_read};
 
-		LC3EncodeOutput_t LC3EncodeOutput = { .outputData = data_in,
-						      .outputDataLength = data_out_size,
-						      .bytesWritten = 0 };
+		LC3EncodeOutput_t LC3EncodeOutput = {.outputData = data_in,
+						     .outputDataLength = data_out_size,
+						     .bytesWritten = 0};
 
 		if (!enc_handles[i]) {
 			LOG_ERR("LC3 enc ch:%d is not initialized", i);

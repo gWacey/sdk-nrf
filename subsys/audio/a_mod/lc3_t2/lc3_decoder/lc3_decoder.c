@@ -57,58 +57,6 @@ void interleave(void const *const input, size_t input_size, uint8_t channel, uin
 }
 
 /**
- * @brief  Function for opening a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules configuration to set.
- *
- * @return 0 if successful, error value
- */
-static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration);
-
-/**
- * @brief  Function close an open module.
- *
- * @param handle  A pointer to the modules handle.
- *
- * @return 0 if successful, error value
- */
-static int lc3_dec_t2_close(struct handle *handle);
-
-/**
- * @brief  Function to set the configuration of a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules configuration to set.
- *
- * @return 0 if successful, error value
- */
-static int lc3_dec_t2_configuration_set(struct handle *handle,
-					struct amod_configuration *configuration);
-
-/**
- * @brief  Function to set the configuration of a module.
- *
- * @param handle         A pointer to the modules handle.
- * @param configuration  A pointer to the modules current configuration.
- *
- * @return 0 if successful, error value
- */
-static int lc3_dec_t2_configuration_get(struct handle *handle,
-					struct amod_configuration *configuration);
-
-/**
- * @brief This processes the input block into the output block.
- *
- * @param handle	 A handle to this module instance
- * @param block_in   Pointer to the input audio block or NULL for an input module
- * @param block_out  Pointer to the output audio block or NULL for an output module
- *
- * @return 0 if successful, error value
- */
-static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
-				   struct aobj_block *block_out);
-/**
  * @brief Table of the LC3 decoder module functions.
  *
  */
@@ -148,8 +96,7 @@ struct amod_functions lc3_dec_t2_functions = {
 	/**
 	 * @brief The core data processing function in the LC3 decoder module.
 	 */
-	.data_process = lc3_dec_t2_data_process,
-};
+	.data_process = lc3_dec_t2_data_process};
 
 /**
  * @brief The set-up parameters for the LC3 decoder.
@@ -170,7 +117,7 @@ struct amod_description *lc3_dec_description = &lc3_dec_dept;
  * @brief Open an instance of the LC3 decoder
  *
  */
-static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *configuration)
+int lc3_dec_t2_open(struct amod_handle_private *handle, struct amod_configuration *configuration)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
@@ -253,7 +200,7 @@ static int lc3_dec_t2_open(struct handle *handle, struct amod_configuration *con
  * @brief  Function close an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_close(struct handle *handle)
+int lc3_dec_t2_close(struct amod_handle_private *handle)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -274,8 +221,8 @@ static int lc3_dec_t2_close(struct handle *handle)
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_configuration_set(struct handle *handle,
-					struct amod_configuration *configuration)
+int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
+				 struct amod_configuration *configuration)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
@@ -348,8 +295,8 @@ static int lc3_dec_t2_configuration_set(struct handle *handle,
  * @brief  Function to set the configuration of an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_configuration_get(struct handle *handle,
-					struct amod_configuration *configuration)
+int lc3_dec_t2_configuration_get(struct amod_handle_private *handle,
+				 struct amod_configuration *configuration)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
@@ -370,8 +317,8 @@ static int lc3_dec_t2_configuration_get(struct handle *handle,
  * @brief Process an audio data block in an instance of the LC3 decoder.
  *
  */
-static int lc3_dec_t2_data_process(struct handle *handle, struct aobj_block *block_in,
-				   struct aobj_block *block_out)
+int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct aobj_block *block_in,
+			    struct aobj_block *block_out)
 {
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
