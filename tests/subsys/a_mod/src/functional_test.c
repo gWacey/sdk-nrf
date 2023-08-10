@@ -7,9 +7,13 @@
 #include <zephyr/fff.h>
 #include <zephyr/ztest.h>
 #include <errno.h>
+
 #include "fakes.h"
 #include "amod_api.h"
 #include "common_test.h"
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(4);
 
 #define TEST_NUM_CONNECTIONS 5
 
@@ -20,6 +24,61 @@ static uint32_t test_uint32 = 0XDEADBEEF;
 K_THREAD_STACK_DEFINE(mod_stack, TEST_MOD_STACK_SIZE);
 K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, TEST_MOD_MSG_QUEUE_SIZE, 4);
 
+/**
+ * @brief Simple test thread with handle NULL.
+ *
+ * @param handle[in]  The handle to the module instance
+ *
+ * @return 0 if successful, error value
+ */
+static int test_thread_handle(struct amod_handle *handle)
+{
+	/* Execute thread */
+	while (1) {
+		zassert_not_null(handle, NULL, "handle is NULL!");
+
+		/* Sleep for 0.001s */
+		k_sleep(K_MSEC(1));
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Simple function to start a test thread with handle.
+ *
+ * @param handle[in]  The handle to the module instance
+ *
+ * @return 0 if successful, error value
+ */
+static int start_thread(struct amod_handle *handle)
+{
+	int ret;
+
+	handle->thread_id = k_thread_create(
+		&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
+		(k_thread_entry_t)test_thread_handle, handle, NULL, NULL,
+		K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+
+	ret = k_thread_name_set(handle->thread_id, handle->name);
+	if (ret) {
+		LOG_INF("Failed to start module %s test thread, ret %d", handle->name, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Function to initialise a handle.
+ *
+ * @param handle[in/out]     The handle to the module instance
+ * @param description[in]    Pointer to the modules description
+ * @param context[in]        Pointer to the modules context
+ * @param configuration[in]  Pointer to the module's configuration
+ *
+ * @return 0 if successful, error otherwise
+ */
 static void test_initialise_handle(struct amod_handle *handle, struct amod_description *description,
 				   struct mod_context *context, struct mod_config *configuration)
 {
@@ -1333,6 +1392,9 @@ ZTEST(suite_a_mod_functional, test_close)
 		.test_uint32 = 0xDEADBEEF,
 		.config = {.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4}};
 	struct amod_handle handle;
+	struct amod_handle handle_cleared;
+
+	memset(&handle_cleared, 0, sizeof(struct amod_handle));
 
 	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 	handle.description = &test_description;
@@ -1355,14 +1417,16 @@ ZTEST(suite_a_mod_functional, test_close)
 	handle.thread.msg_rx = &mod_fifo_rx;
 	handle.thread.msg_tx = &mod_fifo_tx;
 
+	start_thread(&handle);
+
 	handle.previous_state = AMOD_STATE_RUNNING;
 	handle.state = AMOD_STATE_CONFIGURED;
 
 	ret = amod_close(&handle);
 
 	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_mem_equal(&handle, 0, sizeof(struct amod_handle),
-			  "Failed close handle is none zero");
+	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+			  "Failed close handle contents are none zero");
 	zassert_mem_equal(&test_description, &test_description_pre, sizeof(struct amod_description),
 			  "Failed close, modified the modules description");
 	zassert_mem_equal(&mod_functions, &mod_functions_pre, sizeof(struct amod_functions),
@@ -1393,11 +1457,13 @@ ZTEST(suite_a_mod_functional, test_close)
 	handle.previous_state = AMOD_STATE_RUNNING;
 	handle.state = AMOD_STATE_STOPPED;
 
+	start_thread(&handle);
+
 	ret = amod_close(&handle);
 
 	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_mem_equal(&handle, 0, sizeof(struct amod_handle),
-			  "Failed close handle is none zero");
+	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+			  "Failed close handle contents are none zero");
 	zassert_mem_equal(&test_description, &test_description_pre, sizeof(struct amod_description),
 			  "Failed close, modified the modules description");
 	zassert_mem_equal(&mod_functions, &mod_functions_pre, sizeof(struct amod_functions),
