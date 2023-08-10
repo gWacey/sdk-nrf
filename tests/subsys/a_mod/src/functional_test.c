@@ -99,6 +99,21 @@ static void test_initialise_handle(struct amod_handle *handle, struct amod_descr
 }
 
 /**
+ * @brief Test function to set a module's context.
+ *
+ * @param ctx[out]    The module context to set
+ * @param config[in]  Pointer to the module's configuration
+ *
+ * @return 0 if successful, error otherwise
+ */
+static void test_context_set(struct mod_context *ctx, struct mod_config *config)
+{
+	memcpy(&ctx->test_string, test_string, sizeof(test_string));
+	ctx->test_uint32 = test_uint32;
+	memcpy(&ctx->config, config, sizeof(struct mod_config));
+}
+
+/**
  * @brief Test function to open a module.
  *
  * @param handle[in/out]     The handle to the module instance
@@ -108,8 +123,14 @@ static void test_initialise_handle(struct amod_handle *handle, struct amod_descr
  */
 static int test_open(struct amod_handle_private *handle, struct amod_configuration *configuration)
 {
-	ARG_UNUSED(handle);
-	ARG_UNUSED(configuration);
+	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct mod_context *ctx = (struct mod_context *)hdl->context;
+	struct mod_config *config = (struct mod_config *)configuration;
+
+	test_context_set(ctx, config);
+	memcpy(&ctx->test_string, test_string, sizeof(test_string));
+	ctx->test_uint32 = test_uint32;
+	memcpy(&ctx->config, config, sizeof(struct mod_config));
 
 	return 0;
 }
@@ -361,7 +382,7 @@ ZTEST(suite_a_mod_functional, test_state_get)
 ZTEST(suite_a_mod_functional, test_names_get)
 {
 	int ret;
-	struct amod_description test_description = {0};
+	struct amod_description mod_description = {0};
 	struct amod_handle handle = {0};
 	char *base_name;
 	char instance_name[CONFIG_AMOD_NAME_SIZE] = {0};
@@ -371,8 +392,8 @@ ZTEST(suite_a_mod_functional, test_names_get)
 		"Test base name that is longer than the size of CONFIG_AMOD_NAME_SIZE";
 
 	handle.state = AMOD_STATE_CONFIGURED;
-	test_description.name = test_base_name_empty;
-	handle.description = &test_description;
+	mod_description.name = test_base_name_empty;
+	handle.description = &mod_description;
 	memset(&handle.name[0], 0, CONFIG_AMOD_NAME_SIZE);
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
@@ -382,8 +403,8 @@ ZTEST(suite_a_mod_functional, test_names_get)
 			  "Failed to get the instance name: %s", instance_name);
 
 	handle.state = AMOD_STATE_CONFIGURED;
-	test_description.name = test_base_name;
-	handle.description = &test_description;
+	mod_description.name = test_base_name;
+	handle.description = &mod_description;
 	memcpy(&handle.name, "Test instance name", sizeof("Test instance name"));
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
@@ -394,8 +415,8 @@ ZTEST(suite_a_mod_functional, test_names_get)
 			  "Failed to get the instance name in configured state: %s", instance_name);
 
 	handle.state = AMOD_STATE_RUNNING;
-	test_description.name = test_base_name;
-	handle.description = &test_description;
+	mod_description.name = test_base_name;
+	handle.description = &mod_description;
 	memcpy(&handle.name, "Instance name run", sizeof("Instance name run"));
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
@@ -406,8 +427,8 @@ ZTEST(suite_a_mod_functional, test_names_get)
 			  "Failed to get the instance name in running state: %s", instance_name);
 
 	handle.state = AMOD_STATE_STOPPED;
-	test_description.name = test_base_name;
-	handle.description = &test_description;
+	mod_description.name = test_base_name;
+	handle.description = &mod_description;
 	memcpy(&handle.name, "Instance name stop", sizeof("Instance name stop"));
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
@@ -418,8 +439,8 @@ ZTEST(suite_a_mod_functional, test_names_get)
 			  "Failed to get the instance name in stopped state: %s", instance_name);
 
 	handle.state = AMOD_STATE_CONFIGURED;
-	test_description.name = test_base_name_long;
-	handle.description = &test_description;
+	mod_description.name = test_base_name_long;
+	handle.description = &mod_description;
 	memcpy(&handle.name, "Test instance name", sizeof("Test instance name"));
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
@@ -444,12 +465,12 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_UNDEFINED;
@@ -464,7 +485,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -479,7 +500,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -494,7 +515,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -509,7 +530,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -539,12 +560,12 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_UNDEFINED;
@@ -559,7 +580,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -574,7 +595,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -589,7 +610,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -604,7 +625,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -634,12 +655,12 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_UNDEFINED;
@@ -654,7 +675,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -669,7 +690,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -684,7 +705,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -699,7 +720,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -729,12 +750,12 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_UNDEFINED;
@@ -749,7 +770,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -765,7 +786,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -780,7 +801,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -795,7 +816,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, &mod_config);
+	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -822,11 +843,11 @@ ZTEST(suite_a_mod_functional, test_stop_null_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
 	ret = amod_stop(&handle);
@@ -839,7 +860,7 @@ ZTEST(suite_a_mod_functional, test_stop_null_fnct)
 		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
 		      AMOD_STATE_RUNNING, handle.previous_state);
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_RUNNING;
 	ret = amod_stop(&handle);
@@ -851,7 +872,7 @@ ZTEST(suite_a_mod_functional, test_stop_null_fnct)
 		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
 		      AMOD_STATE_RUNNING, handle.previous_state);
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
 	ret = amod_stop(&handle);
@@ -875,11 +896,11 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_STOPPED;
 	ret = amod_start(&handle);
@@ -892,7 +913,7 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
 		      AMOD_STATE_STOPPED, handle.previous_state);
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
 	ret = amod_start(&handle);
@@ -904,7 +925,7 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
 		      AMOD_STATE_STOPPED, handle.previous_state);
 
-	test_initialise_handle(&handle, &test_description, NULL, NULL);
+	test_initialise_handle(&handle, &mod_description, NULL, NULL);
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_STOPPED;
 	ret = amod_start(&handle);
@@ -920,7 +941,7 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 ZTEST(suite_a_mod_functional, test_stop_fnct)
 {
 	int ret;
-	struct mod_context test_context = {
+	struct mod_context test_mod_context = {
 		.test_string = test_string, .test_uint32 = test_uint32, .config = {0}};
 	struct mod_context mod_context = {.test_string = NULL, .test_uint32 = 0, .config = {0}};
 	struct amod_functions mod_1_functions = {.open = NULL,
@@ -931,12 +952,12 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 						 .stop = test_stop_start,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -951,7 +972,7 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 		      AMOD_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed stop");
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -963,12 +984,13 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
 		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
 		      AMOD_STATE_RUNNING, handle.previous_state);
-	zassert_mem_equal(&test_context, handle_context, sizeof(struct mod_context), "Failed stop");
+	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
+			  "Failed stop");
 
 	mod_context.test_string = NULL;
 	mod_context.test_uint32 = 0;
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_CONFIGURED;
@@ -980,13 +1002,14 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
 		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
 		      AMOD_STATE_RUNNING, handle.previous_state);
-	zassert_mem_equal(&test_context, handle_context, sizeof(struct mod_context), "Failed stop");
+	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
+			  "Failed stop");
 }
 
 ZTEST(suite_a_mod_functional, test_start_fnct)
 {
 	int ret;
-	struct mod_context test_context = {
+	struct mod_context test_mod_context = {
 		.test_string = test_string, .test_uint32 = test_uint32, .config = {0}};
 	struct mod_context mod_context = {.test_string = NULL, .test_uint32 = 0, .config = {0}};
 	struct amod_functions mod_1_functions = {.open = NULL,
@@ -997,12 +1020,12 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 						 .stop = NULL,
 						 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
 	struct amod_handle handle = {0};
 	struct mod_context *handle_context;
 
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_RUNNING;
 	handle.previous_state = AMOD_STATE_STOPPED;
@@ -1020,7 +1043,7 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 	mod_context.test_string = NULL;
 	mod_context.test_uint32 = 0;
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_STOPPED;
 	handle.previous_state = AMOD_STATE_RUNNING;
@@ -1032,13 +1055,13 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
 		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
 		      AMOD_STATE_STOPPED, handle.previous_state);
-	zassert_mem_equal(&test_context, handle_context, sizeof(struct mod_context),
+	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed start");
 
 	mod_context.test_string = NULL;
 	mod_context.test_uint32 = 0;
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &test_description, &mod_context, NULL);
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AMOD_STATE_CONFIGURED;
 	handle.previous_state = AMOD_STATE_STOPPED;
@@ -1050,7 +1073,7 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
 		      "Start previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
 		      AMOD_STATE_CONFIGURED, handle.previous_state);
-	zassert_mem_equal(&test_context, handle_context, sizeof(struct mod_context),
+	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed start");
 }
 
@@ -1362,11 +1385,121 @@ ZTEST(suite_a_mod_functional, test_connect)
 	}
 }
 
+ZTEST(suite_a_mod_functional, test_close_null)
+{
+	int ret;
+	char *test_base_name = "Test base name";
+	char *test_inst_name = "TEST instance 1";
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = NULL};
+	struct amod_functions test_mod_functions = mod_functions;
+	struct amod_description mod_description = {
+		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct amod_description test_mod_description = mod_description;
+	struct amod_parameters mod_parameters = {.description = &mod_description,
+						 .thread = {.stack = mod_stack,
+							    .stack_size = TEST_MOD_STACK_SIZE,
+							    .priority = 2,
+							    .data_slab = &mod_data_slab,
+							    .data_size = TEST_MOD_DATA_SIZE}};
+	struct amod_parameters test_mod_parameters = mod_parameters;
+	struct mod_context mod_context = {0};
+	struct amod_handle handle;
+	struct amod_handle handle_cleared;
+
+	memset(&handle_cleared, 0, sizeof(struct amod_handle));
+
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.data_tx = true;
+	handle.dest_count = TEST_NUM_MODULES;
+	handle.thread.stack = mod_stack;
+	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
+	handle.thread.priority = 2;
+	handle.thread.data_slab = &mod_data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.context = (struct amod_context *)&mod_context;
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+	handle.thread.msg_rx = NULL;
+	handle.thread.msg_tx = NULL;
+
+	start_thread(&handle);
+
+	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AMOD_STATE_CONFIGURED;
+
+	ret = amod_close(&handle);
+
+	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
+	zassert_equal(data_fifo_empty_fake.call_count, 0,
+		      "Failed close, data FIFO empty called %d times",
+		      data_fifo_empty_fake.call_count);
+	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+			  "Failed close handle contents are none zero");
+	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
+			  "Failed close, modified the modules description");
+	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
+			  "Failed close, modified the modules functions");
+	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
+			  "Failed close, modified the modules parameter settings");
+	zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
+			  "Failed close, modified the modules context");
+
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.data_tx = true;
+	handle.dest_count = TEST_NUM_MODULES;
+	handle.thread.stack = mod_stack;
+	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
+	handle.thread.priority = 2;
+	handle.thread.data_slab = &mod_data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.context = (struct amod_context *)&mod_context;
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+	handle.thread.msg_rx = NULL;
+	handle.thread.msg_tx = NULL;
+
+	start_thread(&handle);
+
+	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AMOD_STATE_STOPPED;
+
+	ret = amod_close(&handle);
+
+	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
+	zassert_equal(data_fifo_empty_fake.call_count, 0,
+		      "Failed close, data FIFO empty called %d times",
+		      data_fifo_empty_fake.call_count);
+	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+			  "Failed close handle contents are none zero");
+	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
+			  "Failed close, modified the modules description");
+	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
+			  "Failed close, modified the modules functions");
+	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
+			  "Failed close, modified the modules parameter settings");
+	zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
+			  "Failed close, modified the modules context");
+}
+
 ZTEST(suite_a_mod_functional, test_close)
 {
 	int ret;
 	char *test_base_name = "Test base name";
 	char *test_inst_name = "TEST instance 1";
+	struct mod_config mod_config = {
+		.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4};
 	struct amod_functions mod_functions = {.open = test_open,
 					       .close = test_close,
 					       .configuration_set = test_config_set,
@@ -1374,30 +1507,31 @@ ZTEST(suite_a_mod_functional, test_close)
 					       .start = test_stop_start,
 					       .stop = test_stop_start,
 					       .data_process = test_data_process};
-	struct amod_functions mod_functions_pre = mod_functions;
-	struct amod_description test_description = {
+	struct amod_functions test_mod_functions = mod_functions;
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
-	struct amod_description test_description_pre = test_description;
+	struct amod_description test_mod_description = mod_description;
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
-	struct amod_parameters test_parameters = {.description = &test_description,
-						  .thread = {.stack = mod_stack,
-							     .stack_size = TEST_MOD_STACK_SIZE,
-							     .priority = 2,
-							     .data_slab = &mod_data_slab,
-							     .data_size = TEST_MOD_DATA_SIZE}};
-	struct amod_parameters test_parameters_pre = test_parameters;
-	struct mod_context mod_context = {
-		.test_string = "Context",
-		.test_uint32 = 0xDEADBEEF,
-		.config = {.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4}};
+	struct amod_parameters mod_parameters = {.description = &mod_description,
+						 .thread = {.stack = mod_stack,
+							    .stack_size = TEST_MOD_STACK_SIZE,
+							    .priority = 2,
+							    .data_slab = &mod_data_slab,
+							    .data_size = TEST_MOD_DATA_SIZE}};
+	struct amod_parameters test_mod_parameters = mod_parameters;
+	struct mod_context mod_context;
+	struct mod_context test_mod_context;
 	struct amod_handle handle;
 	struct amod_handle handle_cleared;
+
+	test_context_set(&test_mod_context, &mod_config);
+	mod_context = test_mod_context;
 
 	memset(&handle_cleared, 0, sizeof(struct amod_handle));
 
 	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &test_description;
+	handle.description = &mod_description;
 	handle.data_tx = true;
 	handle.dest_count = TEST_NUM_MODULES;
 	handle.thread.stack = mod_stack;
@@ -1425,17 +1559,22 @@ ZTEST(suite_a_mod_functional, test_close)
 	ret = amod_close(&handle);
 
 	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
+	zassert_equal(data_fifo_empty_fake.call_count, 2,
+		      "Failed close, data FIFO empty called %d times",
+		      data_fifo_empty_fake.call_count);
 	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
 			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&test_description, &test_description_pre, sizeof(struct amod_description),
+	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
 			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &mod_functions_pre, sizeof(struct amod_functions),
+	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
 			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&test_parameters, &test_parameters_pre, sizeof(struct amod_parameters),
+	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
 			  "Failed close, modified the modules parameter settings");
+	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+			  "Failed close, modified the modules context");
 
 	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &test_description;
+	handle.description = &mod_description;
 	handle.data_tx = true;
 	handle.dest_count = TEST_NUM_MODULES;
 	handle.thread.stack = mod_stack;
@@ -1446,10 +1585,11 @@ ZTEST(suite_a_mod_functional, test_close)
 	handle.context = (struct amod_context *)&mod_context;
 
 	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
 	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
-	fake_data_fifo_init__succeeds(&mod_fifo_tx);
-	fake_data_fifo_init__succeeds(&mod_fifo_rx);
+	data_fifo_init(&mod_fifo_tx);
+	data_fifo_init(&mod_fifo_rx);
 
 	handle.thread.msg_rx = &mod_fifo_rx;
 	handle.thread.msg_tx = &mod_fifo_tx;
@@ -1462,14 +1602,19 @@ ZTEST(suite_a_mod_functional, test_close)
 	ret = amod_close(&handle);
 
 	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
+	zassert_equal(data_fifo_empty_fake.call_count, 4,
+		      "Failed close, data FIFO empty called %d times",
+		      data_fifo_empty_fake.call_count);
 	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
 			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&test_description, &test_description_pre, sizeof(struct amod_description),
+	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
 			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &mod_functions_pre, sizeof(struct amod_functions),
+	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
 			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&test_parameters, &test_parameters_pre, sizeof(struct amod_parameters),
+	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
 			  "Failed close, modified the modules parameter settings");
+	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+			  "Failed close, modified the modules context");
 }
 
 ZTEST(suite_a_mod_functional, test_open)
@@ -1477,9 +1622,10 @@ ZTEST(suite_a_mod_functional, test_open)
 	int ret;
 	char *test_base_name = "Test base name";
 	char *test_inst_name = "TEST instance 1";
-	struct mod_context mod_context = {0};
 	struct mod_config mod_config = {
 		.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4};
+	struct mod_context test_mod_context;
+	struct mod_context mod_context = {0};
 	struct amod_functions mod_functions = {.open = test_open,
 					       .close = test_close,
 					       .configuration_set = test_config_set,
@@ -1487,27 +1633,35 @@ ZTEST(suite_a_mod_functional, test_open)
 					       .start = test_stop_start,
 					       .stop = test_stop_start,
 					       .data_process = test_data_process};
-	struct amod_description test_description = {
+	struct amod_description mod_description = {
 		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
+	struct amod_parameters mod_parameters = {.description = &mod_description,
+						 .thread = {.stack = mod_stack,
+							    .stack_size = TEST_MOD_STACK_SIZE,
+							    .priority = 2,
+							    .data_slab = &mod_data_slab,
+							    .data_size = TEST_MOD_DATA_SIZE}};
 	struct amod_handle handle;
-	struct amod_parameters test_parameters = {.description = &test_description,
-						  .thread = {.stack = mod_stack,
-							     .stack_size = TEST_MOD_STACK_SIZE,
-							     .priority = 2,
-							     .data_slab = &mod_data_slab,
-							     .data_size = TEST_MOD_DATA_SIZE}};
 
-	fake_data_fifo_init__succeeds(&mod_fifo_tx);
-	fake_data_fifo_init__succeeds(&mod_fifo_rx);
+	test_context_set(&test_mod_context, &mod_config);
 
-	test_parameters.thread.msg_rx = &mod_fifo_rx;
-	test_parameters.thread.msg_tx = &mod_fifo_tx;
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+
+	data_fifo_init(&mod_fifo_tx);
+	data_fifo_init(&mod_fifo_rx);
+
+	mod_parameters.thread.msg_rx = &mod_fifo_rx;
+	mod_parameters.thread.msg_tx = &mod_fifo_tx;
 
 	memset(&handle, 0, sizeof(struct amod_handle));
 
-	ret = amod_open(&test_parameters, (struct amod_configuration *)&mod_config, test_inst_name,
+	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AMOD_STATE_UNDEFINED;
+
+	ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config, test_inst_name,
 			(struct amod_context *)&mod_context, &handle);
 
 	zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
@@ -1519,18 +1673,18 @@ ZTEST(suite_a_mod_functional, test_open)
 		      AMOD_STATE_UNDEFINED, handle.previous_state);
 	zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 			  "Failed open, name should be %s, but is %s", test_inst_name, handle.name);
-	zassert_mem_equal(handle.description, &test_description, sizeof(struct amod_description),
+	zassert_mem_equal(handle.description, &mod_description, sizeof(struct amod_description),
 			  "Failed open, module descriptions differ");
 	zassert_mem_equal(handle.description->functions, &mod_functions,
 			  sizeof(struct amod_functions),
 			  "Failed open, module function pointers differ");
-	zassert_mem_equal(&handle.thread, &test_parameters.thread,
+	zassert_mem_equal(&handle.thread, &mod_parameters.thread,
 			  sizeof(struct amod_thread_configuration),
 			  "Failed open, module thread settings differ");
-	zassert_mem_equal(handle.context, &mod_context, sizeof(struct amod_thread_configuration),
+	zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 			  "Failed open, module contexts differ");
 	zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
 		      handle.data_tx);
-	zassert_equal(handle.dest_count, false, "Open failed dest_count is not 0: %d",
+	zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 		      handle.dest_count);
 }
