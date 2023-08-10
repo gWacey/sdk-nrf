@@ -6,26 +6,9 @@
 
 #include <zephyr/ztest.h>
 #include <errno.h>
+#include "fakes.h"
 #include "amod_api.h"
-
-#define MOD_STACK_SIZE	       (1024)
-#define MOD_MSG_QUEUE_SIZE     (4)
-#define MOD_MSG_QUEUE_SIZE     (4)
-#define MOD_DATA_SIZE	       (40)
-#define PCM_DATA_OBJECTS_NUM   (4)
-#define CODED_DATA_OBJECTS_NUM (4)
-
-struct mod_context {
-	char *test_string;
-	uint32_t test_uint32;
-};
-
-struct mod_config {
-	int test_int1;
-	int test_int2;
-	int test_int3;
-	int test_int4;
-};
+#include "common_test.h"
 
 const struct amod_functions mod_1_functions = {.open = NULL,
 					       .close = NULL,
@@ -629,15 +612,15 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
 	struct k_mem_slab mod_data_slab;
-	size_t mod_thread_stack = MOD_STACK_SIZE;
+	size_t mod_thread_stack = TEST_MOD_STACK_SIZE;
 
 	test_params_thread.thread.stack = NULL;
-	test_params_thread.thread.stack_size = MOD_STACK_SIZE;
+	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
 	test_params_thread.thread.priority = 4;
 	test_params_thread.thread.msg_rx = &mod_fifo_rx;
 	test_params_thread.thread.msg_tx = &mod_fifo_tx;
 	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = MOD_DATA_SIZE;
+	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
@@ -650,7 +633,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 	test_params_thread.thread.msg_rx = &mod_fifo_rx;
 	test_params_thread.thread.msg_tx = &mod_fifo_tx;
 	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = MOD_DATA_SIZE;
+	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
@@ -658,12 +641,12 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 		      ret);
 
 	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = MOD_STACK_SIZE;
+	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
 	test_params_thread.thread.priority = 4;
 	test_params_thread.thread.msg_rx = NULL;
 	test_params_thread.thread.msg_tx = &mod_fifo_tx;
 	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = MOD_DATA_SIZE;
+	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
@@ -671,12 +654,12 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 		      ret);
 
 	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = MOD_STACK_SIZE;
+	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
 	test_params_thread.thread.priority = 4;
 	test_params_thread.thread.msg_rx = &mod_fifo_rx;
 	test_params_thread.thread.msg_tx = NULL;
 	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = MOD_DATA_SIZE;
+	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
