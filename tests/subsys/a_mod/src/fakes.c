@@ -3,14 +3,13 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#include "fakes.h"
 
-#include <zephyr/fff.h>
 #include <zephyr/ztest.h>
+#include <zephyr/fff.h>
+
 #include "data_fifo.h"
 #include "common_test.h"
-
-DEFINE_FFF_GLOBALS;
+#include "fakes.h"
 
 /* Overload the message buffer pointer with a point to one of the an arrays below */
 static int fifo_num;
@@ -29,16 +28,21 @@ static struct test_data_fifo_buffer test_fifo_data_slab[TEST_NUM_MODULES];
 /* FIFO "queue" items */
 static struct test_data_fifo_buffer test_fifo_data_queue[TEST_NUM_MODULES];
 
-/* Fake functions declaration */
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_pointer_first_vacant_get, struct data_fifo *, void **,
-			k_timeout_t);
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_block_lock, struct data_fifo *, void **, size_t);
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_pointer_last_filled_get, struct data_fifo *, void **,
-			size_t *, k_timeout_t);
-DECLARE_FAKE_VOID_FUNC2(data_fifo_block_free, struct data_fifo *, void **);
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_num_used_get, struct data_fifo *, uint32_t *, uint32_t *);
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_empty, struct data_fifo *);
-DECLARE_FAKE_VALUE_FUNC(int, data_fifo_init, struct data_fifo *);
+/*
+ * Stubs are defined here, so that multiple .C files can share them
+ * without having linker issues.
+ */
+DEFINE_FFF_GLOBALS;
+
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_pointer_first_vacant_get, struct data_fifo *, void **,
+		       k_timeout_t);
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_block_lock, struct data_fifo *, void **, size_t);
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_pointer_last_filled_get, struct data_fifo *, void **,
+		       size_t *, k_timeout_t);
+DEFINE_FAKE_VOID_FUNC2(data_fifo_block_free, struct data_fifo *, void **);
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_num_used_get, struct data_fifo *, uint32_t *, uint32_t *);
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_empty, struct data_fifo *);
+DEFINE_FAKE_VALUE_FUNC(int, data_fifo_init, struct data_fifo *);
 
 /* Custom fakes implementation */
 int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fifo, void **data,

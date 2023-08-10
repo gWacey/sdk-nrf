@@ -1345,8 +1345,12 @@ ZTEST(suite_a_mod_functional, test_close)
 	handle.thread.data_size = TEST_MOD_DATA_SIZE;
 	handle.context = (struct amod_context *)&mod_context;
 
-	fake_data_fifo_init__succeeds(&mod_fifo_tx);
-	fake_data_fifo_init__succeeds(&mod_fifo_rx);
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+	data_fifo_init(&mod_fifo_tx);
+	data_fifo_init(&mod_fifo_rx);
 
 	handle.thread.msg_rx = &mod_fifo_rx;
 	handle.thread.msg_tx = &mod_fifo_tx;
@@ -1376,6 +1380,9 @@ ZTEST(suite_a_mod_functional, test_close)
 	handle.thread.data_slab = &mod_data_slab;
 	handle.thread.data_size = TEST_MOD_DATA_SIZE;
 	handle.context = (struct amod_context *)&mod_context;
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
 	fake_data_fifo_init__succeeds(&mod_fifo_tx);
 	fake_data_fifo_init__succeeds(&mod_fifo_rx);

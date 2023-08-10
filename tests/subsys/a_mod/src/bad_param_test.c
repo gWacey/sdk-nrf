@@ -6,7 +6,6 @@
 
 #include <zephyr/ztest.h>
 #include <errno.h>
-#include "fakes.h"
 #include "amod_api.h"
 #include "common_test.h"
 
