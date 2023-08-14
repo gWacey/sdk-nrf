@@ -7,26 +7,30 @@
 #include <zephyr/ztest.h>
 #include <zephyr/fff.h>
 
+#include "common.h"
 #include "data_fifo.h"
-#include "common_test.h"
 #include "fakes.h"
 
 /* Overload the message buffer pointer with a point to one of the an arrays below */
 static int fifo_num;
 
 /* Number of messages used*/
-static int msgq_num_used_in;
-static int slab_blocks_num_used;
 
 struct test_data_fifo_buffer {
-	char buffer[TEST_MOD_MSG_QUEUE_SIZE][TEST_MOD_DATA_SIZE];
+	int msgq_read_pos;
+	int msgq_free_pos;
+	int slab_blocks_read_pos;
+	int slab_blocks_free_pos;
+
+	char buffer[FAKE_FIFO_MSG_QUEUE_SIZE][FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	size_t buffer_size;
 };
 
 /* FIFO "slab" buffers */
-static struct test_data_fifo_buffer test_fifo_data_slab[TEST_NUM_MODULES];
+static struct test_data_fifo_buffer test_fifo_data_slab[FAKE_FIFO_NUM];
 
 /* FIFO "queue" items */
-static struct test_data_fifo_buffer test_fifo_data_queue[TEST_NUM_MODULES];
+static struct test_data_fifo_buffer test_fifo_data_queue[FAKE_FIFO_NUM];
 
 /*
  * Stubs are defined here, so that multiple .C files can share them
@@ -50,11 +54,12 @@ int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fif
 {
 	ARG_UNUSED(data_fifo);
 	ARG_UNUSED(timeout);
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	*data = &(((struct test_data_fifo_buffer *)data_fifo->slab_buffer)
-			  ->buffer[slab_blocks_num_used][0]);
+	*data = &msg->buffer[msg->slab_blocks_free_pos][0];
 
-	slab_blocks_num_used += 1;
+	msg->slab_blocks_read_pos = msg->slab_blocks_free_pos;
+	msg->slab_blocks_free_pos += 1;
 
 	return 0;
 }
@@ -91,11 +96,13 @@ int fake_data_fifo_pointer_first_vacant_get__invalid_fails(struct data_fifo *dat
 
 int fake_data_fifo_block_lock__succeeds(struct data_fifo *data_fifo, void **data, size_t size)
 {
-	memcpy(&((struct test_data_fifo_buffer *)data_fifo->msgq_buffer)
-			->buffer[msgq_num_used_in][0],
-	       *data, size);
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	msgq_num_used_in += 1;
+	memcpy(&msg->buffer[msg->msgq_free_pos][0], *data, size);
+	msg->buffer_size = size;
+
+	msg->msgq_read_pos = msg->msgq_free_pos;
+	msg->msgq_free_pos += 1;
 
 	return 0;
 }
@@ -131,12 +138,13 @@ int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo
 						     size_t *size, k_timeout_t timeout)
 {
 	ARG_UNUSED(timeout);
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	*data = &(((struct test_data_fifo_buffer *)data_fifo->slab_buffer)
-			  ->buffer[msgq_num_used_in][0]);
-	*size = TEST_MOD_DATA_SIZE;
+	*data = &msg->buffer[msg->msgq_read_pos][0];
+	*size = data_fifo->block_size_max;
 
-	msgq_num_used_in -= 1;
+	msg->msgq_read_pos -= 1;
+	msg->msgq_free_pos -= 1;
 
 	return 0;
 }
@@ -169,17 +177,20 @@ void fake_data_fifo_block_free__succeeds(struct data_fifo *data_fifo, void **dat
 {
 	ARG_UNUSED(data_fifo);
 	ARG_UNUSED(data);
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	slab_blocks_num_used -= 1;
+	msg->slab_blocks_read_pos -= 1;
+	msg->slab_blocks_free_pos -= 1;
 }
 
 int fake_data_fifo_num_used_get__succeeds(struct data_fifo *data_fifo, uint32_t *alloced_num,
 					  uint32_t *locked_num)
 {
 	ARG_UNUSED(data_fifo);
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	*alloced_num = msgq_num_used_in;
-	*locked_num = slab_blocks_num_used;
+	*alloced_num = msg->msgq_free_pos;
+	*locked_num = msg->slab_blocks_free_pos;
 
 	return 0;
 }
@@ -196,8 +207,12 @@ int fake_data_fifo_num_used_get__fails(struct data_fifo *data_fifo, uint32_t *al
 
 int fake_data_fifo_empty__succeeds(struct data_fifo *data_fifo)
 {
-	msgq_num_used_in = 0;
-	slab_blocks_num_used = 0;
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+
+	msg->msgq_free_pos = 0;
+	msg->msgq_read_pos = 0;
+	msg->slab_blocks_free_pos = 0;
+	msg->slab_blocks_read_pos = 0;
 
 	return 0;
 }
@@ -232,15 +247,19 @@ int fake_data_fifo_empty__timeout_fails(struct data_fifo *data_fifo)
 
 int fake_data_fifo_init__succeeds(struct data_fifo *data_fifo)
 {
+	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+
 	data_fifo->msgq_buffer = (char *)&test_fifo_data_queue[fifo_num];
 	data_fifo->slab_buffer = (char *)&test_fifo_data_slab[fifo_num];
-	data_fifo->elements_max = TEST_MOD_MSG_QUEUE_SIZE;
-	data_fifo->block_size_max = TEST_MOD_DATA_SIZE;
+	data_fifo->elements_max = FAKE_FIFO_MSG_QUEUE_SIZE;
+	data_fifo->block_size_max = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
 	data_fifo->initialized = true;
 
 	fifo_num += 1;
-	msgq_num_used_in = 0;
-	slab_blocks_num_used = 0;
+	msg->msgq_read_pos = 0;
+	msg->msgq_free_pos = 0;
+	msg->slab_blocks_read_pos = 0;
+	msg->slab_blocks_free_pos = 0;
 
 	return 0;
 }

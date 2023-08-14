@@ -1,0 +1,8 @@
+tests:
+  nrf5340_audio.lc3_decode_test:
+    platform_allow: nrf5340dk_nrf5340_cpuapp nrf5340_audio_dk_nrf5340_cpuapp
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+      - nrf5340_audio_dk_nrf5340_cpuapp
+    tags: a_mod lc3_decode nrf5340_lc3_decoder_tests
+    timeout: 20

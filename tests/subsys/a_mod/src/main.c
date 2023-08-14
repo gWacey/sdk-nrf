@@ -8,7 +8,6 @@
 #include <zephyr/ztest.h>
 #include <errno.h>
 #include "fakes.h"
-#include "amod_api.h"
 
 /* This function runs before each test */
 static void run_before(void *fixture)

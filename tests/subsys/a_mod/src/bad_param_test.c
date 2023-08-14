@@ -5,10 +5,11 @@
  */
 
 #include <zephyr/ztest.h>
+#include "fakes.h"
 #include <errno.h>
 
 #include "amod_api.h"
-#include "common_test.h"
+#include "common.h"
 
 const struct amod_functions mod_1_functions = {.open = NULL,
 					       .close = NULL,
@@ -21,15 +22,8 @@ const struct amod_functions mod_1_functions = {.open = NULL,
 ZTEST(suite_a_mod_bad_param, test_number_channels_calculate_null)
 {
 	int ret;
-	struct ablk_block block = {0};
-	uint8_t number_channels;
 
-	ret = amod_number_channels_calculate(NULL, &number_channels);
-	zassert_equal(ret, -EINVAL,
-		      "Calculate number of channels function did not return -EINVAL (%d): ret %d",
-		      -EINVAL, ret);
-
-	ret = amod_number_channels_calculate(&block, NULL);
+	ret = amod_number_channels_calculate(1, NULL);
 	zassert_equal(ret, -EINVAL,
 		      "Calculate number of channels function did not return -EINVAL (%d): ret %d",
 		      -EINVAL, ret);
@@ -98,6 +92,336 @@ ZTEST(suite_a_mod_bad_param, test_names_get_null)
 		      -ENOTSUP, ret);
 	zassert_equal(handle.state, AMOD_STATE_UNDEFINED,
 		      "Get names returns with incorrect state: %d", handle.state);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+	struct amod_handle handle = {.description = &test_description,
+				     .previous_state = AMOD_STATE_CONFIGURED};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block = {0};
+
+	test_block.data = &test_data[0];
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description.type = AMOD_TYPE_INPUT;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description.type = AMOD_TYPE_PROCESS;
+
+	handle.state = AMOD_STATE_UNDEFINED;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.state = AMOD_STATE_CONFIGURED;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.state = AMOD_STATE_STOPPED;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_tx_null)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+	struct amod_handle handle = {.description = &test_description,
+				     .previous_state = AMOD_STATE_CONFIGURED,
+				     .state = AMOD_STATE_RUNNING};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block = {0};
+
+	test_block.data = &test_data[0];
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx(NULL, &test_block, NULL);
+	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = amod_data_tx(&handle, NULL, NULL);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block.data = NULL;
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block.data = &test_data[0];
+	test_block.data_size = 0;
+
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module RX", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+	struct amod_handle handle = {.description = &test_description,
+				     .previous_state = AMOD_STATE_CONFIGURED,
+				     .state = AMOD_STATE_RUNNING};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block = {0};
+
+	test_block.data = &test_data[0];
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description.type = AMOD_TYPE_OUTPUT;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description.type = AMOD_TYPE_PROCESS;
+
+	handle.state = AMOD_STATE_UNDEFINED;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.state = AMOD_STATE_CONFIGURED;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.state = AMOD_STATE_STOPPED;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_rx_null)
+{
+	int ret;
+	struct amod_description test_description = {
+		.name = "Module 1", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+	struct amod_handle handle = {.description = &test_description,
+				     .previous_state = AMOD_STATE_CONFIGURED,
+				     .state = AMOD_STATE_RUNNING};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block = {0};
+
+	test_block.data = &test_data[0];
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_rx(NULL, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -EINVAL, "Data RX function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = amod_data_rx(&handle, NULL, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data RX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block.data = NULL;
+	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data RX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block.data = &test_data[0];
+	test_block.data_size = 0;
+
+	ret = amod_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data RX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
+{
+	int ret;
+	struct amod_description test_description_tx = {
+		.name = "Module TX", .type = AMOD_TYPE_UNDEFINED, .functions = NULL};
+	struct amod_description test_description_rx = {
+		.name = "Module RX", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+	struct amod_handle handle_tx = {.description = &test_description_tx,
+					.previous_state = AMOD_STATE_CONFIGURED,
+					.state = AMOD_STATE_RUNNING};
+	struct amod_handle handle_rx = {.description = &test_description_rx,
+					.previous_state = AMOD_STATE_CONFIGURED,
+					.state = AMOD_STATE_RUNNING};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block_tx = {0};
+	struct ablk_block test_block_rx = {0};
+
+	test_block_tx.data = &test_data[0];
+	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+	test_block_rx.data = &test_data[0];
+	test_block_rx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description_tx.type = AMOD_TYPE_INPUT;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description_tx.type = AMOD_TYPE_PROCESS;
+	test_description_rx.type = AMOD_TYPE_UNDEFINED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description_rx.type = AMOD_TYPE_OUTPUT;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	test_description_tx.type = AMOD_TYPE_PROCESS;
+	test_description_rx.type = AMOD_TYPE_PROCESS;
+
+	handle_tx.state = AMOD_STATE_UNDEFINED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_tx.state = AMOD_STATE_CONFIGURED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_tx.state = AMOD_STATE_STOPPED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_tx.state = AMOD_STATE_RUNNING;
+	handle_rx.state = AMOD_STATE_UNDEFINED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_rx.state = AMOD_STATE_CONFIGURED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_rx.state = AMOD_STATE_STOPPED;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+}
+
+ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
+{
+	int ret;
+	struct amod_description test_description_tx = {
+		.name = "Module TX", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+	struct amod_description test_description_rx = {
+		.name = "Module RX", .type = AMOD_TYPE_PROCESS, .functions = NULL};
+	struct amod_handle handle_tx = {.description = &test_description_tx,
+					.previous_state = AMOD_STATE_CONFIGURED,
+					.state = AMOD_STATE_RUNNING};
+	struct amod_handle handle_rx = {.description = &test_description_rx,
+					.previous_state = AMOD_STATE_CONFIGURED,
+					.state = AMOD_STATE_RUNNING};
+	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
+	struct ablk_block test_block_tx = {0};
+	struct ablk_block test_block_rx = {0};
+
+	test_block_tx.data = &test_data[0];
+	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+	test_block_rx.data = &test_data[0];
+	test_block_rx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx_rx(NULL, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = amod_data_tx_rx(&handle_tx, NULL, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, NULL, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, NULL, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block_tx.data = NULL;
+	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block_tx.data = &test_data[0];
+	test_block_tx.data_size = 0;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block_tx.data = &test_data[0];
+	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+	test_block_rx.data = NULL;
+	test_block_rx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
+
+	test_block_rx.data = &test_data[0];
+	test_block_rx.data_size = 0;
+
+	ret = amod_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
+	zassert_equal(ret, -ECONNREFUSED,
+		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      ret);
 }
 
 ZTEST(suite_a_mod_bad_param, test_stop_bad_state)
@@ -609,18 +933,11 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 	struct amod_configuration *config = (struct amod_configuration *)&configuration;
 	struct amod_handle handle = {0};
 	struct mod_context context = {0};
-	struct data_fifo mod_fifo_rx;
-	struct data_fifo mod_fifo_tx;
-	struct k_mem_slab mod_data_slab;
-	size_t mod_thread_stack = TEST_MOD_STACK_SIZE;
+	char mod_thread_stack[TEST_MOD_THREAD_STACK_SIZE];
 
 	test_params_thread.thread.stack = NULL;
-	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = &mod_fifo_rx;
-	test_params_thread.thread.msg_tx = &mod_fifo_tx;
-	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
+	test_params_thread.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+	test_params_thread.thread.priority = TEST_MOD_THREAD_PRIORITY;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
@@ -629,37 +946,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 
 	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
 	test_params_thread.thread.stack_size = 0;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = &mod_fifo_rx;
-	test_params_thread.thread.msg_tx = &mod_fifo_tx;
-	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
-
-	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
-			&handle);
-	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = NULL;
-	test_params_thread.thread.msg_tx = &mod_fifo_tx;
-	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
-
-	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
-			&handle);
-	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	test_params_thread.thread.stack = (k_thread_stack_t *)&mod_thread_stack;
-	test_params_thread.thread.stack_size = TEST_MOD_STACK_SIZE;
-	test_params_thread.thread.priority = 4;
-	test_params_thread.thread.msg_rx = &mod_fifo_rx;
-	test_params_thread.thread.msg_tx = NULL;
-	test_params_thread.thread.data_slab = (struct k_mem_slab *)&mod_data_slab;
-	test_params_thread.thread.data_size = TEST_MOD_DATA_SIZE;
+	test_params_thread.thread.priority = TEST_MOD_THREAD_PRIORITY;
 
 	ret = amod_open(&test_params_thread, config, inst_name, (struct amod_context *)&context,
 			&handle);
@@ -705,7 +992,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_description)
 		      ret);
 
 	test_description.name = "Module 1";
-	test_description.type = 4;
+	test_description.type = TEST_MOD_THREAD_PRIORITY;
 	test_description.functions = &mod_1_functions;
 	test_params_desc.description = &test_description;
 

@@ -190,17 +190,17 @@ struct amod_thread_configuration {
 	/* Thread priority */
 	int priority;
 
-	/* A pointer to a module's data receiver FIFO */
+	/* A pointer to a module's data receiver FIFO, can be NULL */
 	struct data_fifo *msg_rx;
 
-	/* A pointer to a module's data transmitter FIFO */
+	/* A pointer to a module's data transmitter FIFO, can be NULL */
 	struct data_fifo *msg_tx;
 
-	/* A pointer to the data buffer slab */
+	/* A pointer to the data buffer sla, can be NULL */
 	struct k_mem_slab *data_slab;
 
 	/* Size of each memory block in bytes that will be
-	 * taken from the data buffer slab
+	 * taken from the data buffer slab or 0
 	 */
 	size_t data_size;
 };
@@ -403,7 +403,7 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
  *
  * @return 0 if successful, error otherwise
  */
-int amod_data_tx_rx(struct amod_handle handle_tx, struct amod_handle handle_rx,
+int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx,
 		    struct ablk_block *block_tx, struct ablk_block *block_rx, k_timeout_t timeout);
 
 /**
@@ -432,11 +432,11 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state);
  * @brief Helper function to calculate the number of channels from the channel map for the given
  *        block.
  *
- * @param block[in]             Pointer to the audio data block
+ * @param channel_map[in]       Channel mapping to calculate the number of channels from
  * @param number_channels[out]  Pointer to the calculated number of channels in the block
  *
  * @return 0 if successful, error otherwise
  */
-int amod_number_channels_calculate(struct ablk_block *block, int8_t *number_channels);
+int amod_number_channels_calculate(uint32_t channel_map, int8_t *number_channels);
 
 #endif /*_AMOD_API_H_ */

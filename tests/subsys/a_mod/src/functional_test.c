@@ -10,19 +10,17 @@
 
 #include "fakes.h"
 #include "amod_api.h"
-#include "common_test.h"
+#include "common.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(4);
-
-#define TEST_NUM_CONNECTIONS 5
 
 static char *test_instance_name = "Test instance";
 static char *test_string = "This is a test string";
 static uint32_t test_uint32 = 0XDEADBEEF;
 
-K_THREAD_STACK_DEFINE(mod_stack, TEST_MOD_STACK_SIZE);
-K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, TEST_MOD_MSG_QUEUE_SIZE, 4);
+K_THREAD_STACK_DEFINE(mod_stack, TEST_MOD_THREAD_STACK_SIZE);
+K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, FAKE_FIFO_MSG_QUEUE_SIZE, 4);
 
 /**
  * @brief Simple test thread with handle NULL.
@@ -33,9 +31,40 @@ K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, TEST_MOD_MSG_QUEUE_SIZE, 4)
  */
 static int test_thread_handle(struct amod_handle *handle)
 {
+	int ret;
+	struct amod_message *data_msg_rx;
+	struct amod_message *data_msg_tx;
+	size_t size;
+
 	/* Execute thread */
 	while (1) {
 		zassert_not_null(handle, NULL, "handle is NULL!");
+
+		LOG_INF("Test thread running");
+
+		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx,
+							(void **)&data_msg_rx, &size, K_FOREVER);
+		if (ret) {
+			LOG_DBG("Error getting input message for module %s, ret %d", handle->name,
+				ret);
+			continue;
+		}
+
+		ret = data_fifo_pointer_first_vacant_get(handle->thread.msg_tx,
+							 (void **)&data_msg_tx, K_FOREVER);
+		if (ret) {
+			LOG_DBG("No free message for module %s, ret %d", handle->name, ret);
+			continue;
+		}
+
+		/* Configure audio block */
+		memcpy(&data_msg_tx->block, &data_msg_rx->block, sizeof(struct ablk_block));
+		data_msg_tx->tx_handle = NULL;
+		data_msg_tx->response_cb = NULL;
+
+		/* Send audio block to modules output message queue */
+		ret = data_fifo_block_lock(handle->thread.msg_tx, (void **)&data_msg_tx,
+					   sizeof(struct amod_message));
 
 		/* Sleep for 0.001s */
 		k_sleep(K_MSEC(1));
@@ -55,10 +84,12 @@ static int start_thread(struct amod_handle *handle)
 {
 	int ret;
 
+	LOG_INF("Start test thread");
+
 	handle->thread_id = k_thread_create(
 		&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
 		(k_thread_entry_t)test_thread_handle, handle, NULL, NULL,
-		K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+		K_PRIO_PREEMPT(handle->thread.priority), 0, K_NO_WAIT);
 
 	ret = k_thread_name_set(handle->thread_id, handle->name);
 	if (ret) {
@@ -223,6 +254,10 @@ static int test_data_process(struct amod_handle_private *handle, struct ablk_blo
 	ARG_UNUSED(block_rx);
 	ARG_UNUSED(block_tx);
 
+	memcpy(block_tx, block_rx, sizeof(struct ablk_block));
+	memcpy(block_tx->data, block_rx->data, block_rx->data_size);
+	block_tx->data_size = block_rx->data_size;
+
 	return 0;
 }
 
@@ -295,7 +330,7 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate)
 	struct ablk_block block = {0};
 	uint8_t number_channels;
 
-	ret = amod_number_channels_calculate(&block, &number_channels);
+	ret = amod_number_channels_calculate(block.channel_map, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -304,8 +339,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate)
 		      "Calculate number of channels function did not return 0 (%d) channel count",
 		      number_channels);
 
-	block.format.channel_map = 0x00000001;
-	ret = amod_number_channels_calculate(&block, &number_channels);
+	block.channel_map = 0x00000001;
+	ret = amod_number_channels_calculate(block.channel_map, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -314,8 +349,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.format.channel_map = 0x80000000;
-	ret = amod_number_channels_calculate(&block, &number_channels);
+	block.channel_map = 0x80000000;
+	ret = amod_number_channels_calculate(block.channel_map, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -324,8 +359,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.format.channel_map = 0xFFFFFFFF;
-	ret = amod_number_channels_calculate(&block, &number_channels);
+	block.channel_map = 0xFFFFFFFF;
+	ret = amod_number_channels_calculate(block.channel_map, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -334,8 +369,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate)
 		      "Calculate number of channels function did not return 32 (%d) channel count",
 		      number_channels);
 
-	block.format.channel_map = 0x55555555;
-	ret = amod_number_channels_calculate(&block, &number_channels);
+	block.channel_map = 0x55555555;
+	ret = amod_number_channels_calculate(block.channel_map, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -1095,11 +1130,11 @@ ZTEST(suite_a_mod_functional, test_disconnect)
 	struct amod_description test_from_description = {.name = test_base_name,
 							 .functions = &mod_functions};
 	struct amod_handle handle_from;
-	struct amod_handle handles_to[TEST_NUM_CONNECTIONS];
+	struct amod_handle handles_to[TEST_CONNECTIONS_NUM];
 	struct amod_description test_to_description = {.name = test_base_name,
 						       .functions = &mod_functions};
 
-	for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+	for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 		test_initialise_handle(&handles_to[k], &test_to_description, NULL, NULL);
 		snprintf(handles_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d", test_inst_to_name, k);
 	}
@@ -1114,9 +1149,9 @@ ZTEST(suite_a_mod_functional, test_disconnect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 			num_destionations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, false);
+				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				ret = amod_disconnect(&handle_from, &handles_to[k]);
 
 				zassert_equal(
@@ -1147,9 +1182,9 @@ ZTEST(suite_a_mod_functional, test_disconnect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 			num_destionations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, false);
+				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				ret = amod_disconnect(&handle_from, &handles_to[k]);
 
 				zassert_equal(
@@ -1180,9 +1215,9 @@ ZTEST(suite_a_mod_functional, test_disconnect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 			num_destionations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_NUM_CONNECTIONS, true);
+				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, true);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				ret = amod_disconnect(&handle_from, &handles_to[k]);
 
 				zassert_equal(
@@ -1256,7 +1291,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 	struct amod_description test_from_description = {.name = test_base_name,
 							 .functions = &mod_functions};
 	struct amod_handle handle_from;
-	struct amod_handle handle_to[TEST_NUM_CONNECTIONS];
+	struct amod_handle handle_to[TEST_CONNECTIONS_NUM];
 	struct amod_description test_to_description = {.name = test_base_name,
 						       .functions = &mod_functions};
 
@@ -1271,7 +1306,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
 				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
@@ -1289,7 +1324,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 					      handle_from.dest_count);
 			}
 
-			test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, false);
+			test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, false);
 		}
 	}
 
@@ -1303,7 +1338,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
 				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
@@ -1321,7 +1356,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 					      handle_from.dest_count);
 			}
 
-			test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, false);
+			test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, false);
 		}
 	}
 
@@ -1335,7 +1370,7 @@ ZTEST(suite_a_mod_functional, test_connect)
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 
-			for (k = 0; k < TEST_NUM_CONNECTIONS - 1; k++) {
+			for (k = 0; k < TEST_CONNECTIONS_NUM - 1; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
 				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
@@ -1357,12 +1392,12 @@ ZTEST(suite_a_mod_functional, test_connect)
 			zassert_equal(ret, 0,
 				      "Connect function did not return successfully (0): ret %d",
 				      ret);
-			zassert_equal(handle_from.dest_count, TEST_NUM_CONNECTIONS,
-				      "Destination count is not %d, %d", TEST_NUM_CONNECTIONS,
+			zassert_equal(handle_from.dest_count, TEST_CONNECTIONS_NUM,
+				      "Destination count is not %d, %d", TEST_CONNECTIONS_NUM,
 				      handle_from.dest_count);
 		}
 
-		test_list(&handle_from, &handle_to[0], TEST_NUM_CONNECTIONS, true);
+		test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, true);
 	}
 
 	test_from_description.type = AMOD_TYPE_PROCESS;
@@ -1399,98 +1434,115 @@ ZTEST(suite_a_mod_functional, test_close_null)
 					       .data_process = NULL};
 	struct amod_functions test_mod_functions = mod_functions;
 	struct amod_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
-	struct amod_description test_mod_description = mod_description;
-	struct amod_parameters mod_parameters = {.description = &mod_description,
-						 .thread = {.stack = mod_stack,
-							    .stack_size = TEST_MOD_STACK_SIZE,
-							    .priority = 2,
-							    .data_slab = &mod_data_slab,
-							    .data_size = TEST_MOD_DATA_SIZE}};
+		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
+	struct amod_description test_mod_description;
+	struct amod_parameters mod_parameters = {
+		.description = &mod_description,
+		.thread = {.stack = mod_stack,
+			   .stack_size = TEST_MOD_THREAD_STACK_SIZE,
+			   .priority = TEST_MOD_THREAD_PRIORITY,
+			   .data_slab = &mod_data_slab,
+			   .data_size = TEST_MOD_DATA_SIZE}};
 	struct amod_parameters test_mod_parameters = mod_parameters;
 	struct mod_context mod_context = {0};
 	struct amod_handle handle;
 	struct amod_handle handle_cleared;
 
-	memset(&handle_cleared, 0, sizeof(struct amod_handle));
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		/* Register resets */
+		DO_FOREACH_FAKE(RESET_FAKE);
 
-	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &mod_description;
-	handle.data_tx = true;
-	handle.dest_count = TEST_NUM_MODULES;
-	handle.thread.stack = mod_stack;
-	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
-	handle.thread.priority = 2;
-	handle.thread.data_slab = &mod_data_slab;
-	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.context = (struct amod_context *)&mod_context;
+		mod_description.type = i;
+		test_mod_description = mod_description;
 
-	/* Fake internal empty data FIFO success */
-	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+		memset(&handle_cleared, 0, sizeof(struct amod_handle));
 
-	handle.thread.msg_rx = NULL;
-	handle.thread.msg_tx = NULL;
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
 
-	start_thread(&handle);
+		/* Fake internal empty data FIFO success */
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
-	handle.previous_state = AMOD_STATE_RUNNING;
-	handle.state = AMOD_STATE_CONFIGURED;
+		handle.thread.msg_rx = NULL;
+		handle.thread.msg_tx = NULL;
 
-	ret = amod_close(&handle);
+		start_thread(&handle);
 
-	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_equal(data_fifo_empty_fake.call_count, 0,
-		      "Failed close, data FIFO empty called %d times",
-		      data_fifo_empty_fake.call_count);
-	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
-			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
-			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
-			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
-			  "Failed close, modified the modules parameter settings");
-	zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
-			  "Failed close, modified the modules context");
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_CONFIGURED;
 
-	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &mod_description;
-	handle.data_tx = true;
-	handle.dest_count = TEST_NUM_MODULES;
-	handle.thread.stack = mod_stack;
-	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
-	handle.thread.priority = 2;
-	handle.thread.data_slab = &mod_data_slab;
-	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.context = (struct amod_context *)&mod_context;
+		ret = amod_close(&handle);
 
-	/* Fake internal empty data FIFO success */
-	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 0,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
 
-	handle.thread.msg_rx = NULL;
-	handle.thread.msg_tx = NULL;
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
 
-	start_thread(&handle);
+		/* Fake internal empty data FIFO success */
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
-	handle.previous_state = AMOD_STATE_RUNNING;
-	handle.state = AMOD_STATE_STOPPED;
+		handle.thread.msg_rx = NULL;
+		handle.thread.msg_tx = NULL;
 
-	ret = amod_close(&handle);
+		start_thread(&handle);
 
-	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_equal(data_fifo_empty_fake.call_count, 0,
-		      "Failed close, data FIFO empty called %d times",
-		      data_fifo_empty_fake.call_count);
-	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
-			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
-			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
-			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
-			  "Failed close, modified the modules parameter settings");
-	zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
-			  "Failed close, modified the modules context");
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_STOPPED;
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 0,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+	}
 }
 
 ZTEST(suite_a_mod_functional, test_close)
@@ -1509,112 +1561,339 @@ ZTEST(suite_a_mod_functional, test_close)
 					       .data_process = test_data_process};
 	struct amod_functions test_mod_functions = mod_functions;
 	struct amod_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
-	struct amod_description test_mod_description = mod_description;
+		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
+	struct amod_description test_mod_description;
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
-	struct amod_parameters mod_parameters = {.description = &mod_description,
-						 .thread = {.stack = mod_stack,
-							    .stack_size = TEST_MOD_STACK_SIZE,
-							    .priority = 2,
-							    .data_slab = &mod_data_slab,
-							    .data_size = TEST_MOD_DATA_SIZE}};
+	struct amod_parameters mod_parameters = {
+		.description = &mod_description,
+		.thread = {.stack = mod_stack,
+			   .stack_size = TEST_MOD_THREAD_STACK_SIZE,
+			   .priority = TEST_MOD_THREAD_PRIORITY,
+			   .data_slab = &mod_data_slab,
+			   .data_size = TEST_MOD_DATA_SIZE}};
 	struct amod_parameters test_mod_parameters = mod_parameters;
 	struct mod_context mod_context;
 	struct mod_context test_mod_context;
 	struct amod_handle handle;
 	struct amod_handle handle_cleared;
 
-	test_context_set(&test_mod_context, &mod_config);
-	mod_context = test_mod_context;
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		/* Register resets */
+		DO_FOREACH_FAKE(RESET_FAKE);
 
-	memset(&handle_cleared, 0, sizeof(struct amod_handle));
+		test_context_set(&test_mod_context, &mod_config);
+		mod_context = test_mod_context;
 
-	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &mod_description;
-	handle.data_tx = true;
-	handle.dest_count = TEST_NUM_MODULES;
-	handle.thread.stack = mod_stack;
-	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
-	handle.thread.priority = 2;
-	handle.thread.data_slab = &mod_data_slab;
-	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.context = (struct amod_context *)&mod_context;
+		mod_description.type = i;
+		test_mod_description = mod_description;
 
-	/* Fake internal empty data FIFO success */
-	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
-	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+		memset(&handle_cleared, 0, sizeof(struct amod_handle));
 
-	data_fifo_init(&mod_fifo_tx);
-	data_fifo_init(&mod_fifo_rx);
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
 
-	handle.thread.msg_rx = &mod_fifo_rx;
-	handle.thread.msg_tx = &mod_fifo_tx;
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
-	start_thread(&handle);
+		data_fifo_init(&mod_fifo_rx);
+		data_fifo_init(&mod_fifo_tx);
 
-	handle.previous_state = AMOD_STATE_RUNNING;
-	handle.state = AMOD_STATE_CONFIGURED;
+		handle.thread.msg_rx = &mod_fifo_rx;
+		handle.thread.msg_tx = &mod_fifo_tx;
 
-	ret = amod_close(&handle);
+		start_thread(&handle);
 
-	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_equal(data_fifo_empty_fake.call_count, 2,
-		      "Failed close, data FIFO empty called %d times",
-		      data_fifo_empty_fake.call_count);
-	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
-			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
-			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
-			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
-			  "Failed close, modified the modules parameter settings");
-	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
-			  "Failed close, modified the modules context");
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_CONFIGURED;
 
-	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &mod_description;
-	handle.data_tx = true;
-	handle.dest_count = TEST_NUM_MODULES;
-	handle.thread.stack = mod_stack;
-	handle.thread.stack_size = TEST_MOD_STACK_SIZE;
-	handle.thread.priority = 2;
-	handle.thread.data_slab = &mod_data_slab;
-	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.context = (struct amod_context *)&mod_context;
+		ret = amod_close(&handle);
 
-	/* Fake internal empty data FIFO success */
-	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
-	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 2,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
 
-	data_fifo_init(&mod_fifo_tx);
-	data_fifo_init(&mod_fifo_rx);
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
 
-	handle.thread.msg_rx = &mod_fifo_rx;
-	handle.thread.msg_tx = &mod_fifo_tx;
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
-	handle.previous_state = AMOD_STATE_RUNNING;
-	handle.state = AMOD_STATE_STOPPED;
+		data_fifo_init(&mod_fifo_rx);
+		data_fifo_init(&mod_fifo_tx);
 
-	start_thread(&handle);
+		handle.thread.msg_rx = &mod_fifo_rx;
+		handle.thread.msg_tx = &mod_fifo_tx;
 
-	ret = amod_close(&handle);
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_STOPPED;
 
-	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
-	zassert_equal(data_fifo_empty_fake.call_count, 4,
-		      "Failed close, data FIFO empty called %d times",
-		      data_fifo_empty_fake.call_count);
-	zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
-			  "Failed close handle contents are none zero");
-	zassert_mem_equal(&mod_description, &test_mod_description, sizeof(struct amod_description),
-			  "Failed close, modified the modules description");
-	zassert_mem_equal(&mod_functions, &test_mod_functions, sizeof(struct amod_functions),
-			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&mod_parameters, &test_mod_parameters, sizeof(struct amod_parameters),
-			  "Failed close, modified the modules parameter settings");
-	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
-			  "Failed close, modified the modules context");
+		start_thread(&handle);
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 4,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		/* Register resets */
+		DO_FOREACH_FAKE(RESET_FAKE);
+
+		test_context_set(&test_mod_context, &mod_config);
+		mod_context = test_mod_context;
+
+		mod_description.type = i;
+		test_mod_description = mod_description;
+
+		memset(&handle_cleared, 0, sizeof(struct amod_handle));
+
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
+
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+		data_fifo_init(&mod_fifo_rx);
+
+		handle.thread.msg_rx = &mod_fifo_rx;
+		handle.thread.msg_tx = NULL;
+
+		start_thread(&handle);
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_CONFIGURED;
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 1,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
+
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+		data_fifo_init(&mod_fifo_rx);
+
+		handle.thread.msg_rx = &mod_fifo_rx;
+		handle.thread.msg_tx = NULL;
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_STOPPED;
+
+		start_thread(&handle);
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 2,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		/* Register resets */
+		DO_FOREACH_FAKE(RESET_FAKE);
+
+		test_context_set(&test_mod_context, &mod_config);
+		mod_context = test_mod_context;
+
+		mod_description.type = i;
+		test_mod_description = mod_description;
+
+		memset(&handle_cleared, 0, sizeof(struct amod_handle));
+
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
+
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+		data_fifo_init(&mod_fifo_tx);
+
+		handle.thread.msg_rx = NULL;
+		handle.thread.msg_tx = &mod_fifo_tx;
+
+		start_thread(&handle);
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_CONFIGURED;
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 1,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+
+		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+		handle.description = &mod_description;
+		handle.data_tx = true;
+		handle.dest_count = TEST_MODULES_NUM;
+		handle.thread.stack = mod_stack;
+		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+		handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+		handle.thread.data_slab = &mod_data_slab;
+		handle.thread.data_size = TEST_MOD_DATA_SIZE;
+		handle.context = (struct amod_context *)&mod_context;
+
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+		data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+		data_fifo_init(&mod_fifo_tx);
+
+		handle.thread.msg_rx = NULL;
+		handle.thread.msg_tx = &mod_fifo_tx;
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_STOPPED;
+
+		start_thread(&handle);
+
+		ret = amod_close(&handle);
+
+		zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d",
+			      ret);
+		zassert_equal(data_fifo_empty_fake.call_count, 2,
+			      "Failed close, data FIFO empty called %d times",
+			      data_fifo_empty_fake.call_count);
+		zassert_mem_equal(&handle, &handle_cleared, sizeof(struct amod_handle),
+				  "Failed close handle contents are none zero");
+		zassert_mem_equal(&mod_description, &test_mod_description,
+				  sizeof(struct amod_description),
+				  "Failed close, modified the modules description");
+		zassert_mem_equal(&mod_functions, &test_mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed close, modified the modules functions");
+		zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+				  sizeof(struct amod_parameters),
+				  "Failed close, modified the modules parameter settings");
+		zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed close, modified the modules context");
+	}
 }
 
 ZTEST(suite_a_mod_functional, test_open)
@@ -1634,57 +1913,480 @@ ZTEST(suite_a_mod_functional, test_open)
 					       .stop = test_stop_start,
 					       .data_process = test_data_process};
 	struct amod_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
-	struct amod_parameters mod_parameters = {.description = &mod_description,
-						 .thread = {.stack = mod_stack,
-							    .stack_size = TEST_MOD_STACK_SIZE,
-							    .priority = 2,
-							    .data_slab = &mod_data_slab,
-							    .data_size = TEST_MOD_DATA_SIZE}};
+	struct amod_parameters mod_parameters = {
+		.description = &mod_description,
+		.thread = {.stack = mod_stack,
+			   .stack_size = TEST_MOD_THREAD_STACK_SIZE,
+			   .priority = TEST_MOD_THREAD_PRIORITY,
+			   .data_slab = &mod_data_slab,
+			   .data_size = TEST_MOD_DATA_SIZE}};
 	struct amod_handle handle;
-
-	test_context_set(&test_mod_context, &mod_config);
 
 	/* Fake internal empty data FIFO success */
 	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
 
+	data_fifo_init(&mod_fifo_rx);
 	data_fifo_init(&mod_fifo_tx);
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		test_context_set(&test_mod_context, &mod_config);
+
+		mod_parameters.thread.msg_rx = &mod_fifo_rx;
+		mod_parameters.thread.msg_tx = &mod_fifo_tx;
+
+		mod_description.type = i;
+
+		memset(&handle, 0, sizeof(struct amod_handle));
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_UNDEFINED;
+
+		ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config,
+				test_inst_name, (struct amod_context *)&mod_context, &handle);
+
+		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
+			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
+			      AMOD_STATE_CONFIGURED, handle.state);
+		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
+			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
+			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+				  "Failed open, name should be %s, but is %s", test_inst_name,
+				  handle.name);
+		zassert_mem_equal(handle.description, &mod_description,
+				  sizeof(struct amod_description),
+				  "Failed open, module descriptions differ");
+		zassert_mem_equal(handle.description->functions, &mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed open, module function pointers differ");
+		zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+				  sizeof(struct amod_thread_configuration),
+				  "Failed open, module thread settings differ");
+		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed open, module contexts differ");
+		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
+			      handle.data_tx);
+		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+			      handle.dest_count);
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		test_context_set(&test_mod_context, &mod_config);
+
+		mod_parameters.thread.msg_rx = NULL;
+		mod_parameters.thread.msg_tx = &mod_fifo_tx;
+
+		mod_description.type = i;
+
+		memset(&handle, 0, sizeof(struct amod_handle));
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_UNDEFINED;
+
+		ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config,
+				test_inst_name, (struct amod_context *)&mod_context, &handle);
+
+		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
+			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
+			      AMOD_STATE_CONFIGURED, handle.state);
+		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
+			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
+			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+				  "Failed open, name should be %s, but is %s", test_inst_name,
+				  handle.name);
+		zassert_mem_equal(handle.description, &mod_description,
+				  sizeof(struct amod_description),
+				  "Failed open, module descriptions differ");
+		zassert_mem_equal(handle.description->functions, &mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed open, module function pointers differ");
+		zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+				  sizeof(struct amod_thread_configuration),
+				  "Failed open, module thread settings differ");
+		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed open, module contexts differ");
+		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
+			      handle.data_tx);
+		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+			      handle.dest_count);
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		test_context_set(&test_mod_context, &mod_config);
+
+		mod_parameters.thread.msg_rx = &mod_fifo_rx;
+		mod_parameters.thread.msg_tx = NULL;
+
+		mod_description.type = i;
+
+		memset(&handle, 0, sizeof(struct amod_handle));
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_UNDEFINED;
+
+		ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config,
+				test_inst_name, (struct amod_context *)&mod_context, &handle);
+
+		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
+			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
+			      AMOD_STATE_CONFIGURED, handle.state);
+		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
+			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
+			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+				  "Failed open, name should be %s, but is %s", test_inst_name,
+				  handle.name);
+		zassert_mem_equal(handle.description, &mod_description,
+				  sizeof(struct amod_description),
+				  "Failed open, module descriptions differ");
+		zassert_mem_equal(handle.description->functions, &mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed open, module function pointers differ");
+		zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+				  sizeof(struct amod_thread_configuration),
+				  "Failed open, module thread settings differ");
+		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed open, module contexts differ");
+		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
+			      handle.data_tx);
+		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+			      handle.dest_count);
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		test_context_set(&test_mod_context, &mod_config);
+
+		mod_parameters.thread.msg_rx = &mod_fifo_rx;
+		mod_parameters.thread.msg_tx = &mod_fifo_tx;
+		mod_parameters.thread.data_slab = NULL;
+		mod_parameters.thread.data_size = TEST_MOD_DATA_SIZE;
+
+		mod_description.type = i;
+
+		memset(&handle, 0, sizeof(struct amod_handle));
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_UNDEFINED;
+
+		ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config,
+				test_inst_name, (struct amod_context *)&mod_context, &handle);
+
+		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
+			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
+			      AMOD_STATE_CONFIGURED, handle.state);
+		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
+			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
+			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+				  "Failed open, name should be %s, but is %s", test_inst_name,
+				  handle.name);
+		zassert_mem_equal(handle.description, &mod_description,
+				  sizeof(struct amod_description),
+				  "Failed open, module descriptions differ");
+		zassert_mem_equal(handle.description->functions, &mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed open, module function pointers differ");
+		zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+				  sizeof(struct amod_thread_configuration),
+				  "Failed open, module thread settings differ");
+		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed open, module contexts differ");
+		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
+			      handle.data_tx);
+		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+			      handle.dest_count);
+	}
+
+	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+		test_context_set(&test_mod_context, &mod_config);
+
+		/* Fake internal empty data FIFO success */
+		data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+
+		data_fifo_init(&mod_fifo_rx);
+		data_fifo_init(&mod_fifo_tx);
+
+		mod_parameters.thread.msg_rx = &mod_fifo_rx;
+		mod_parameters.thread.msg_tx = &mod_fifo_tx;
+		mod_parameters.thread.data_slab = &mod_data_slab;
+		mod_parameters.thread.data_size = 0;
+
+		mod_description.type = i;
+
+		memset(&handle, 0, sizeof(struct amod_handle));
+
+		handle.previous_state = AMOD_STATE_RUNNING;
+		handle.state = AMOD_STATE_UNDEFINED;
+
+		ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config,
+				test_inst_name, (struct amod_context *)&mod_context, &handle);
+
+		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
+			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
+			      AMOD_STATE_CONFIGURED, handle.state);
+		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
+			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
+			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+				  "Failed open, name should be %s, but is %s", test_inst_name,
+				  handle.name);
+		zassert_mem_equal(handle.description, &mod_description,
+				  sizeof(struct amod_description),
+				  "Failed open, module descriptions differ");
+		zassert_mem_equal(handle.description->functions, &mod_functions,
+				  sizeof(struct amod_functions),
+				  "Failed open, module function pointers differ");
+		zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+				  sizeof(struct amod_thread_configuration),
+				  "Failed open, module thread settings differ");
+		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+				  "Failed open, module contexts differ");
+		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
+			      handle.data_tx);
+		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+			      handle.dest_count);
+	}
+}
+
+ZTEST(suite_a_mod_functional, test_data_tx)
+{
+	int ret;
+	char *test_base_name = "Test base name";
+	char *test_inst_name = "TEST instance 1";
+	struct mod_config mod_config = {
+		.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4};
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = NULL};
+	struct amod_description mod_description = {
+		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct data_fifo mod_fifo_rx;
+	struct mod_context mod_context;
+	struct amod_handle handle = {0};
+	size_t size;
+	char test_data[TEST_MOD_DATA_SIZE];
+	struct ablk_block test_block = {0};
+	struct amod_message *msg_rx;
+
+	test_context_set(&mod_context, &mod_config);
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+	data_fifo_pointer_first_vacant_get_fake.custom_fake =
+		fake_data_fifo_pointer_first_vacant_get__succeeds;
+	data_fifo_block_lock_fake.custom_fake = fake_data_fifo_block_lock__succeeds;
+	data_fifo_pointer_last_filled_get_fake.custom_fake =
+		fake_data_fifo_pointer_last_filled_get__succeeds;
+
 	data_fifo_init(&mod_fifo_rx);
 
-	mod_parameters.thread.msg_rx = &mod_fifo_rx;
-	mod_parameters.thread.msg_tx = &mod_fifo_tx;
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.thread.msg_rx = &mod_fifo_rx;
+	handle.thread.msg_tx = NULL;
+	handle.thread.data_slab = &mod_data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AMOD_STATE_RUNNING;
+	handle.context = (struct amod_context *)&mod_context;
 
-	memset(&handle, 0, sizeof(struct amod_handle));
+	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
+		test_data[i] = TEST_MOD_DATA_SIZE - i;
+	}
 
-	handle.previous_state = AMOD_STATE_RUNNING;
-	handle.state = AMOD_STATE_UNDEFINED;
+	test_block.data = &test_data[0];
+	test_block.data_size = TEST_MOD_DATA_SIZE;
 
-	ret = amod_open(&mod_parameters, (struct amod_configuration *)&mod_config, test_inst_name,
-			(struct amod_context *)&mod_context, &handle);
+	ret = amod_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, 0, "Data TX function did not return successfully (0):: ret %d", ret);
 
-	zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d", AMOD_STATE_CONFIGURED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-		      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
-		      AMOD_STATE_UNDEFINED, handle.previous_state);
-	zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
-			  "Failed open, name should be %s, but is %s", test_inst_name, handle.name);
-	zassert_mem_equal(handle.description, &mod_description, sizeof(struct amod_description),
-			  "Failed open, module descriptions differ");
-	zassert_mem_equal(handle.description->functions, &mod_functions,
-			  sizeof(struct amod_functions),
-			  "Failed open, module function pointers differ");
-	zassert_mem_equal(&handle.thread, &mod_parameters.thread,
-			  sizeof(struct amod_thread_configuration),
-			  "Failed open, module thread settings differ");
-	zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+	ret = data_fifo_pointer_last_filled_get(&mod_fifo_rx, (void **)&msg_rx, &size, K_NO_WAIT);
+	zassert_equal(ret, 0, "Data TX function did not return 0: ret %d", 0, ret);
+	zassert_equal(size, FAKE_FIFO_MSG_QUEUE_DATA_SIZE,
+		      "Data TX function did not return %d, but %d", FAKE_FIFO_MSG_QUEUE_DATA_SIZE,
+		      size);
+	zassert_equal(msg_rx->block.data_size, TEST_MOD_DATA_SIZE,
+		      "Data TX function did not return %d, but %d", TEST_MOD_DATA_SIZE,
+		      msg_rx->block.data_size);
+	zassert_mem_equal(msg_rx->block.data, &test_data[0], TEST_MOD_DATA_SIZE,
 			  "Failed open, module contexts differ");
-	zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-		      handle.data_tx);
-	zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
-		      handle.dest_count);
+	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
+		      "Failed to get item, data FIFO get called %d times",
+		      data_fifo_pointer_first_vacant_get_fake.call_count);
+	zassert_equal(data_fifo_block_lock_fake.call_count, 1,
+		      "Failed to send item, data FIFO send called %d times",
+		      data_fifo_pointer_first_vacant_get_fake.call_count);
+}
+
+ZTEST(suite_a_mod_functional, test_data_rx)
+{
+	int ret;
+	char *test_base_name = "Test base name";
+	char *test_inst_name = "TEST instance 1";
+	struct mod_config mod_config = {
+		.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4};
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = NULL};
+	struct amod_description mod_description = {
+		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct data_fifo mod_fifo_rx;
+	struct mod_context mod_context;
+	struct amod_handle handle = {0};
+	char test_data[TEST_MOD_DATA_SIZE];
+	char data[TEST_MOD_DATA_SIZE] = {0};
+	struct ablk_block test_block = {1};
+	struct ablk_block block = {0};
+	struct amod_message data_msg_rx;
+
+	test_context_set(&mod_context, &mod_config);
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+	data_fifo_pointer_last_filled_get_fake.custom_fake =
+		fake_data_fifo_pointer_last_filled_get__succeeds;
+	data_fifo_block_free_fake.custom_fake = fake_data_fifo_block_free__succeeds;
+
+	data_fifo_init(&mod_fifo_rx);
+
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.thread.msg_rx = &mod_fifo_rx;
+	handle.thread.msg_tx = NULL;
+	handle.thread.data_slab = &mod_data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AMOD_STATE_RUNNING;
+	handle.context = (struct amod_context *)&mod_context;
+
+	ret = data_fifo_pointer_first_vacant_get(&mod_fifo_rx, (void **)&data_msg_rx, K_NO_WAIT);
+	/* fill data */
+	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
+		test_data[i] = TEST_MOD_DATA_SIZE - i;
+	}
+
+	test_block.data = &test_data[0];
+	test_block.data_size = TEST_MOD_DATA_SIZE;
+
+	memcpy(&data_msg_rx.block, &test_block, sizeof(struct ablk_block));
+	data_msg_rx.tx_handle = NULL;
+	data_msg_rx.response_cb = NULL;
+
+	ret = data_fifo_block_lock(&mod_fifo_rx, (void **)&data_msg_rx,
+				   sizeof(struct amod_message));
+
+	block.data = &data[0];
+	block.data_size = TEST_MOD_DATA_SIZE;
+
+	/* Register resets */
+	DO_FOREACH_FAKE(RESET_FAKE);
+
+	ret = amod_data_rx(&handle, &block, K_NO_WAIT);
+	zassert_equal(ret, 0, "Data RX function did not return successfully (0):: ret %d", ret);
+	zassert_mem_equal(&block, &test_block, sizeof(struct ablk_block),
+			  "Failed Data RX function, blocks differs");
+	zassert_mem_equal(block.data, &test_data, TEST_MOD_DATA_SIZE,
+			  "Failed Data RX function, data differs");
+	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 1,
+		      "Data RX function failed to get item, data FIFO get called %d times",
+		      data_fifo_pointer_last_filled_get_fake.call_count);
+	zassert_equal(data_fifo_block_free_fake.call_count, 1,
+		      "Data RX function failed to free item, data FIFO free called %d times",
+		      data_fifo_block_free_fake.call_count);
+}
+
+ZTEST(suite_a_mod_functional, test_data_tx_rx)
+{
+	int ret;
+	char *test_base_name = "Test base name";
+	char *test_inst_name = "TEST instance 1";
+	struct mod_config mod_config = {
+		.test_int1 = 5, .test_int2 = 4, .test_int3 = 3, .test_int4 = 4};
+	struct amod_functions mod_functions = {.open = NULL,
+					       .close = NULL,
+					       .configuration_set = NULL,
+					       .configuration_get = NULL,
+					       .start = NULL,
+					       .stop = NULL,
+					       .data_process = test_data_process};
+	struct amod_description mod_description = {
+		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct data_fifo mod_fifo_rx;
+	struct data_fifo mod_fifo_tx;
+	struct mod_context mod_context;
+	struct amod_handle handle = {0};
+	char test_data[TEST_MOD_DATA_SIZE];
+	char data[TEST_MOD_DATA_SIZE] = {0};
+	struct ablk_block test_block = {1};
+	struct ablk_block block = {0};
+
+	test_context_set(&mod_context, &mod_config);
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+	data_fifo_pointer_first_vacant_get_fake.custom_fake =
+		fake_data_fifo_pointer_first_vacant_get__succeeds;
+	data_fifo_block_lock_fake.custom_fake = fake_data_fifo_block_lock__succeeds;
+	data_fifo_pointer_last_filled_get_fake.custom_fake =
+		fake_data_fifo_pointer_last_filled_get__succeeds;
+
+	data_fifo_init(&mod_fifo_rx);
+	data_fifo_init(&mod_fifo_tx);
+
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.thread.stack = mod_stack;
+	handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+	handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+	handle.thread.msg_rx = &mod_fifo_rx;
+	handle.thread.msg_tx = &mod_fifo_tx;
+	handle.thread.data_slab = &mod_data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AMOD_STATE_RUNNING;
+	handle.context = (struct amod_context *)&mod_context;
+
+	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
+		test_data[i] = TEST_MOD_DATA_SIZE - i;
+	}
+
+	test_block.data = &test_data[0];
+	test_block.data_size = TEST_MOD_DATA_SIZE;
+	block.data = &data[0];
+	block.data_size = TEST_MOD_DATA_SIZE;
+
+	start_thread(&handle);
+
+	ret = amod_data_tx_rx(&handle, &handle, &test_block, &block, K_FOREVER);
+	zassert_equal(ret, 0, "Data TX-RX function did not return successfully (0):: ret %d", ret);
+	zassert_mem_equal(&block, &test_block, sizeof(struct ablk_block),
+			  "Failed Data TX-RX function, blocks differs");
+	zassert_mem_equal(block.data, &test_data, TEST_MOD_DATA_SIZE,
+			  "Failed Data TX-RX function, data differs");
+	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 1,
+		      "Data TX-RX function failed to get item, data FIFO get called %d times",
+		      data_fifo_pointer_last_filled_get_fake.call_count);
+	zassert_equal(data_fifo_block_free_fake.call_count, 1,
+		      "Data TX-RX function failed to free item, data FIFO free called %d times",
+		      data_fifo_block_free_fake.call_count);
+	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
+		      "Data TX-RX failed to get item, data FIFO get called %d times",
+		      data_fifo_pointer_first_vacant_get_fake.call_count);
 }

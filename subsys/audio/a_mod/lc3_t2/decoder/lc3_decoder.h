@@ -11,7 +11,6 @@
 #include "amod_api.h"
 #include "LC3API.h"
 
-#if (CONFIG_SW_CODEC_LC3)
 #define LC3_MAX_FRAME_SIZE_MS	10
 #define LC3_ENC_MONO_FRAME_SIZE (CONFIG_LC3_BITRATE * LC3_MAX_FRAME_SIZE_MS / (8 * 1000))
 
@@ -19,12 +18,6 @@
 	(CONFIG_AUDIO_SAMPLE_RATE_HZ * CONFIG_AUDIO_BIT_DEPTH_OCTETS * LC3_MAX_FRAME_SIZE_MS / 1000)
 #define LC3_ENC_TIME_US 3000
 #define LC3_DEC_TIME_US 1500
-#else
-#define LC3_ENC_MONO_FRAME_SIZE 0
-#define LC3_PCM_NUM_BYTES_MONO	0
-#define LC3_ENC_TIME_US		0
-#define LC3_DEC_TIME_US		0
-#endif /* CONFIG_SW_CODEC_LC3 */
 
 /* Max will be used when multiple codecs are supported */
 #define DEC_TIME_US		     MAX(LC3_DEC_TIME_US, 0)
@@ -34,7 +27,7 @@
 /**
  * @brief Private pointer to the module's parameters.
  */
-extern struct amod_description *lc3_dec_description;
+extern struct amod_description *lc3_decoder_description;
 
 /**
  * @brief Private pointer to the decoders handle.
@@ -54,14 +47,8 @@ struct lc3_decoder_configuration {
 	/* Maximum bit rate for this decoder instance */
 	uint32_t max_bitrate;
 
-	/* The packing format for the output PCM buffer */
-	enum aobj_interleaved packing;
-
 	/* Frame duration for this decoder instance */
 	uint32_t duration_us;
-
-	/* Number of channels for this decoder instance */
-	uint32_t number_channels;
 
 	/* Channel map for this decoder instance */
 	uint32_t channel_map;
@@ -89,11 +76,6 @@ struct lc3_decoder_context {
 	/* Number of successive frames to which PLC has been applied */
 	uint16_t plc_count;
 };
-
-/**
- * @brief Size of the decoder's private context.
- */
-#define LC3_DECODER_CONTEXT_SIZE (sizeof(struct lc3_decoder_context))
 
 /**
  * @brief  Function for opening a module.
@@ -145,7 +127,7 @@ int lc3_dec_t2_configuration_get(struct amod_handle_private *handle,
  *
  * @return 0 if successful, error value
  */
-int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct aobj_block *block_in,
-			    struct aobj_block *block_out);
+int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_block *block_in,
+			    struct ablk_block *block_out);
 
 #endif /* _LC3_DECODER_H_ */

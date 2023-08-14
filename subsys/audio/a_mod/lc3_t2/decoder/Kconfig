@@ -6,16 +6,24 @@
 
 rsource "Kconfig.defaults"
 
-menu "Audio Modules"
+#----------------------------------------------------------------------------#
+menu "Modules"
+
+config SW_LC3_DECODER_T2
+	bool "Select the T2 software LC3 Decoder"
+
+config AMOD_NAME_SIZE
+	int "Maximum size for module naming in characters"
+	default 20
+
+endmenu # Modules
 
 #----------------------------------------------------------------------------#
 menu "Log levels"
 
-module = LC3_DECODER
+module = SW_LC3_DECODER_T2
 module-str = lc3-decoder
 source "subsys/logging/Kconfig.template.log_config"
 
 endmenu # Log levels
 #----------------------------------------------------------------------------#
-
-endmenu # Audio Modules

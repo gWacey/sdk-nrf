@@ -8,6 +8,7 @@ rsource "Kconfig.defaults"
 
 menu "Audio"
 
+#----------------------------------------------------------------------------#
 menu "Modules"
 
 config A_MOD
