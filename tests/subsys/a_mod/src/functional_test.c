@@ -36,6 +36,8 @@ static int test_thread_handle(struct amod_handle *handle)
 	struct amod_message *data_msg_tx;
 	size_t size;
 
+	LOG_INF("Test thread started");
+
 	/* Execute thread */
 	while (1) {
 		zassert_not_null(handle, NULL, "handle is NULL!");

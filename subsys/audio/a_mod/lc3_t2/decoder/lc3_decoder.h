@@ -41,14 +41,27 @@ struct lc3_decoder_configuration {
 	/* Sample rate for the decoder instance */
 	uint32_t sample_rate;
 
-	/* Bit depth for this decoder instance */
-	uint32_t bit_depth;
+	/* Number of valid bits for a sample (bit depth).
+	 * Typically 16 or 24.
+	 */
+	uint8_t bits_per_sample;
+
+	/* Number of bits used to carry a sample of size bits_per_sample.
+	 * For example, say we have a 24 bit sample stored in a 32 bit
+	 * word (int32_t), then:
+	 *     bits_per_sample = 24
+	 *     carrier_size    = 32
+	 */
+	uint32_t carrier_size;
 
 	/* Maximum bit rate for this decoder instance */
 	uint32_t max_bitrate;
 
 	/* Frame duration for this decoder instance */
 	uint32_t duration_us;
+
+	/* A flag indicating if the decoded buffer is sample interleaved or not */
+	enum ablk_interleaved interleaved;
 
 	/* Channel map for this decoder instance */
 	uint32_t channel_map;
@@ -64,7 +77,7 @@ struct lc3_decoder_context {
 	/* Number of decoder channel handles */
 	uint32_t dec_handles_count;
 
-	/* The decoder cnfiguration */
+	/* The decoder configuration */
 	struct lc3_decoder_configuration config;
 
 	/* Minimum coded bytes required for this decoder instance */

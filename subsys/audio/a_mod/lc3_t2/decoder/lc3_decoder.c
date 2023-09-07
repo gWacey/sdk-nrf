@@ -70,7 +70,7 @@ struct amod_functions lc3_dec_t2_functions = {
  * @brief The set-up parameters for the LC3 decoder.
  *
  */
-struct amod_description lc3_dec_dept = {.name = "LC3 Dcoder (T2)",
+struct amod_description lc3_dec_dept = {.name = "LC3 Decoder (T2)",
 					.type = AMOD_TYPE_PROCESS,
 					.functions =
 						(struct amod_functions *)&lc3_dec_t2_functions};
@@ -120,81 +120,13 @@ void interleave(void const *const input, size_t input_size, uint8_t channel, uin
  */
 int lc3_dec_t2_open(struct amod_handle_private *handle, struct amod_configuration *configuration)
 {
-	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	struct lc3_decoder_configuration *config =
-		(struct lc3_decoder_configuration *)configuration;
-	uint8_t enc_sample_rates = 0;
-	uint8_t dec_sample_rates = 0;
-	uint8_t unique_session = 0;
-	LC3FrameSize_t framesize;
 
 	/* Clear the context */
 	memset(ctx, 0, sizeof(struct lc3_decoder_context));
 
-	/* Set unique session to 0 for using the default sharing memory setting.
-	 *
-	 * This could lead to higher heap consumtion, but is able to manipulate
-	 * different sample rate setting between encoder/decoder.
-	 */
-
-	/* Check supported sample rates for encoder */
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_8KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_8_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_16KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_16_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_24KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_24_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_32KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_32_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_441KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_441_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_ENC_SAMPLE_RATE_48KHZ_SUPPORT)) {
-		enc_sample_rates |= LC3_SAMPLE_RATE_48_KHZ;
-	}
-
-	/* Check supported sample rates for decoder */
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_8KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_8_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_16KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_16_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_24KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_24_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_32KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_32_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_441KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_441_KHZ;
-	}
-	if (IS_ENABLED(CONFIG_LC3_DEC_SAMPLE_RATE_48KHZ_SUPPORT)) {
-		dec_sample_rates |= LC3_SAMPLE_RATE_48_KHZ;
-	}
-
-	switch (config->duration_us) {
-	case 7500:
-		framesize = LC3FrameSize7_5Ms;
-		break;
-	case 10000:
-		framesize = LC3FrameSize10Ms;
-		break;
-	default:
-		LOG_ERR("Unsupported framesize: %d", config->duration_us);
-		return -EINVAL;
-	}
-
-	ret = LC3Initialize(enc_sample_rates, dec_sample_rates, framesize, unique_session, NULL,
-			    NULL);
-
-	return ret;
+	return 0;
 }
 
 /**
@@ -243,7 +175,9 @@ int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
 		return -EALREADY;
 	}
 
-	amod_number_channels_calculate(ctx->config.channel_map, &number_channels);
+	/* Need to validate the config parameters here before proceeding */
+
+	amod_number_channels_calculate(config->channel_map, &number_channels);
 
 	/* Free previous decoder memory */
 	for (uint8_t i = 0; i < number_channels; i++) {
@@ -265,15 +199,15 @@ int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
 		return -EINVAL;
 	}
 
-	coded_bytes_req = LC3BitstreamBuffersize(ctx->config.sample_rate, ctx->config.max_bitrate,
-						 framesize, &ret);
+	coded_bytes_req =
+		LC3BitstreamBuffersize(config->sample_rate, config->max_bitrate, framesize, &ret);
 	if (coded_bytes_req == 0) {
-		LOG_ERR("Required coded bytes to LC3 encode instance %s is zero", hdl->name);
+		LOG_ERR("Required coded bytes to LC3 instance %s is zero", hdl->name);
 		return -EPERM;
 	}
 
 	for (uint8_t i = 0; i < number_channels; i++) {
-		dec_handles[i] = LC3DecodeSessionOpen(config->sample_rate, config->bit_depth,
+		dec_handles[i] = LC3DecodeSessionOpen(config->sample_rate, config->bits_per_sample,
 						      framesize, NULL, NULL, &ret);
 		if (ret) {
 			LOG_ERR("LC3 decoder channel %d failed to initialise for module %s", i,
@@ -291,9 +225,10 @@ int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
 		(ctx->config.duration_us * ctx->config.sample_rate) / LC3_DECODER_US_IN_A_SECOND;
 
 	/* Configure decoder */
-	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits %dus %d channel(s)", hdl->name,
-		ctx->config.sample_rate, ctx->config.bit_depth, ctx->config.duration_us,
-		number_channels);
+	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits (sample bits %d) %dus %d "
+		"channel(s)",
+		hdl->name, ctx->config.sample_rate, ctx->config.carrier_size,
+		ctx->config.bits_per_sample, ctx->config.duration_us, number_channels);
 
 	return 0;
 }
@@ -312,9 +247,10 @@ int lc3_dec_t2_configuration_get(struct amod_handle_private *handle,
 	memcpy(config, &ctx->config, sizeof(struct lc3_decoder_configuration));
 
 	/* Configure decoder */
-	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits %dus channel(s) mapped as 0x%X",
-		hdl->name, config->sample_rate, config->bit_depth, config->duration_us,
-		config->channel_map);
+	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits (sample bits %d) %dus channel(s) "
+		"mapped as 0x%X",
+		hdl->name, config->sample_rate, config->carrier_size, config->bits_per_sample,
+		config->duration_us, config->channel_map);
 
 	return 0;
 }
@@ -337,12 +273,11 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 	uint8_t *data_in;
 	uint8_t *data_out;
 	uint8_t temp_pcm[LC3_PCM_NUM_BYTES_MONO];
-	enum ablk_interleaved packing;
 	int8_t number_channels;
 
-	if (block_in->data_type != ABLK_TYPE_LC3 || block_out->data_type != ABLK_TYPE_PCM) {
-		LOG_DBG("LC3 decoder module %s has incorrect input and/or output data type(s)",
-			hdl->name);
+	if (block_in->data_type != ABLK_TYPE_LC3) {
+		LOG_DBG("LC3 decoder module %s has incorrect input data type: %d", hdl->name,
+			block_in->data_type);
 		return -EINVAL;
 	}
 
@@ -362,19 +297,28 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 		return -EINVAL;
 	}
 
+	if (block_out->data_size <
+	    (ctx->samples_per_frame * (ctx->config.carrier_size / 8) * number_channels)) {
+		LOG_ERR("Output buffer too small. Bytes required %d, output buffer is %d",
+			(ctx->samples_per_frame * (ctx->config.carrier_size / 8) * number_channels),
+			block_out->data_size);
+		return -EINVAL;
+	}
+
 	data_out = (uint8_t *)block_out->data;
 	data_out_size = block_out->data_size;
-	packing = block_out->interleaved;
 
 	memcpy(block_out, block_in, sizeof(struct ablk_block));
-	block_out->data = data_out;
+	block_out->data = (void *)data_out;
 	block_out->data_size = data_out_size;
 	block_out->data_type = ABLK_TYPE_PCM;
-	block_out->interleaved = packing;
+	block_out->interleaved = ctx->config.interleaved;
 
-	if (packing == ABLK_INTERLEAVED) {
+	if (ctx->config.interleaved == ABLK_INTERLEAVED) {
 		data_out = &temp_pcm[0];
 	}
+
+	data_out_size = 0;
 
 	for (uint8_t i = 0; i < number_channels; i++) {
 		data_in = (uint8_t *)block_in->data + (session_in_size * i);
@@ -398,28 +342,32 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 			continue;
 		}
 
-		if (LC3DecodeOutput.bytesWritten != ctx->samples_per_frame) {
+		if (LC3DecodeOutput.bytesWritten !=
+		    ctx->samples_per_frame * (ctx->config.bits_per_sample / 8)) {
 			/* handle error */
 			LOG_DBG("Error in decoder, output incorrect size %d when should "
 				"be %d",
-				LC3DecodeOutput.bytesWritten, ctx->samples_per_frame);
+				LC3DecodeOutput.bytesWritten,
+				ctx->samples_per_frame * (ctx->config.bits_per_sample / 8));
 
 			/* Clear this channel as it is not correct */
 			memset(data_out, 0, LC3DecodeOutput.bytesWritten);
 		}
 
-		if (packing == ABLK_INTERLEAVED) {
+		if (ctx->config.interleaved == ABLK_INTERLEAVED) {
 			interleave(data_out, LC3DecodeOutput.bytesWritten,
 				   block_in->bits_per_sample, i, block_out->data, number_channels);
 
 		} else {
 			data_out += LC3DecodeOutput.bytesWritten;
 		}
+
+		data_out_size += LC3DecodeOutput.bytesWritten;
 	}
 
 	ctx->plc_count = plc_counter;
 
-	block_out->data_size = block_out->data_size - ((uint8_t *)block_out->data - data_out);
+	block_out->data_size = data_out_size;
 
 	return 0;
 }

@@ -1,8 +1,7 @@
 tests:
-  nrf5340_audio.lc3_decode_test:
-    platform_allow: nrf5340dk_nrf5340_cpuapp nrf5340_audio_dk_nrf5340_cpuapp
+  nrf5340_audio.lc3_module_test:
+    platform_allow: qemu_cortex_m3
     integration_platforms:
-      - nrf5340dk_nrf5340_cpuapp
-      - nrf5340_audio_dk_nrf5340_cpuapp
-    tags: a_mod lc3_decode nrf5340_lc3_decoder_tests
+      - qemu_cortex_m3
+    tags: lc3_module nrf5340_audio_unit_tests
     timeout: 20
