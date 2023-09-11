@@ -880,7 +880,7 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
 	}
 
 	if (msg_tx->block.data == NULL || msg_tx->block.data_size > block->data_size) {
-		LOG_DBG("Data output buffer too small for received buffer from module %s",
+		LOG_DBG("Data output buffer NULL or too small for received buffer from module %s",
 			handle->name);
 		ret = -EINVAL;
 	} else {

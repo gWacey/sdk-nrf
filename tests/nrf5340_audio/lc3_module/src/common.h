@@ -20,8 +20,8 @@
 #define TEST_PCM_SAMPLE_RATE	    48000
 #define TEST_LC3_BITRATE	    96000
 #define TEST_LC3_FRAME_SIZE_US	    10000
-#define TEST_LC3_NUM_CHANNELS	    2
 #define TEST_AUDIO_CH_L		    0
 #define TEST_AUDIO_CH_R		    1
+#define TEST_AUDIO_CHANNELS_MAX	    5
 
 #endif /* _COMMON_H_ */

@@ -185,13 +185,16 @@ LC3DecoderHandle_t fake_LC3DecodeSessionOpen__succeeds(uint16_t sampleRate, uint
 	ARG_UNUSED(frameSize);
 	ARG_UNUSED(buffer);
 	ARG_UNUSED(bufferSize);
+	struct lc3_dec_session *session = (struct lc3_dec_session *)&dec_session_ctx[dec_count];
 
-	dec_session_ctx[dec_count].session_init = true;
-	dec_session_ctx[dec_count].data_in = wav_out;
+	session->session_init = true;
+	session->data_in = wav_out;
+
+	dec_count++;
 
 	*result = 0;
 
-	return (void *)&dec_session_ctx[dec_count++];
+	return (void *)session;
 }
 
 LC3DecoderHandle_t fake_LC3DecodeSessionOpen__fails(uint16_t sampleRate, uint8_t bitsPerSample,

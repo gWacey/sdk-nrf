@@ -82,17 +82,21 @@ struct amod_description lc3_dec_dept = {.name = "LC3 Decoder (T2)",
 struct amod_description *lc3_decoder_description = &lc3_dec_dept;
 
 /**
- * @brief Interleave a channel into a buffer of Nchannels of PCM
+ * @brief Interleave a channel into a buffer of N channels of PCM
  *
  * @param[in]	input			Pointer to the single channel input buffer.
  * @param[in]	input_size		Number of bytes in input. Must be divisible by two.
  * @param[in]	channel			Channel to interleave into.
  * @param[in]	pcm_bit_depth	Bit depth of PCM samples (16, 24, or 32).
  * @param[out]	output			Pointer to the output start of the multi-channel output.
- * @param[out]	output_chans	Number of output channels in the output buffer.
+ * @param[in]	output_size		Number of bytes in output. Must be divisible by two and
+ *                              atleast (input_size * bytes_per_sample * output_channels).
+ * @param[out]	output_channels	Number of output channels in the output buffer.
+ *
+ * @return 0 if successful, error value
  */
-void interleave(void const *const input, size_t input_size, uint8_t channel, uint8_t pcm_bit_depth,
-		void *output, uint8_t output_chans)
+int interleave(void const *const input, size_t input_size, uint8_t channel, uint8_t pcm_bit_depth,
+	       void *output, size_t output_size, uint8_t output_channels)
 {
 	uint32_t samples_per_channel;
 	uint8_t bytes_per_sample = pcm_bit_depth / 8;
@@ -100,8 +104,13 @@ void interleave(void const *const input, size_t input_size, uint8_t channel, uin
 	char *pointer_input;
 	char *pointer_output;
 
+	if (output_size < (input_size * output_channels)) {
+		LOG_DBG("Output buffer too small to interleave input into");
+		return -EINVAL;
+	}
+
 	samples_per_channel = input_size / bytes_per_sample;
-	step = bytes_per_sample * output_chans;
+	step = bytes_per_sample * (output_channels - 1);
 	pointer_input = (char *)input;
 	pointer_output = (char *)output + (bytes_per_sample * channel);
 
@@ -112,6 +121,8 @@ void interleave(void const *const input, size_t input_size, uint8_t channel, uin
 
 		pointer_output += step;
 	}
+
+	return 0;
 }
 
 /**
@@ -137,7 +148,7 @@ int lc3_dec_t2_close(struct amod_handle_private *handle)
 {
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)&ctx->lc3_dec_channel[0];
 	int8_t number_channels;
 
 	amod_number_channels_calculate(ctx->config.channel_map, &number_channels);
@@ -165,15 +176,10 @@ int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
 	struct lc3_decoder_configuration *config =
 		(struct lc3_decoder_configuration *)configuration;
-	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)&ctx->lc3_dec_channel[0];
 	LC3FrameSize_t framesize;
 	uint16_t coded_bytes_req;
 	int8_t number_channels;
-
-	if (ctx->dec_handles_count) {
-		LOG_ERR("LC3 decoder instance %s already initialised", hdl->name);
-		return -EALREADY;
-	}
 
 	/* Need to validate the config parameters here before proceeding */
 
@@ -214,6 +220,9 @@ int lc3_dec_t2_configuration_set(struct amod_handle_private *handle,
 				hdl->name);
 			return ret;
 		}
+
+		LOG_DBG("LC3 decode module %s session %d: %dus %dbits", hdl->name, i,
+			config->duration_us, config->bits_per_sample);
 
 		ctx->dec_handles_count += 1;
 	}
@@ -265,11 +274,12 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 	int ret;
 	struct amod_handle *hdl = (struct amod_handle *)handle;
 	struct lc3_decoder_context *ctx = (struct lc3_decoder_context *)hdl->context;
-	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)ctx->lc3_dec_channel;
+	LC3DecoderHandle_t *dec_handles = (LC3DecoderHandle_t *)&ctx->lc3_dec_channel[0];
 	LC3BFI_t frame_status;
 	uint16_t plc_counter = 0;
 	size_t data_out_size;
 	size_t session_in_size;
+	size_t frame_size_bytes;
 	uint8_t *data_in;
 	uint8_t *data_out;
 	uint8_t temp_pcm[LC3_PCM_NUM_BYTES_MONO];
@@ -297,13 +307,15 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 		return -EINVAL;
 	}
 
-	if (block_out->data_size <
-	    (ctx->samples_per_frame * (ctx->config.carrier_size / 8) * number_channels)) {
+	frame_size_bytes = (ctx->samples_per_frame * (ctx->config.carrier_size / 8));
+
+	if (block_out->data_size < frame_size_bytes * number_channels) {
 		LOG_ERR("Output buffer too small. Bytes required %d, output buffer is %d",
-			(ctx->samples_per_frame * (ctx->config.carrier_size / 8) * number_channels),
-			block_out->data_size);
+			(frame_size_bytes * number_channels), block_out->data_size);
 		return -EINVAL;
 	}
+
+	LOG_DBG("out size = %d", block_out->data_size);
 
 	data_out = (uint8_t *)block_out->data;
 	data_out_size = block_out->data_size;
@@ -320,43 +332,54 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 
 	data_out_size = 0;
 
-	for (uint8_t i = 0; i < number_channels; i++) {
-		data_in = (uint8_t *)block_in->data + (session_in_size * i);
+	for (uint8_t chan = 0; chan < number_channels; chan++) {
+		data_in = (uint8_t *)block_in->data + (session_in_size * chan);
 
 		LC3DecodeInput_t LC3DecodeInput = {
 			.inputData = data_in, .inputDataLength = session_in_size, frame_status};
 		LC3DecodeOutput_t LC3DecodeOutput = {.PCMData = data_out,
-						     .PCMDataLength = ctx->samples_per_frame,
+						     .PCMDataLength = frame_size_bytes,
 						     .bytesWritten = 0,
 						     .PLCCounter = plc_counter};
 
-		if (dec_handles[i] == NULL) {
-			LOG_DBG("LC3 dec ch:%d is not initialized", i);
-			continue;
+		if (dec_handles[chan] == NULL) {
+			LOG_DBG("LC3 dec ch:%d is not initialized", chan);
+			return -EINVAL;
 		}
 
-		ret = LC3DecodeSessionData(dec_handles[i], &LC3DecodeInput, &LC3DecodeOutput);
+		LOG_DBG("data_size = %d", block_out->data_size);
+
+		ret = LC3DecodeSessionData(dec_handles[chan], &LC3DecodeInput, &LC3DecodeOutput);
 		if (ret) {
 			/* handle error */
 			LOG_DBG("Error in decoder, ret: %d", ret);
-			continue;
+			return ret;
+			;
 		}
 
-		if (LC3DecodeOutput.bytesWritten !=
-		    ctx->samples_per_frame * (ctx->config.bits_per_sample / 8)) {
+		if (LC3DecodeOutput.bytesWritten != frame_size_bytes) {
 			/* handle error */
 			LOG_DBG("Error in decoder, output incorrect size %d when should "
 				"be %d",
-				LC3DecodeOutput.bytesWritten,
-				ctx->samples_per_frame * (ctx->config.bits_per_sample / 8));
+				LC3DecodeOutput.bytesWritten, frame_size_bytes);
 
 			/* Clear this channel as it is not correct */
 			memset(data_out, 0, LC3DecodeOutput.bytesWritten);
+
+			return -EFAULT;
 		}
 
+		LOG_DBG("Interleave (data_size = %d)", block_out->data_size);
+
 		if (ctx->config.interleaved == ABLK_INTERLEAVED) {
-			interleave(data_out, LC3DecodeOutput.bytesWritten,
-				   block_in->bits_per_sample, i, block_out->data, number_channels);
+			ret = interleave(data_out, LC3DecodeOutput.bytesWritten, chan,
+					 block_in->bits_per_sample, block_out->data,
+					 block_out->data_size, number_channels);
+
+			if (ret) {
+				LOG_DBG("Failed to interleave output");
+				return ret;
+			}
 
 		} else {
 			data_out += LC3DecodeOutput.bytesWritten;
