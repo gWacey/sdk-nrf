@@ -315,8 +315,6 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 		return -EINVAL;
 	}
 
-	LOG_DBG("out size = %d", block_out->data_size);
-
 	data_out = (uint8_t *)block_out->data;
 	data_out_size = block_out->data_size;
 
@@ -347,8 +345,6 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 			return -EINVAL;
 		}
 
-		LOG_DBG("data_size = %d", block_out->data_size);
-
 		ret = LC3DecodeSessionData(dec_handles[chan], &LC3DecodeInput, &LC3DecodeOutput);
 		if (ret) {
 			/* handle error */
@@ -368,8 +364,6 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 
 			return -EFAULT;
 		}
-
-		LOG_DBG("Interleave (data_size = %d)", block_out->data_size);
 
 		if (ctx->config.interleaved == ABLK_INTERLEAVED) {
 			ret = interleave(data_out, LC3DecodeOutput.bytesWritten, chan,

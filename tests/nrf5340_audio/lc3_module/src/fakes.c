@@ -17,7 +17,7 @@
 LOG_MODULE_REGISTER(module_fakes, 4);
 
 #define TEST_ENC_SESSIONS_NUM (5)
-#define TEST_DEC_SESSIONS_NUM (5)
+#define TEST_DEC_SESSIONS_NUM (10)
 
 struct lc3_dec_session {
 	bool session_init;

@@ -161,7 +161,7 @@ static void test_lc3_decoder_mono_init(void)
 	test_decoder_config.max_bitrate = TEST_LC3_BITRATE;
 	test_decoder_config.duration_us = TEST_LC3_FRAME_SIZE_US;
 	test_decoder_config.interleaved = ABLK_DEINTERLEAVED;
-	test_decoder_config.channel_map = BIT(TEST_AUDIO_CH_L);
+	test_decoder_config.channel_map = TEST_AUDIO_MONO_LEFT_CHANNEL_MAP;
 
 	/* Need a data_fifo_deinit() */
 	lc3_dec1_fifo_rx.initialized = false;
@@ -221,7 +221,7 @@ static void test_lc3_decoder_dual_mono_init(void)
 	test_decoder_config.max_bitrate = TEST_LC3_BITRATE;
 	test_decoder_config.duration_us = TEST_LC3_FRAME_SIZE_US;
 	test_decoder_config.interleaved = ABLK_DEINTERLEAVED;
-	test_decoder_config.channel_map = BIT(TEST_AUDIO_CH_L);
+	test_decoder_config.channel_map = TEST_AUDIO_MONO_LEFT_CHANNEL_MAP;
 
 	/* Need a data_fifo_deinit() */
 	lc3_dec1_fifo_rx.initialized = false;
@@ -254,7 +254,7 @@ static void test_lc3_decoder_dual_mono_init(void)
 		      "Failed to call LC3 open decoder session %d times",
 		      LC3DecodeSessionOpen_fake.call_count);
 
-	test_decoder_config.channel_map = BIT(TEST_AUDIO_CH_R);
+	test_decoder_config.channel_map = TEST_AUDIO_MONO_RIGHT_CHANNEL_MAP;
 
 	/* Need a data_fifo_deinit() */
 	lc3_dec2_fifo_rx.initialized = false;
@@ -312,7 +312,7 @@ static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
 	test_decoder_config.max_bitrate = TEST_LC3_BITRATE;
 	test_decoder_config.duration_us = TEST_LC3_FRAME_SIZE_US;
 	test_decoder_config.interleaved = interleaved;
-	test_decoder_config.channel_map = BIT(TEST_AUDIO_CH_L) | BIT(TEST_AUDIO_CH_R);
+	test_decoder_config.channel_map = (AMOD_CHANNEL_LEFT_FRONT | AMOD_CHANNEL_RIGHT_FRONT);
 
 	/* Need a data_fifo_deinit() */
 	lc3_dec1_fifo_rx.initialized = false;

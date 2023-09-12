@@ -72,7 +72,7 @@ struct lc3_decoder_configuration {
  */
 struct lc3_decoder_context {
 	/* Array of decoder channel handles */
-	struct lc3_decoder_handle *lc3_dec_channel[AUDIO_CH_NUM];
+	struct lc3_decoder_handle *lc3_dec_channel[AMOD_BITS_IN_CHANNEL_MAP];
 
 	/* Number of decoder channel handles */
 	uint32_t dec_handles_count;

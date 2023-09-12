@@ -13,10 +13,21 @@
 #include "ablk_api.h"
 
 /**
- * @brief Number of valid least significat bits in the channel map
+ * @brief Number of valid least significant bits in the channel map
  *
  */
 #define AMOD_BITS_IN_CHANNEL_MAP (32)
+
+/**
+ * @brief Channel positions within the channel map
+ *
+ */
+#define AMOD_CHANNEL_LEFT_FRONT	 1
+#define AMOD_CHANNEL_RIGHT_FRONT 2
+#define AMOD_CHANNEL_CENTRE	 4
+#define AMOD_CHANNEL_LFE	 8
+#define AMOD_CHANNEL_LEFT_BACK	 16
+#define AMOD_CHANNEL_RIGHT_BACK	 32
 
 /**
  * @brief Module type.
