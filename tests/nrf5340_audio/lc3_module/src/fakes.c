@@ -225,9 +225,9 @@ int32_t fake_LC3DecodeSessionData__succeeds(LC3DecoderHandle_t decodeHandle,
 		*data_out++ = *data_in++;
 	}
 
-	session->data_in += TEST_DEC_MONO_BUF_SIZE;
+	session->data_in = data_in;
 
-	decodeOutput->bytesWritten = TEST_DEC_MONO_BUF_SIZE;
+	decodeOutput->bytesWritten = test_dec_out_size;
 
 	return 0;
 }

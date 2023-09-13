@@ -4,4 +4,4 @@ tests:
     integration_platforms:
       - qemu_cortex_m3
     tags: lc3_module nrf5340_audio_unit_tests
-    timeout: 20
+    timeout: 2

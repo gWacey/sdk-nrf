@@ -375,6 +375,7 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 			/* Configure new audio block */
 			block.data = data;
 			block.data_size = handle->thread.data_size;
+			block.data_valid_size = 0;
 
 			/* Process the input audio block into the output audio block */
 			ret = handle->description->functions->data_process(
@@ -445,10 +446,11 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	/* Allocate the context memory */
 	handle->context = context;
 
-	memcpy(handle->name, name, CONFIG_AMOD_NAME_SIZE);
-	if (strlen(name) > CONFIG_AMOD_NAME_SIZE) {
+	memcpy(handle->name, name, CONFIG_AMOD_NAME_SIZE - 1);
+	if (strlen(name) > CONFIG_AMOD_NAME_SIZE - 1) {
 		LOG_INF("Module's instance name truncated to %s", handle->name);
 	}
+	handle->name[CONFIG_AMOD_NAME_SIZE - 1] = '\0';
 
 	handle->description = parameters->description;
 	memcpy(&handle->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
@@ -903,7 +905,7 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
  * @note The block is processed within the module or sequence of modules. The result is returned
  *       via the module or final module's output FIFO.
  *       All the input data is consumed within the call and thus the input data buffer
- *       maybe released once the function retrurns.
+ *       maybe released once the function returns.
  *
  */
 int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx,
@@ -964,16 +966,17 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 
 	LOG_DBG("Retrieved new message");
 
-	if (msg_rx->block.data == NULL || msg_rx->block.data_size == 0) {
+	if (msg_rx->block.data == NULL || msg_rx->block.data_valid_size == 0) {
 		LOG_DBG("Data output buffer too small for received buffer from module %s (%d)",
-			handle_rx->name, msg_rx->block.data_size);
+			handle_rx->name, msg_rx->block.data_valid_size);
 		ret = -EINVAL;
 	} else {
 		uint8_t *pcm_out = (uint8_t *)block_rx->data;
 
 		memcpy(block_rx, &msg_rx->block, sizeof(struct ablk_block));
-		memcpy(pcm_out, (uint8_t *)msg_rx->block.data, msg_rx->block.data_size);
-		block_rx->data_size = msg_rx->block.data_size;
+		block_rx->data = (void *)pcm_out;
+		memcpy((uint8_t *)block_rx->data, (uint8_t *)msg_rx->block.data,
+		       msg_rx->block.data_valid_size);
 	}
 
 	block_release_cb((struct amod_handle_private *)handle_rx, &msg_rx->block);

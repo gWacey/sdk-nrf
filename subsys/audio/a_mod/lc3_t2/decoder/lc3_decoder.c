@@ -291,6 +291,12 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 		return -EINVAL;
 	}
 
+	if (ctx->config.channel_map != block_in->channel_map) {
+		LOG_DBG("LC3 decoder module %s has incorrect channel map in the new block: %d",
+			hdl->name, block_in->channel_map);
+		return -EINVAL;
+	}
+
 	if (block_in->bad_frame) {
 		frame_status = BadFrame;
 	} else {
@@ -366,8 +372,12 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 		}
 
 		if (ctx->config.interleaved == ABLK_INTERLEAVED) {
-			ret = interleave(data_out, LC3DecodeOutput.bytesWritten, chan,
-					 block_in->bits_per_sample, block_out->data,
+			uint8_t bits_per_sample = block_in->bits_per_sample < block_in->carrier_size
+							  ? block_in->carrier_size
+							  : block_in->bits_per_sample;
+
+			ret = interleave(LC3DecodeOutput.PCMData, LC3DecodeOutput.bytesWritten,
+					 chan, bits_per_sample, block_out->data,
 					 block_out->data_size, number_channels);
 
 			if (ret) {
@@ -384,7 +394,7 @@ int lc3_dec_t2_data_process(struct amod_handle_private *handle, struct ablk_bloc
 
 	ctx->plc_count = plc_counter;
 
-	block_out->data_size = data_out_size;
+	block_out->data_valid_size = data_out_size;
 
 	return 0;
 }

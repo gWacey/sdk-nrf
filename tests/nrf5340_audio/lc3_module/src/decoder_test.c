@@ -20,15 +20,14 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(module_testing, 4);
 
-#define CONFIG_DECODER_MSG_QUEUE_SIZE	   (4)
-#define CONFIG_DATA_OBJECTS_NUM		   (4)
-#define CONFIG_LC3_DECODER_STACK_SIZE	   (10000)
-#define CONFIG_LC3_DECODER_THREAD_PRIORITY (4)
-#define CONFIG_MODULES_NUM		   (3)
-#define CONFIG_DECODER_MODULES_NUM	   (2)
-#define CONFIG_ENCODER_MODULES_NUM	   (1)
-#define CONFIG_DECODER_BUFFER_NUM	   (8)
-#define CONFIG_DECODER_BUFFER_ALIGN	   (4)
+#define CONFIG_DECODER_MSG_QUEUE_SIZE	    (2)
+#define CONFIG_DATA_OBJECTS_NUM		    (1)
+#define CONFIG_LC3_DECODER_STACK_SIZE	    (8384)
+#define CONFIG_LC3_DECODER_MULTI_STACK_SIZE (4192)
+#define CONFIG_LC3_DECODER_THREAD_PRIORITY  (4)
+#define CONFIG_MODULES_NUM		    (3)
+#define CONFIG_DECODER_MODULES_NUM	    (2)
+#define CONFIG_ENCODER_MODULES_NUM	    (1)
 
 enum test_module_id {
 	TEST_MODULE_LC3_DECODER = 0,
@@ -44,7 +43,8 @@ enum test_lc3_decoder_module_id {
 
 struct amod_handle handle[CONFIG_DECODER_MODULES_NUM + CONFIG_ENCODER_MODULES_NUM];
 struct lc3_decoder_context decoder_ctx[CONFIG_DECODER_MODULES_NUM];
-K_THREAD_STACK_DEFINE(lc3_dec1_thread_stack, CONFIG_LC3_DECODER_STACK_SIZE);
+
+K_THREAD_STACK_DEFINE(lc3_dec1_thread_stack, CONFIG_LC3_DECODER_MULTI_STACK_SIZE);
 DATA_FIFO_DEFINE(lc3_dec1_fifo_tx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(lc3_dec1_fifo_rx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 
@@ -52,10 +52,8 @@ K_THREAD_STACK_DEFINE(lc3_dec2_thread_stack, CONFIG_LC3_DECODER_STACK_SIZE);
 DATA_FIFO_DEFINE(lc3_dec2_fifo_tx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 DATA_FIFO_DEFINE(lc3_dec2_fifo_rx, CONFIG_DECODER_MSG_QUEUE_SIZE, sizeof(struct amod_message));
 
-K_MEM_SLAB_DEFINE(audio_mono_data_slab, TEST_DEC_MONO_BUF_SIZE, CONFIG_DATA_OBJECTS_NUM,
-		  CONFIG_DECODER_BUFFER_ALIGN);
-K_MEM_SLAB_DEFINE(audio_stereo_data_slab, TEST_DEC_STEREO_BUF_SIZE, CONFIG_DATA_OBJECTS_NUM,
-		  CONFIG_DECODER_BUFFER_ALIGN);
+static char audio_data_memory[TEST_DEC_MULTI_BUF_SIZE * CONFIG_DATA_OBJECTS_NUM];
+struct k_mem_slab audio_data_slab;
 
 struct ablk_block test_block = {.data_type = ABLK_TYPE_LC3,
 				.frame_len_us = TEST_LC3_FRAME_SIZE_US,
@@ -170,11 +168,15 @@ static void test_lc3_decoder_mono_init(void)
 	data_fifo_init(&lc3_dec1_fifo_rx);
 	data_fifo_init(&lc3_dec1_fifo_tx);
 
+	ret = k_mem_slab_init(&audio_data_slab, &audio_data_memory[0], TEST_DEC_MONO_BUF_SIZE,
+			      CONFIG_DATA_OBJECTS_NUM);
+	zassert_equal(ret, 0, "Failed to allocate the data slab: ret = %d", ret);
+
 	test_decoder_param.description = lc3_decoder_description;
 	test_decoder_param.thread.stack = lc3_dec1_thread_stack,
 	test_decoder_param.thread.stack_size = CONFIG_LC3_DECODER_STACK_SIZE;
 	test_decoder_param.thread.priority = CONFIG_LC3_DECODER_THREAD_PRIORITY;
-	test_decoder_param.thread.data_slab = &audio_mono_data_slab;
+	test_decoder_param.thread.data_slab = &audio_data_slab;
 	test_decoder_param.thread.data_size = TEST_DEC_MONO_BUF_SIZE;
 	test_decoder_param.thread.msg_rx = &lc3_dec1_fifo_rx;
 	test_decoder_param.thread.msg_tx = &lc3_dec1_fifo_tx;
@@ -230,10 +232,14 @@ static void test_lc3_decoder_dual_mono_init(void)
 	data_fifo_init(&lc3_dec1_fifo_rx);
 	data_fifo_init(&lc3_dec1_fifo_tx);
 
+	ret = k_mem_slab_init(&audio_data_slab, (void *)&audio_data_memory[0], 1024,
+			      CONFIG_DATA_OBJECTS_NUM);
+	zassert_equal(ret, 0, "Failed to allocate the data slab: ret = %d", ret);
+
 	test_decoder_param.description = lc3_decoder_description;
 	test_decoder_param.thread.stack_size = CONFIG_LC3_DECODER_STACK_SIZE;
 	test_decoder_param.thread.priority = CONFIG_LC3_DECODER_THREAD_PRIORITY;
-	test_decoder_param.thread.data_slab = &audio_mono_data_slab;
+	test_decoder_param.thread.data_slab = &audio_data_slab;
 	test_decoder_param.thread.data_size = TEST_DEC_MONO_BUF_SIZE;
 	test_decoder_param.thread.stack = lc3_dec1_thread_stack,
 	test_decoder_param.thread.msg_rx = &lc3_dec1_fifo_rx;
@@ -266,7 +272,7 @@ static void test_lc3_decoder_dual_mono_init(void)
 	test_decoder_param.description = lc3_decoder_description;
 	test_decoder_param.thread.stack_size = CONFIG_LC3_DECODER_STACK_SIZE;
 	test_decoder_param.thread.priority = CONFIG_LC3_DECODER_THREAD_PRIORITY;
-	test_decoder_param.thread.data_slab = &audio_mono_data_slab;
+	test_decoder_param.thread.data_slab = &audio_data_slab;
 	test_decoder_param.thread.data_size = TEST_DEC_MONO_BUF_SIZE;
 	test_decoder_param.thread.stack = lc3_dec2_thread_stack,
 	test_decoder_param.thread.msg_rx = &lc3_dec2_fifo_rx;
@@ -300,11 +306,12 @@ static void test_lc3_decoder_dual_mono_init(void)
 	zassert_equal(ret, 0, "Right decoder module start did not return zero");
 }
 
-static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
+static void test_lc3_decoder_multi_init(enum ablk_interleaved interleaved, uint32_t channel_map)
 {
 	int ret;
 	struct amod_parameters test_decoder_param;
 	struct lc3_decoder_configuration test_decoder_config;
+	uint8_t number_channels;
 
 	test_decoder_config.sample_rate = TEST_PCM_SAMPLE_RATE;
 	test_decoder_config.bits_per_sample = TEST_SAMPLE_BIT_DEPTH;
@@ -312,7 +319,9 @@ static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
 	test_decoder_config.max_bitrate = TEST_LC3_BITRATE;
 	test_decoder_config.duration_us = TEST_LC3_FRAME_SIZE_US;
 	test_decoder_config.interleaved = interleaved;
-	test_decoder_config.channel_map = (AMOD_CHANNEL_LEFT_FRONT | AMOD_CHANNEL_RIGHT_FRONT);
+	test_decoder_config.channel_map = channel_map;
+
+	amod_number_channels_calculate(channel_map, &number_channels);
 
 	/* Need a data_fifo_deinit() */
 	lc3_dec1_fifo_rx.initialized = false;
@@ -321,17 +330,21 @@ static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
 	data_fifo_init(&lc3_dec1_fifo_rx);
 	data_fifo_init(&lc3_dec1_fifo_tx);
 
+	ret = k_mem_slab_init(&audio_data_slab, &audio_data_memory[0],
+			      TEST_DEC_MONO_BUF_SIZE * number_channels, CONFIG_DATA_OBJECTS_NUM);
+	zassert_equal(ret, 0, "Failed to allocate the data slab: ret = %d", ret);
+
 	test_decoder_param.description = lc3_decoder_description;
 	test_decoder_param.thread.stack_size = CONFIG_LC3_DECODER_STACK_SIZE;
 	test_decoder_param.thread.priority = CONFIG_LC3_DECODER_THREAD_PRIORITY;
-	test_decoder_param.thread.data_slab = &audio_stereo_data_slab;
-	test_decoder_param.thread.data_size = TEST_DEC_STEREO_BUF_SIZE;
+	test_decoder_param.thread.data_slab = &audio_data_slab;
+	test_decoder_param.thread.data_size = TEST_DEC_MONO_BUF_SIZE * number_channels;
 	test_decoder_param.thread.stack = lc3_dec1_thread_stack,
 	test_decoder_param.thread.msg_rx = &lc3_dec1_fifo_rx;
 	test_decoder_param.thread.msg_tx = &lc3_dec1_fifo_tx;
 
 	ret = amod_open(&test_decoder_param, (struct amod_configuration *)&test_decoder_config,
-			"Decoder Stereo",
+			"Decoder Multi-channel",
 			(struct amod_context *)&decoder_ctx[TEST_MODULE_ID_DECODER_1],
 			&handle[TEST_MODULE_ID_DECODER_1]);
 	zassert_equal(ret, 0, "Decoder left module open did not return zero");
@@ -343,7 +356,7 @@ static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
 	zassert_equal(LC3BitstreamBuffersize_fake.call_count, 1,
 		      "Failed to call LC3 get buffer size %d times",
 		      LC3BitstreamBuffersize_fake.call_count);
-	zassert_equal(LC3DecodeSessionOpen_fake.call_count, 2,
+	zassert_equal(LC3DecodeSessionOpen_fake.call_count, number_channels,
 		      "Failed to call LC3 open decoder session %d times",
 		      LC3DecodeSessionOpen_fake.call_count);
 
@@ -357,7 +370,7 @@ static void test_lc3_decoder_stereo_init(enum ablk_interleaved interleaved)
 ZTEST(suite_lc3_decoder_functional, test_lc3_decode_mono)
 {
 	int ret;
-	int dec_call_count = 1;
+	int dec_call_count = 0;
 	uint8_t *data_in = &lc3_mono_in[0];
 	uint8_t *data_ref = (uint8_t *)&wav_mono_ref[0];
 	uint8_t pcm_out[TEST_DEC_MONO_BUF_SIZE];
@@ -386,20 +399,23 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_mono)
 		block_tx.data_type = ABLK_TYPE_LC3;
 		block_tx.data = (void *)data_in;
 		block_tx.data_size = TEST_ENC_MONO_BUF_SIZE;
+		block_tx.data_valid_size = TEST_ENC_MONO_BUF_SIZE;
+		block_tx.channel_map = AMOD_CHANNEL_LEFT_FRONT;
 
 		block_rx.data_type = ABLK_TYPE_PCM;
 		block_rx.data = (void *)&pcm_out[0];
 		block_rx.data_size = TEST_DEC_MONO_BUF_SIZE;
+		block_rx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_1],
 				      &handle[TEST_MODULE_ID_DECODER_1], &block_tx, &block_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for the decoder: %d", ret);
-		zassert_equal(block_rx.data_size, TEST_DEC_MONO_BUF_SIZE,
-			      "Decoded number of bytes incorrect: %d");
+		zassert_equal(block_rx.data_valid_size, TEST_DEC_MONO_BUF_SIZE,
+			      "Decoded number of bytes incorrect: %d", block_rx.data_valid_size);
 		zassert_mem_equal(&pcm_out[0], data_ref, TEST_DEC_MONO_BUF_SIZE,
 				  "Decoded PCM data does not match reference PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 1,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
 
@@ -408,8 +424,8 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_mono)
 
 		dec_call_count += 1;
 
-	} while ((dec_call_count <= (LC3_MONO_IN_SIZE / TEST_ENC_MONO_BUF_SIZE) &&
-		  dec_call_count <= (WAV_MONO_REF_SIZE / TEST_DEC_MONO_BUF_SAMPLES)));
+	} while ((dec_call_count < (LC3_MONO_IN_SIZE / TEST_ENC_MONO_BUF_SIZE) &&
+		  dec_call_count < (WAV_MONO_REF_SIZE / TEST_DEC_MONO_BUF_SAMPLES)));
 
 	ret = amod_stop(&handle[TEST_MODULE_ID_DECODER_1]);
 	zassert_equal(ret, 0, "Failed to stop module did not return zero: ret = %d", ret);
@@ -425,12 +441,12 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_mono)
 ZTEST(suite_lc3_decoder_functional, test_lc3_decode_dual_mono)
 {
 	int ret;
-	int dec_call_count = 1;
+	int dec_call_count = 0;
 	uint8_t *data_l_in = (uint8_t *)&lc3_mono_in[0];
 	uint8_t *data_r_in = (uint8_t *)&lc3_mono_in[0];
-	uint8_t data_l[TEST_DEC_MONO_BUF_SIZE], data_r[TEST_DEC_MONO_BUF_SIZE];
 	uint8_t *data_l_ref = (uint8_t *)&wav_mono_ref[0];
 	uint8_t *data_r_ref = (uint8_t *)&wav_mono_ref[0];
+	uint8_t data_l[TEST_DEC_MONO_BUF_SIZE], data_r[TEST_DEC_MONO_BUF_SIZE];
 	struct ablk_block block_l_tx, block_l_rx;
 	struct ablk_block block_r_tx, block_r_rx;
 
@@ -457,20 +473,24 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_dual_mono)
 		block_l_tx.data_type = ABLK_TYPE_LC3;
 		block_l_tx.data = (void *)data_l_in;
 		block_l_tx.data_size = TEST_ENC_MONO_BUF_SIZE;
+		block_l_tx.data_valid_size = TEST_ENC_MONO_BUF_SIZE;
+		block_l_tx.channel_map = AMOD_CHANNEL_LEFT_FRONT;
 
+		memset(&data_l[0], 0, TEST_DEC_MONO_BUF_SIZE);
 		block_l_rx.data = (void *)&data_l[0];
 		block_l_rx.data_size = TEST_DEC_MONO_BUF_SIZE;
+		block_l_rx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_1],
 				      &handle[TEST_MODULE_ID_DECODER_1], &block_l_tx, &block_l_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for left decoder: %d", ret);
-		zassert_equal(block_l_rx.data_size, TEST_DEC_MONO_BUF_SIZE,
+		zassert_equal(block_l_rx.data_valid_size, TEST_DEC_MONO_BUF_SIZE,
 			      "Decoded number of bytes for right incorrect: %d",
-			      block_l_rx.data_size);
+			      block_l_rx.data_valid_size);
 		zassert_mem_equal(&data_l[0], data_l_ref, TEST_DEC_MONO_BUF_SIZE,
 				  "Decoded left PCM data does not match reference PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 1,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
 
@@ -485,22 +505,24 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_dual_mono)
 		block_r_tx.data_type = ABLK_TYPE_LC3;
 		block_r_tx.data = (void *)data_r_in;
 		block_r_tx.data_size = TEST_ENC_MONO_BUF_SIZE;
+		block_r_tx.data_valid_size = TEST_ENC_MONO_BUF_SIZE;
+		block_r_tx.channel_map = AMOD_CHANNEL_RIGHT_FRONT;
 
+		memset(&data_r[0], 0, TEST_DEC_MONO_BUF_SIZE);
 		block_r_rx.data = (void *)&data_r[0];
 		block_r_rx.data_size = TEST_DEC_MONO_BUF_SIZE;
+		block_r_rx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_2],
 				      &handle[TEST_MODULE_ID_DECODER_2], &block_r_tx, &block_r_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for right decoder: %d", ret);
-		zassert_equal(block_r_rx.data_size, TEST_DEC_MONO_BUF_SIZE,
+		zassert_equal(block_r_rx.data_valid_size, TEST_DEC_MONO_BUF_SIZE,
 			      "Decoded number of bytes for left incorrect: %d",
-			      block_r_rx.data_size);
+			      block_r_rx.data_valid_size);
 		zassert_mem_equal(&data_r[0], data_r_ref, TEST_DEC_MONO_BUF_SIZE,
 				  "Decoded right PCM data does not match reference PCM data");
-		zassert_mem_equal(&data_r[0], data_r_ref, TEST_DEC_MONO_BUF_SIZE,
-				  "Left PCM data does not match right PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 1,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
 
@@ -530,7 +552,7 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_dual_mono)
 ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_deint)
 {
 	int ret;
-	int dec_call_count = 2;
+	int dec_call_count = 0;
 	uint8_t *data_source = (uint8_t *)&lc3_mono_in[0];
 	uint8_t *data_reference = (uint8_t *)&wav_mono_ref[0];
 	uint8_t data_in[TEST_ENC_STEREO_BUF_SIZE];
@@ -552,7 +574,7 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_deint)
 	zassert_equal(LC3Initialize_fake.call_count, 1, "Failed to call LC3 initialize %d times",
 		      LC3Initialize_fake.call_count);
 
-	test_lc3_decoder_stereo_init(ABLK_DEINTERLEAVED);
+	test_lc3_decoder_multi_init(ABLK_DEINTERLEAVED, TEST_AUDIO_STEREO_CHANNEL_MAP);
 
 	do {
 		memcpy(&data_in[0], data_source, TEST_ENC_MONO_BUF_SIZE);
@@ -566,19 +588,22 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_deint)
 		block_tx.data_type = ABLK_TYPE_LC3;
 		block_tx.data = &data_in[0];
 		block_tx.data_size = TEST_ENC_STEREO_BUF_SIZE;
+		block_tx.data_valid_size = TEST_ENC_STEREO_BUF_SIZE;
+		block_tx.channel_map = TEST_AUDIO_STEREO_CHANNEL_MAP;
 
 		block_rx.data = (void *)&data_out[0];
 		block_rx.data_size = TEST_DEC_STEREO_BUF_SIZE;
+		block_rx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_1],
 				      &handle[TEST_MODULE_ID_DECODER_1], &block_tx, &block_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for left decoder: %d", ret);
-		zassert_equal(block_rx.data_size, TEST_DEC_STEREO_BUF_SIZE,
-			      "Decoded number of bytes incorrect: %d");
+		zassert_equal(block_rx.data_valid_size, TEST_DEC_STEREO_BUF_SIZE,
+			      "Decoded number of bytes incorrect: %d", block_rx.data_valid_size);
 		zassert_mem_equal(&data_out[0], &data_ref[0], TEST_DEC_STEREO_BUF_SIZE,
 				  "Decoded PCM data does not match reference PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 2,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
 
@@ -604,10 +629,7 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_deint)
 ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_int)
 {
 	int ret;
-	int dec_call_count = 2;
-	uint8_t *data_source = (uint8_t *)&lc3_mono_in[0];
-	uint8_t *data_reference = (uint8_t *)&wav_mono_ref[0];
-	uint8_t *in_l, *in_r, *ref;
+	int dec_call_count = 0;
 	uint8_t data_in[TEST_ENC_STEREO_BUF_SIZE];
 	uint8_t data_out[TEST_DEC_STEREO_BUF_SIZE];
 	uint8_t data_ref[TEST_DEC_STEREO_BUF_SIZE];
@@ -627,25 +649,29 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_int)
 	zassert_equal(LC3Initialize_fake.call_count, 1, "Failed to call LC3 initialize %d times",
 		      LC3Initialize_fake.call_count);
 
-	test_lc3_decoder_stereo_init(ABLK_INTERLEAVED);
+	test_lc3_decoder_multi_init(ABLK_INTERLEAVED, TEST_AUDIO_STEREO_CHANNEL_MAP);
 
 	do {
+		uint8_t *ref = &data_ref[0];
+		uint8_t *data_source =
+			(uint8_t *)&lc3_mono_in[TEST_ENC_MONO_BUF_SIZE * (dec_call_count >> 1)];
+		uint8_t *data_reference =
+			(uint8_t *)&wav_mono_ref[TEST_DEC_MONO_BUF_SAMPLES * (dec_call_count >> 1)];
+
 		memcpy(&data_in[0], data_source, TEST_ENC_MONO_BUF_SIZE);
 		memcpy(&data_in[TEST_ENC_MONO_BUF_SIZE], data_source, TEST_ENC_MONO_BUF_SIZE);
 
-		/* Interleave the channel samples CM */
-		in_l = data_reference;
-		in_r = data_reference;
-		ref = &data_ref[0];
-
+		/* Interleave the channel samples */
 		for (uint32_t i = 0; i < TEST_DEC_MONO_BUF_SAMPLES; i++) {
-			for (uint8_t j = 0; j < (TEST_SAMPLE_BIT_DEPTH / 8); j++) {
-				*ref++ = *in_l++;
+			for (uint8_t j = 0; j < TEST_AUDIO_CHANNELS_STEREO; j++) {
+				for (uint8_t k = 0; k < (TEST_SAMPLE_BIT_DEPTH / 8); k++) {
+					*ref++ = *data_reference++;
+				}
+
+				data_reference -= (TEST_SAMPLE_BIT_DEPTH / 8);
 			}
 
-			for (uint8_t j = 0; j < (TEST_SAMPLE_BIT_DEPTH / 8); j++) {
-				*ref++ = *in_r++;
-			}
+			data_reference += (TEST_SAMPLE_BIT_DEPTH / 8);
 		}
 
 		memcpy(&block_tx, &test_block, sizeof(struct ablk_block));
@@ -654,24 +680,24 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_int)
 		block_tx.data_type = ABLK_TYPE_LC3;
 		block_tx.data = &data_in[0];
 		block_tx.data_size = TEST_ENC_STEREO_BUF_SIZE;
+		block_tx.data_valid_size = TEST_ENC_STEREO_BUF_SIZE;
+		block_tx.channel_map = TEST_AUDIO_STEREO_CHANNEL_MAP;
 
 		block_rx.data = (void *)&data_out[0];
 		block_rx.data_size = TEST_DEC_STEREO_BUF_SIZE;
+		block_tx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_1],
 				      &handle[TEST_MODULE_ID_DECODER_1], &block_tx, &block_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for left decoder: %d", ret);
-		zassert_equal(block_rx.data_size, TEST_DEC_STEREO_BUF_SIZE,
-			      "Decoded number of bytes incorrect: %d");
+		zassert_equal(block_rx.data_valid_size, TEST_DEC_STEREO_BUF_SIZE,
+			      "Decoded number of bytes incorrect: %d", block_rx.data_valid_size);
 		zassert_mem_equal(&data_out[0], &data_ref[0], TEST_DEC_STEREO_BUF_SIZE,
 				  "Decoded PCM data does not match reference PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 2,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
-
-		data_source += TEST_ENC_MONO_BUF_SIZE;
-		data_reference += TEST_DEC_MONO_BUF_SIZE;
 
 		dec_call_count += 2;
 
@@ -693,13 +719,10 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_stereo_int)
 ZTEST(suite_lc3_decoder_functional, test_lc3_decode_multi_int)
 {
 	int ret;
-	int dec_call_count = TEST_MULTI_CHANNEL_NUM;
-	uint8_t *data_source = (uint8_t *)&lc3_mono_in[0];
-	uint8_t *data_reference = (uint8_t *)&wav_mono_ref[0];
-	uint8_t *in_l, *in_r, *ref;
+	int dec_call_count = 0;
 	uint8_t data_in[TEST_ENC_MULTI_BUF_SIZE];
-	uint8_t data_out[TEST_ENC_MULTI_BUF_SIZE];
-	uint8_t data_ref[TEST_ENC_MULTI_BUF_SIZE];
+	uint8_t data_out[TEST_DEC_MULTI_BUF_SIZE];
+	uint8_t data_ref[TEST_DEC_MULTI_BUF_SIZE];
 	struct ablk_block block_tx, block_rx;
 
 	/* Fake internal empty data FIFO success */
@@ -716,28 +739,31 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_multi_int)
 	zassert_equal(LC3Initialize_fake.call_count, 1, "Failed to call LC3 initialize %d times",
 		      LC3Initialize_fake.call_count);
 
-	test_lc3_decoder_stereo_init(ABLK_INTERLEAVED);
+	test_lc3_decoder_multi_init(ABLK_INTERLEAVED, TEST_AUDIO_MULTI_CHANNEL_MAP);
 
 	do {
-		in_chan = &data_in[0];
-		for (uint8_t chan = 0; chan < TEST_MULTI_CHANNEL_NUM; chan++) {
-			memcpy(in_chan, data_source, TEST_ENC_MONO_BUF_SAMPLES);
-			in_chan += TEST_ENC_MONO_BUF_SAMPLES
+		uint8_t *ref = &data_ref[0];
+		uint8_t *data_source =
+			(uint8_t *)&lc3_mono_in[TEST_ENC_MONO_BUF_SIZE * (dec_call_count >> 1)];
+		uint8_t *data_reference =
+			(uint8_t *)&wav_mono_ref[TEST_DEC_MONO_BUF_SAMPLES * (dec_call_count >> 1)];
+
+		for (int i = 0; i < TEST_AUDIO_CHANNELS_MAX; i++) {
+			memcpy(&data_in[TEST_ENC_MONO_BUF_SIZE * i], data_source,
+			       TEST_ENC_MONO_BUF_SIZE);
 		}
 
-		/* Interleave the channel samples CM */
-		in_l = data_reference;
-		in_r = data_reference;
-		ref = &data_ref[0];
-
+		/* Interleave the channel samples */
 		for (uint32_t i = 0; i < TEST_DEC_MONO_BUF_SAMPLES; i++) {
-			for (uint8_t j = 0; j < (TEST_SAMPLE_BIT_DEPTH / 8); j++) {
-				*ref++ = *in_l++;
+			for (uint8_t j = 0; j < TEST_AUDIO_CHANNELS_MAX; j++) {
+				for (uint8_t k = 0; k < (TEST_SAMPLE_BIT_DEPTH / 8); k++) {
+					*ref++ = *data_reference++;
+				}
+
+				data_reference -= (TEST_SAMPLE_BIT_DEPTH / 8);
 			}
 
-			for (uint8_t j = 0; j < (TEST_SAMPLE_BIT_DEPTH / 8); j++) {
-				*ref++ = *in_r++;
-			}
+			data_reference += (TEST_SAMPLE_BIT_DEPTH / 8);
 		}
 
 		memcpy(&block_tx, &test_block, sizeof(struct ablk_block));
@@ -745,25 +771,25 @@ ZTEST(suite_lc3_decoder_functional, test_lc3_decode_multi_int)
 
 		block_tx.data_type = ABLK_TYPE_LC3;
 		block_tx.data = &data_in[0];
-		block_tx.data_size = TEST_ENC_STEREO_BUF_SIZE;
+		block_tx.data_size = TEST_ENC_MULTI_BUF_SIZE;
+		block_tx.data_valid_size = TEST_ENC_MULTI_BUF_SIZE;
+		block_tx.channel_map = TEST_AUDIO_MULTI_CHANNEL_MAP;
 
 		block_rx.data = (void *)&data_out[0];
-		block_rx.data_size = TEST_DEC_STEREO_BUF_SIZE;
+		block_rx.data_size = TEST_DEC_MULTI_BUF_SIZE;
+		block_tx.data_valid_size = 0;
 
 		ret = amod_data_tx_rx(&handle[TEST_MODULE_ID_DECODER_1],
 				      &handle[TEST_MODULE_ID_DECODER_1], &block_tx, &block_rx,
 				      K_FOREVER);
 		zassert_equal(ret, 0, "Data TX-RX did not return zero for left decoder: %d", ret);
-		zassert_equal(block_rx.data_size, TEST_DEC_STEREO_BUF_SIZE,
-			      "Decoded number of bytes incorrect: %d");
-		zassert_mem_equal(&data_out[0], &data_ref[0], TEST_DEC_STEREO_BUF_SIZE,
+		zassert_equal(block_rx.data_valid_size, TEST_DEC_MULTI_BUF_SIZE,
+			      "Decoded number of bytes incorrect: %d", block_rx.data_valid_size);
+		zassert_mem_equal(&data_out[0], &data_ref[0], TEST_DEC_MULTI_BUF_SIZE,
 				  "Decoded PCM data does not match reference PCM data");
-		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count,
+		zassert_equal(LC3DecodeSessionData_fake.call_count, dec_call_count + 2,
 			      "Failed to call LC3 decode %d times",
 			      LC3DecodeSessionData_fake.call_count);
-
-		data_source += TEST_ENC_MONO_BUF_SIZE;
-		data_reference += TEST_DEC_MONO_BUF_SIZE;
 
 		dec_call_count += 2;
 

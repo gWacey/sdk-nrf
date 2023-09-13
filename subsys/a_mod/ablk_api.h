@@ -41,11 +41,14 @@ struct ablk_block {
 	/* A pointer to the PCM or coded data (e.g., PCM, LC3, etc.) buffer */
 	void *data;
 
-	/* The size in bytes of the data buffer.
+	/* Size of the data buffer */
+	size_t data_size;
+
+	/* The size in bytes of the valid data in the data buffer.
 	 * To get the size of each channel, this value must be divided by the number of
 	 * used channels.
 	 */
-	size_t data_size;
+	size_t data_valid_size;
 
 	/* Frame length in microseconds.
 	 * This may be aligned with the Bluetooth connection interval.
