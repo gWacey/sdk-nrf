@@ -8,7 +8,6 @@
 
 #include <zephyr/kernel.h>
 #include <errno.h>
-#include <zephyr/bluetooth/audio/audio.h>
 
 #include "channel_assignment.h"
 #include "pcm_stream_channel_modifier.h"
@@ -17,13 +16,7 @@
 #endif /* (CONFIG_SW_CODEC_LC3) */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(sw_codec_select, 4); /* CONFIG_SW_CODEC_SELECT_LOG_LEVEL); */
-
-#if ((CONFIG_AUDIO_FRAME_DURATION_US == 7500) && CONFIG_SW_CODEC_LC3)
-#define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 15 / 2) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
-#else
-#define FRAME_SIZE ((CONFIG_AUDIO_SAMPLE_RATE_HZ / 1000 * 10) * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
-#endif /* ((CONFIG_AUDIO_FRAME_DURATION_US == 7500) && CONFIG_SW_CODEC_LC3) */
+LOG_MODULE_REGISTER(sw_codec_select, CONFIG_SW_CODEC_SELECT_LOG_LEVEL);
 
 static struct sw_codec_config m_config;
 
@@ -246,7 +239,7 @@ int sw_codec_uninit(struct sw_codec_config sw_codec_cfg)
 	return 0;
 }
 
-int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *modules)
+int sw_codec_init(struct sw_codec_config sw_codec_cfg)
 {
 	switch (sw_codec_cfg.sw_codec) {
 	case SW_CODEC_LC3: {
@@ -302,9 +295,10 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *module
 			}
 		}
 		break;
-
+#else
 		LOG_ERR("LC3 is not compiled in, please open menuconfig and select LC3");
 		return -ENODEV;
+#endif /* (CONFIG_SW_CODEC_LC3) */
 	}
 
 	default:

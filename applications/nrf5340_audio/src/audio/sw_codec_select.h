@@ -9,10 +9,9 @@
 
 #include <zephyr/kernel.h>
 #include "channel_assignment.h"
-#include "amod_api.h"
 
 #if (CONFIG_SW_CODEC_LC3)
-#define LC3_MAX_FRAME_SIZE_MS 10
+#define LC3_MAX_FRAME_SIZE_MS	10
 #define LC3_ENC_MONO_FRAME_SIZE (CONFIG_LC3_BITRATE * LC3_MAX_FRAME_SIZE_MS / (8 * 1000))
 
 #define LC3_PCM_NUM_BYTES_MONO                                                                     \
@@ -21,16 +20,16 @@
 #define LC3_DEC_TIME_US 1500
 #else
 #define LC3_ENC_MONO_FRAME_SIZE 0
-#define LC3_PCM_NUM_BYTES_MONO 0
-#define LC3_ENC_TIME_US 0
-#define LC3_DEC_TIME_US 0
+#define LC3_PCM_NUM_BYTES_MONO	0
+#define LC3_ENC_TIME_US		0
+#define LC3_DEC_TIME_US		0
 #endif /* CONFIG_SW_CODEC_LC3 */
 
 /* Max will be used when multiple codecs are supported */
-#define ENC_MAX_FRAME_SIZE MAX(LC3_ENC_MONO_FRAME_SIZE, 0)
-#define ENC_TIME_US MAX(LC3_ENC_TIME_US, 0)
-#define DEC_TIME_US MAX(LC3_DEC_TIME_US, 0)
-#define PCM_NUM_BYTES_MONO MAX(LC3_PCM_NUM_BYTES_MONO, 0)
+#define ENC_MAX_FRAME_SIZE   MAX(LC3_ENC_MONO_FRAME_SIZE, 0)
+#define ENC_TIME_US	     MAX(LC3_ENC_TIME_US, 0)
+#define DEC_TIME_US	     MAX(LC3_DEC_TIME_US, 0)
+#define PCM_NUM_BYTES_MONO   MAX(LC3_PCM_NUM_BYTES_MONO, 0)
 #define PCM_NUM_BYTES_STEREO (PCM_NUM_BYTES_MONO * 2)
 
 enum sw_codec_select {
@@ -40,7 +39,7 @@ enum sw_codec_select {
 
 enum sw_codec_num_ch {
 	SW_CODEC_ZERO_CHANNELS,
-	SW_CODEC_MONO, /* Only use one channel */
+	SW_CODEC_MONO,	 /* Only use one channel */
 	SW_CODEC_STEREO, /* Use both channels */
 };
 
@@ -57,16 +56,13 @@ struct sw_codec_decoder {
 	enum audio_channel audio_ch; /* Only used if channel mode is mono */
 };
 
-struct sw_codec_handle;
-
 /** @brief  Sw_codec configuration structure
  */
 struct sw_codec_config {
-	enum sw_codec_select sw_codec; /* sw_codec to be used, e.g. LC3, etc */
+	enum sw_codec_select sw_codec;	 /* sw_codec to be used, e.g. LC3, etc */
 	struct sw_codec_decoder decoder; /* Struct containing settings for decoder */
 	struct sw_codec_encoder encoder; /* Struct containing settings for encoder */
-	bool initialized; /* Status of codec */
-	struct amod_handle *handles; /* Array of codec handles */
+	bool initialized;		 /* Status of codec */
 };
 
 /**@brief	Encode PCM data and output encoded data
@@ -111,10 +107,9 @@ int sw_codec_uninit(struct sw_codec_config sw_codec_cfg);
  *		and its configuration.
  *
  * @param[in]	sw_codec_cfg	Struct to set up sw_codec
- * @param[in]   modules         A table describing all the modules in the stream
  *
  * @return	0 if success, error codes depends on sw_codec selected
  */
-int sw_codec_init(struct sw_codec_config sw_codec_cfg, struct amod_table *modules);
+int sw_codec_init(struct sw_codec_config sw_codec_cfg);
 
 #endif /* _SW_CODEC_SELECT_H_ */

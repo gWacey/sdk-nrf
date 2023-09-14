@@ -14,23 +14,41 @@
 /* Overload the message buffer pointer with a point to one of the an arrays below */
 static int fifo_num;
 
-/* Number of messages used*/
+struct test_slab_queue {
+	size_t head;
+	size_t tail;
+	size_t size;
+	size_t locked;
 
-struct test_data_fifo_buffer {
-	int msgq_read_pos;
-	int msgq_free_pos;
-	int slab_blocks_read_pos;
-	int slab_blocks_free_pos;
-
-	char buffer[FAKE_FIFO_MSG_QUEUE_SIZE][FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	size_t buffer_size;
+	void **data[FAKE_FIFO_MSG_QUEUE_SIZE];
+	struct amod_message msg[FAKE_FIFO_MSG_QUEUE_SIZE];
 };
 
-/* FIFO "slab" buffers */
-static struct test_data_fifo_buffer test_fifo_data_slab[FAKE_FIFO_NUM];
+struct test_msg_fifo_queue {
+	size_t head;
+	size_t tail;
+	size_t size;
+	size_t locked;
 
-/* FIFO "queue" items */
-static struct test_data_fifo_buffer test_fifo_data_queue[FAKE_FIFO_NUM];
+	void **data[FAKE_FIFO_MSG_QUEUE_SIZE];
+};
+
+/* FIFO "slab" */
+static struct test_slab_queue test_fifo_slab[FAKE_FIFO_NUM];
+
+/* FIFO "message" queue */
+static struct test_msg_fifo_queue test_fifo_msg_queue[FAKE_FIFO_NUM];
+
+void data_fifo_deinit(struct data_fifo *data_fifo)
+{
+	data_fifo->msgq_buffer = (char *)NULL;
+	data_fifo->slab_buffer = (char *)NULL;
+	data_fifo->elements_max = 0;
+	data_fifo->block_size_max = 0;
+	data_fifo->initialized = false;
+
+	fifo_num = 0;
+}
 
 /*
  * Stubs are defined here, so that multiple .C files can share them
@@ -52,14 +70,19 @@ DEFINE_FAKE_VALUE_FUNC(int, data_fifo_init, struct data_fifo *);
 int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fifo, void **data,
 						      k_timeout_t timeout)
 {
-	ARG_UNUSED(data_fifo);
-	ARG_UNUSED(timeout);
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	struct test_slab_queue *test_fifo_slab_data =
+		(struct test_slab_queue *)data_fifo->slab_buffer;
 
-	*data = &msg->buffer[msg->slab_blocks_free_pos][0];
+	if (test_fifo_slab_data->head == test_fifo_slab_data->tail) {
+		return -1;
+	}
 
-	msg->slab_blocks_read_pos = msg->slab_blocks_free_pos;
-	msg->slab_blocks_free_pos += 1;
+	*data = &test_fifo_slab_data->msg[test_fifo_slab_data->tail % test_fifo_slab_data->size];
+	test_fifo_slab_data->tail++;
+
+	if (timeout != K_FOREVER) {
+		k_sleep(timeout);
+	}
 
 	return 0;
 }
@@ -96,13 +119,18 @@ int fake_data_fifo_pointer_first_vacant_get__invalid_fails(struct data_fifo *dat
 
 int fake_data_fifo_block_lock__succeeds(struct data_fifo *data_fifo, void **data, size_t size)
 {
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	ARG_UNUSED(size);
+	struct test_msg_fifo_queue *test_fifo_msg =
+		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
-	memcpy(&msg->buffer[msg->msgq_free_pos][0], *data, size);
-	msg->buffer_size = size;
+	if (((test_fifo_msg->head + 1) % test_fifo_msg->size) == test_fifo_msg->tail) {
+		return -1;
+	}
 
-	msg->msgq_read_pos = msg->msgq_free_pos;
-	msg->msgq_free_pos += 1;
+	test_fifo_msg->data[test_fifo_msg->head] = *data;
+	test_fifo_msg->head = (test_fifo_msg->head + 1) % test_fifo_msg->size;
+
+	test_fifo_msg->locked++;
 
 	return 0;
 }
@@ -137,20 +165,33 @@ int fake_data_fifo_block_lock__put_fails(struct data_fifo *data_fifo, void **dat
 int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo, void **data,
 						     size_t *size, k_timeout_t timeout)
 {
-	ARG_UNUSED(timeout);
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	struct amod_message *msg;
+	struct test_msg_fifo_queue *test_fifo_msg =
+		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
-	*data = &msg->buffer[msg->msgq_read_pos][0];
-	*size = data_fifo->block_size_max;
+	if (test_fifo_msg->tail == test_fifo_msg->head) {
+		return -1;
+	}
 
-	msg->msgq_read_pos -= 1;
-	msg->msgq_free_pos -= 1;
+	msg = (struct amod_message *)test_fifo_msg->data[test_fifo_msg->tail];
+
+	test_fifo_msg->data[test_fifo_msg->tail] = NULL;
+	test_fifo_msg->tail = (test_fifo_msg->tail + 1) % test_fifo_msg->size;
+
+	*data = msg;
+	*size = sizeof(struct amod_message);
+
+	test_fifo_msg->locked--;
+
+	if (timeout != K_FOREVER) {
+		k_sleep(timeout);
+	}
 
 	return 0;
 }
 
-int fake_data_fifo_pointer_last_filled_get_no_wait_fails(struct data_fifo *data_fifo, void **data,
-							 size_t *size, k_timeout_t timeout)
+int fake_data_fifo_pointer_last_filled_get__no_wait_fails(struct data_fifo *data_fifo, void **data,
+							  size_t *size, k_timeout_t timeout)
 {
 	ARG_UNUSED(data_fifo);
 	ARG_UNUSED(data);
@@ -167,30 +208,36 @@ int fake_data_fifo_pointer_last_filled_get__timeout_fails(struct data_fifo *data
 	ARG_UNUSED(data);
 	ARG_UNUSED(size);
 
-	/* Sleep for timeout */
-	k_sleep(timeout);
-
 	return -EAGAIN;
 }
 
 void fake_data_fifo_block_free__succeeds(struct data_fifo *data_fifo, void **data)
 {
-	ARG_UNUSED(data_fifo);
 	ARG_UNUSED(data);
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
 
-	msg->slab_blocks_read_pos -= 1;
-	msg->slab_blocks_free_pos -= 1;
+	struct test_slab_queue *test_fifo_slab_data =
+		(struct test_slab_queue *)data_fifo->slab_buffer;
+
+	if (test_fifo_slab_data->tail == test_fifo_slab_data->head) {
+		return;
+	}
+
+	test_fifo_slab_data->data[test_fifo_slab_data->tail] = NULL;
+	test_fifo_slab_data->tail = (test_fifo_slab_data->tail + 1) % test_fifo_slab_data->size;
+
+	if (test_fifo_slab_data->tail == test_fifo_slab_data->head) {
+		return;
+	}
 }
 
 int fake_data_fifo_num_used_get__succeeds(struct data_fifo *data_fifo, uint32_t *alloced_num,
 					  uint32_t *locked_num)
 {
-	ARG_UNUSED(data_fifo);
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	struct test_msg_fifo_queue *test_fifo_msg =
+		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
-	*alloced_num = msg->msgq_free_pos;
-	*locked_num = msg->slab_blocks_free_pos;
+	*alloced_num = test_fifo_msg->head - test_fifo_msg->tail;
+	*locked_num = test_fifo_msg->locked;
 
 	return 0;
 }
@@ -207,12 +254,19 @@ int fake_data_fifo_num_used_get__fails(struct data_fifo *data_fifo, uint32_t *al
 
 int fake_data_fifo_empty__succeeds(struct data_fifo *data_fifo)
 {
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	struct test_msg_fifo_queue *test_fifo_msg =
+		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
+	struct test_slab_queue *test_fifo_slab_data =
+		(struct test_slab_queue *)data_fifo->slab_buffer;
 
-	msg->msgq_free_pos = 0;
-	msg->msgq_read_pos = 0;
-	msg->slab_blocks_free_pos = 0;
-	msg->slab_blocks_read_pos = 0;
+	test_fifo_msg->head = 0;
+	test_fifo_msg->tail = 0;
+	test_fifo_msg->size = FAKE_FIFO_MSG_QUEUE_SIZE;
+	test_fifo_msg->locked = 0;
+
+	test_fifo_slab_data->head = 0;
+	test_fifo_slab_data->tail = 0;
+	test_fifo_slab_data->size = FAKE_FIFO_MSG_QUEUE_SIZE;
 
 	return 0;
 }
@@ -247,19 +301,36 @@ int fake_data_fifo_empty__timeout_fails(struct data_fifo *data_fifo)
 
 int fake_data_fifo_init__succeeds(struct data_fifo *data_fifo)
 {
-	struct test_data_fifo_buffer *msg = (struct test_data_fifo_buffer *)data_fifo;
+	struct test_msg_fifo_queue *test_fifo_msg = &test_fifo_msg_queue[fifo_num];
+	struct test_slab_queue *test_fifo_slab_data = &test_fifo_slab[fifo_num];
 
-	data_fifo->msgq_buffer = (char *)&test_fifo_data_queue[fifo_num];
-	data_fifo->slab_buffer = (char *)&test_fifo_data_slab[fifo_num];
+	data_fifo->msgq_buffer = (char *)test_fifo_msg;
+	data_fifo->slab_buffer = (char *)test_fifo_slab_data;
 	data_fifo->elements_max = FAKE_FIFO_MSG_QUEUE_SIZE;
-	data_fifo->block_size_max = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
+	data_fifo->block_size_max = TEST_MOD_DATA_SIZE;
 	data_fifo->initialized = true;
 
 	fifo_num += 1;
-	msg->msgq_read_pos = 0;
-	msg->msgq_free_pos = 0;
-	msg->slab_blocks_read_pos = 0;
-	msg->slab_blocks_free_pos = 0;
+
+	test_fifo_msg->head = 0;
+	test_fifo_msg->tail = 0;
+	test_fifo_msg->size = FAKE_FIFO_MSG_QUEUE_SIZE;
+	test_fifo_msg->locked = 0;
+
+	test_fifo_slab_data->head = 0;
+	test_fifo_slab_data->tail = 0;
+	test_fifo_slab_data->size = FAKE_FIFO_MSG_QUEUE_SIZE;
+
+	for (int i = 0; i < FAKE_FIFO_MSG_QUEUE_SIZE - 1; i++) {
+		if (((test_fifo_slab_data->head + 1) % test_fifo_slab_data->size) ==
+		    test_fifo_slab_data->tail) {
+			return -1;
+		}
+		test_fifo_slab_data->data[test_fifo_slab_data->head] =
+			(void **)&test_fifo_slab_data->msg[i];
+		test_fifo_slab_data->head =
+			(test_fifo_slab_data->head + 1) % test_fifo_slab_data->size;
+	}
 
 	return 0;
 }

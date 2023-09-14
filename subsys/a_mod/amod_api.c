@@ -15,7 +15,7 @@
 #include "data_fifo.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(module_api, 4); /* CONFIG_MODULE_API_LOG_LEVEL);*/
+LOG_MODULE_REGISTER(module_api, CONFIG_MODULE_API_LOG_LEVEL);
 
 /**
  * @brief Helper function to validate the module description.
@@ -49,7 +49,7 @@ static int validate_parameters(struct amod_parameters *parameters)
 }
 
 /**
- * @brief General callback for releasing the audio block when intermodule block
+ * @brief General callback for releasing the audio block when inter-module block
  *        passing.
  *
  * @param handle  The handle of the sending modules instance
@@ -555,7 +555,7 @@ int amod_close(struct amod_handle *handle)
 
 	/*
 	 * How to return all the data to the slab items?
-	 * Test the semephore and wait for it to be zero.
+	 * Test the semaphore and wait for it to be zero.
 	 */
 
 	k_thread_abort(handle->thread_id);
@@ -886,10 +886,12 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
 			handle->name);
 		ret = -EINVAL;
 	} else {
+
 		uint8_t *data_out = block->data;
 
 		memcpy(block, &msg_tx->block, sizeof(struct ablk_block));
-		memcpy((uint8_t *)data_out, (uint8_t *)msg_tx->block.data, msg_tx->block.data_size);
+		memcpy((uint8_t *)data_out, (uint8_t *)msg_tx->block.data,
+		       msg_tx->block.data_valid_size);
 	}
 
 	block_release_cb((struct amod_handle_private *)handle, &msg_tx->block);
@@ -955,9 +957,9 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 		return ret;
 	}
 
-	LOG_DBG("Wait for message on module %s TX queue", handle_tx->name);
+	LOG_DBG("Wait for message on module %s TX queue", handle_rx->name);
 
-	ret = data_fifo_pointer_last_filled_get(handle_rx->thread.msg_tx, (void **)&msg_rx,
+	ret = data_fifo_pointer_last_filled_get(handle_rx->thread.msg_rx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
 		LOG_DBG("Failed to retrieve data from module %s, ret %d", handle_rx->name, ret);
@@ -979,7 +981,9 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 		       msg_rx->block.data_valid_size);
 	}
 
-	block_release_cb((struct amod_handle_private *)handle_rx, &msg_rx->block);
+	if (handle_tx != handle_rx) {
+		block_release_cb((struct amod_handle_private *)handle_rx, &msg_rx->block);
+	}
 
 	data_fifo_block_free(handle_rx->thread.msg_rx, (void **)&msg_rx);
 

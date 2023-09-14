@@ -207,7 +207,7 @@ struct amod_thread_configuration {
 	/* A pointer to a module's data transmitter FIFO, can be NULL */
 	struct data_fifo *msg_tx;
 
-	/* A pointer to the data buffer sla, can be NULL */
+	/* A pointer to the data buffer slab, can be NULL */
 	struct k_mem_slab *data_slab;
 
 	/* Size of each memory block in bytes that will be

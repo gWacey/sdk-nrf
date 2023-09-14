@@ -9,12 +9,13 @@
 
 #include "amod_api.h"
 
-#define FAKE_FIFO_MSG_QUEUE_SIZE      (4)
+#define FAKE_FIFO_QUEUE_SIZE	      (4)
+#define FAKE_FIFO_MSG_QUEUE_SIZE      (FAKE_FIFO_QUEUE_SIZE + 1)
 #define FAKE_FIFO_MSG_QUEUE_DATA_SIZE (sizeof(struct amod_message))
 #define FAKE_FIFO_NUM		      (2)
 
 #define TEST_MOD_THREAD_STACK_SIZE (1024)
-#define TEST_MOD_THREAD_PRIORITY   (10)
+#define TEST_MOD_THREAD_PRIORITY   (4)
 #define TEST_CONNECTIONS_NUM	   (5)
 #define TEST_MODULES_NUM	   (TEST_CONNECTIONS_NUM - 1)
 #define TEST_MOD_DATA_SIZE	   (40)
