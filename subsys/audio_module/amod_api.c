@@ -15,7 +15,7 @@
 #include "data_fifo.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(module_api, CONFIG_MODULE_API_LOG_LEVEL);
+LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
 
 /**
  * @brief Helper function to validate the module description.
@@ -446,11 +446,11 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	/* Allocate the context memory */
 	handle->context = context;
 
-	memcpy(handle->name, name, CONFIG_AMOD_NAME_SIZE - 1);
-	if (strlen(name) > CONFIG_AMOD_NAME_SIZE - 1) {
+	memcpy(handle->name, name, CONFIG_AUDIO_MODULE_NAME_SIZE - 1);
+	if (strlen(name) > CONFIG_AUDIO_MODULE_NAME_SIZE - 1) {
 		LOG_INF("Module's instance name truncated to %s", handle->name);
 	}
-	handle->name[CONFIG_AMOD_NAME_SIZE - 1] = '\0';
+	handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE - 1] = '\0';
 
 	handle->description = parameters->description;
 	memcpy(&handle->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
@@ -1009,7 +1009,7 @@ int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_
 	}
 
 	*base_name = handle->description->name;
-	memcpy(instance_name, &handle->name, CONFIG_AMOD_NAME_SIZE);
+	memcpy(instance_name, &handle->name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 
 	return 0;
 }

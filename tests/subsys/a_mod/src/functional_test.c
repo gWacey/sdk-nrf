@@ -81,7 +81,7 @@ static void test_initialise_handle(struct amod_handle *handle, struct amod_descr
 				   struct mod_context *context, struct mod_config *configuration)
 {
 	memset(handle, 0, sizeof(struct amod_handle));
-	memcpy(&handle->name[0], test_instance_name, CONFIG_AMOD_NAME_SIZE);
+	memcpy(&handle->name[0], test_instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle->description = description;
 	handle->state = AMOD_STATE_CONFIGURED;
 	handle->previous_state = AMOD_STATE_UNDEFINED;
@@ -388,21 +388,21 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	struct amod_description mod_description = {0};
 	struct amod_handle handle = {0};
 	char *base_name;
-	char instance_name[CONFIG_AMOD_NAME_SIZE] = {0};
+	char instance_name[CONFIG_AUDIO_MODULE_NAME_SIZE] = {0};
 	char *test_base_name_empty = "";
 	char *test_base_name = "Test base name";
 	char *test_base_name_long =
-		"Test base name that is longer than the size of CONFIG_AMOD_NAME_SIZE";
+		"Test base name that is longer than the size of CONFIG_AUDIO_MODULE_NAME_SIZE";
 
 	handle.state = AMOD_STATE_CONFIGURED;
 	mod_description.name = test_base_name_empty;
 	handle.description = &mod_description;
-	memset(&handle.name[0], 0, CONFIG_AMOD_NAME_SIZE);
+	memset(&handle.name[0], 0, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	ret = amod_names_get(&handle, &base_name, &instance_name[0]);
 	zassert_equal(ret, 0, "Get names function did not return successfully (0): ret %d", ret);
 	zassert_equal_ptr(base_name, handle.description->name, "Failed to get the base name: %s",
 			  handle.description->name);
-	zassert_mem_equal(instance_name, handle.name, CONFIG_AMOD_NAME_SIZE,
+	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name: %s", instance_name);
 
 	handle.state = AMOD_STATE_CONFIGURED;
@@ -414,7 +414,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_equal_ptr(base_name, handle.description->name,
 			  "Failed to get the base name in configured state: %s",
 			  handle.description->name);
-	zassert_mem_equal(instance_name, handle.name, CONFIG_AMOD_NAME_SIZE,
+	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in configured state: %s", instance_name);
 
 	handle.state = AMOD_STATE_RUNNING;
@@ -426,7 +426,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_equal_ptr(base_name, handle.description->name,
 			  "Failed to correctly get the base name in running state: %s",
 			  handle.description->name);
-	zassert_mem_equal(instance_name, handle.name, CONFIG_AMOD_NAME_SIZE,
+	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in running state: %s", instance_name);
 
 	handle.state = AMOD_STATE_STOPPED;
@@ -438,7 +438,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_equal_ptr(base_name, handle.description->name,
 			  "Failed to correctly get the base name in stopped state: %s",
 			  handle.description->name);
-	zassert_mem_equal(instance_name, handle.name, CONFIG_AMOD_NAME_SIZE,
+	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in stopped state: %s", instance_name);
 
 	handle.state = AMOD_STATE_CONFIGURED;
@@ -450,7 +450,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_equal_ptr(base_name, handle.description->name,
 			  "Failed to get the base name in configured state: %s",
 			  handle.description->name);
-	zassert_mem_equal(instance_name, handle.name, CONFIG_AMOD_NAME_SIZE,
+	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in configured state: %s", instance_name);
 }
 
@@ -1104,7 +1104,8 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 
 	for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 		test_initialise_handle(&handles_to[k], &test_to_description, NULL, NULL);
-		snprintf(handles_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d", test_inst_to_name, k);
+		snprintf(handles_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
+			 test_inst_to_name, k);
 	}
 
 	test_from_description.type = AMOD_TYPE_INPUT;
@@ -1112,7 +1113,8 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1145,7 +1147,8 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1178,7 +1181,8 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1221,7 +1225,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 	test_from_description.type = AMOD_TYPE_PROCESS;
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 		handle_from.state = i;
 		sys_slist_init(&handle_from.hdl_dest_list);
 		k_mutex_init(&handle_from.dest_mutex);
@@ -1269,7 +1273,8 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1277,7 +1282,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
@@ -1301,7 +1306,8 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1309,7 +1315,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
@@ -1333,7 +1339,8 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+			memcpy(&handle_from.name, test_inst_from_name,
+			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
@@ -1341,7 +1348,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 			for (k = 0; k < TEST_CONNECTIONS_NUM - 1; k++) {
 				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
 						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AMOD_NAME_SIZE, "%s %d",
+				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
@@ -1371,7 +1378,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	test_from_description.type = AMOD_TYPE_PROCESS;
 	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
 		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AMOD_NAME_SIZE);
+		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 		handle_from.state = i;
 		sys_slist_init(&handle_from.hdl_dest_list);
 		k_mutex_init(&handle_from.dest_mutex);

@@ -72,7 +72,7 @@ ZTEST(suite_a_mod_bad_param, test_names_get_null)
 	int ret;
 	struct amod_handle handle = {0};
 	char *base_name;
-	char instance_name[CONFIG_AMOD_NAME_SIZE];
+	char instance_name[CONFIG_AUDIO_MODULE_NAME_SIZE];
 
 	ret = amod_names_get(NULL, &base_name, &instance_name[0]);
 	zassert_equal(ret, -EINVAL, "Get names function did not return -EINVAL (%d): ret %d",
@@ -783,10 +783,10 @@ ZTEST(suite_a_mod_bad_param, test_connect_null)
 	struct amod_handle handle_tx = {0};
 	struct amod_handle handle_rx = {0};
 
-	memcpy(&handle_tx.name, test_inst_name_1, CONFIG_AMOD_NAME_SIZE);
+	memcpy(&handle_tx.name, test_inst_name_1, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle_tx.state = AMOD_STATE_CONFIGURED;
 	handle_tx.description = &test_description;
-	memcpy(&handle_rx.name, test_inst_name_2, CONFIG_AMOD_NAME_SIZE);
+	memcpy(&handle_rx.name, test_inst_name_2, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle_rx.state = AMOD_STATE_CONFIGURED;
 	handle_rx.description = &test_description;
 

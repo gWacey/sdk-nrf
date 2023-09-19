@@ -57,6 +57,4 @@ rsource "dm/Kconfig"
 
 rsource "nrf_security/Kconfig"
 
-rsource "audio/a_mod/lc3_t2/decoder/Kconfig"
-
-rsource "a_mod/Kconfig"
+rsource "audio_module/Kconfig"

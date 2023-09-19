@@ -232,7 +232,7 @@ struct amod_parameters {
  */
 struct amod_handle {
 	/* The unique name of this module instance */
-	char name[CONFIG_AMOD_NAME_SIZE];
+	char name[CONFIG_AUDIO_MODULE_NAME_SIZE];
 
 	/* The module's description */
 	struct amod_description *description;

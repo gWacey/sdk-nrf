@@ -80,9 +80,7 @@ int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fif
 	*data = &test_fifo_slab_data->msg[test_fifo_slab_data->tail % test_fifo_slab_data->size];
 	test_fifo_slab_data->tail++;
 
-	if (timeout != K_FOREVER) {
-		k_sleep(timeout);
-	}
+	k_sleep(timeout);
 
 	return 0;
 }
@@ -183,9 +181,7 @@ int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo
 
 	test_fifo_msg->locked--;
 
-	if (timeout != K_FOREVER) {
-		k_sleep(timeout);
-	}
+	k_sleep(timeout);
 
 	return 0;
 }

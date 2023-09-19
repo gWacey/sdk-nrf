@@ -13,4 +13,4 @@ target_sources(app PRIVATE src/main.c src/fakes.c src/bad_param_test.c src/funct
 
 target_include_directories(app PRIVATE ${ZEPHYR_NRF_MODULE_DIR}/include)
 
-zephyr_library_include_directories( ${ZEPHYR_NRF_MODULE_DIR}/subsys/a_mod)
+zephyr_library_include_directories( ${ZEPHYR_NRF_MODULE_DIR}/subsys/audio_module)
