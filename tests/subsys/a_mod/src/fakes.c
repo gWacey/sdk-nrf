@@ -21,7 +21,7 @@ struct test_slab_queue {
 	size_t locked;
 
 	void **data[FAKE_FIFO_MSG_QUEUE_SIZE];
-	struct amod_message msg[FAKE_FIFO_MSG_QUEUE_SIZE];
+	struct audio_module_message msg[FAKE_FIFO_MSG_QUEUE_SIZE];
 };
 
 struct test_msg_fifo_queue {
@@ -163,7 +163,7 @@ int fake_data_fifo_block_lock__put_fails(struct data_fifo *data_fifo, void **dat
 int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo, void **data,
 						     size_t *size, k_timeout_t timeout)
 {
-	struct amod_message *msg;
+	struct audio_module_message *msg;
 	struct test_msg_fifo_queue *test_fifo_msg =
 		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
@@ -171,13 +171,13 @@ int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo
 		return -1;
 	}
 
-	msg = (struct amod_message *)test_fifo_msg->data[test_fifo_msg->tail];
+	msg = (struct audio_module_message *)test_fifo_msg->data[test_fifo_msg->tail];
 
 	test_fifo_msg->data[test_fifo_msg->tail] = NULL;
 	test_fifo_msg->tail = (test_fifo_msg->tail + 1) % test_fifo_msg->size;
 
 	*data = msg;
-	*size = sizeof(struct amod_message);
+	*size = sizeof(struct audio_module_message);
 
 	test_fifo_msg->locked--;
 

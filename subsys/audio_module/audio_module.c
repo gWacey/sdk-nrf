@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include "amod_api.h"
+#include "audio_module.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
  *
  * @return 0 if successful, error value
  */
-static int validate_parameters(struct amod_parameters *parameters)
+static int validate_parameters(struct audio_module_parameters *parameters)
 {
 	if (parameters == NULL) {
 		LOG_DBG("No description for module");
@@ -55,9 +55,9 @@ static int validate_parameters(struct amod_parameters *parameters)
  * @param handle  The handle of the sending modules instance
  * @param block   Pointer to the audio data block to send to the module
  */
-static void block_release_cb(struct amod_handle_private *handle, struct ablk_block *block)
+static void block_release_cb(struct audio_module_handle_private *handle, struct ablk_block *block)
 {
-	struct amod_handle *hdl = (struct amod_handle *)handle;
+	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 
 	k_sem_take(&hdl->sem, K_NO_WAIT);
 
@@ -78,11 +78,11 @@ static void block_release_cb(struct amod_handle_private *handle, struct ablk_blo
  *
  * @return 0 if successful, error value
  */
-static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
-		   struct ablk_block *block, amod_response_cb data_in_response_cb)
+static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_handle *rx_handle,
+		   struct ablk_block *block, audio_module_response_cb data_in_response_cb)
 {
 	int ret;
-	struct amod_message *data_msg_rx;
+	struct audio_module_message *data_msg_rx;
 
 	if (rx_handle->state == AMOD_STATE_RUNNING) {
 		ret = data_fifo_pointer_first_vacant_get(rx_handle->thread.msg_rx,
@@ -98,7 +98,7 @@ static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
 		data_msg_rx->response_cb = data_in_response_cb;
 
 		ret = data_fifo_block_lock(rx_handle->thread.msg_rx, (void **)&data_msg_rx,
-					   sizeof(struct amod_message));
+					   sizeof(struct audio_module_message));
 		if (ret) {
 			data_fifo_block_free(rx_handle->thread.msg_rx, (void **)&data_msg_rx);
 
@@ -125,10 +125,10 @@ static int data_tx(struct amod_handle *tx_handle, struct amod_handle *rx_handle,
  *
  * @return 0 if successful, error value
  */
-static int send_to_tx_fifo(struct amod_handle *handle, struct ablk_block *block)
+static int send_to_tx_fifo(struct audio_module_handle *handle, struct ablk_block *block)
 {
 	int ret;
-	struct amod_message *data_msg_tx;
+	struct audio_module_message *data_msg_tx;
 
 	/* Take a TX message */
 	ret = data_fifo_pointer_first_vacant_get(handle->thread.msg_tx, (void **)&data_msg_tx,
@@ -145,7 +145,7 @@ static int send_to_tx_fifo(struct amod_handle *handle, struct ablk_block *block)
 
 	/* Send audio block to modules output message queue */
 	ret = data_fifo_block_lock(handle->thread.msg_tx, (void **)&data_msg_tx,
-				   sizeof(struct amod_message));
+				   sizeof(struct audio_module_message));
 	if (ret) {
 		LOG_DBG("Failed to send block to output of module %s, ret %d", handle->name, ret);
 
@@ -167,10 +167,10 @@ static int send_to_tx_fifo(struct amod_handle *handle, struct ablk_block *block)
  *
  * @return 0 if successful, error value
  */
-static int send_to_connected(struct amod_handle *handle, struct ablk_block *block)
+static int send_to_connected(struct audio_module_handle *handle, struct ablk_block *block)
 {
 	int ret;
-	struct amod_handle *handle_to;
+	struct audio_module_handle *handle_to;
 
 	if (handle->dest_count == 0) {
 		LOG_DBG("No where to send the data from module %s so releasing it", handle->name);
@@ -213,7 +213,7 @@ static int send_to_connected(struct amod_handle *handle, struct ablk_block *bloc
  *
  * @return 0 if successful, error value
  */
-static int module_thread_input(struct amod_handle *handle, void *p2, void *p3)
+static int module_thread_input(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
 	struct ablk_block block;
@@ -242,7 +242,7 @@ static int module_thread_input(struct amod_handle *handle, void *p2, void *p3)
 
 			/* Process the input audio block */
 			ret = handle->description->functions->data_process(
-				(struct amod_handle_private *)handle, NULL, &block);
+				(struct audio_module_handle_private *)handle, NULL, &block);
 			if (ret) {
 				k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
 
@@ -268,11 +268,11 @@ static int module_thread_input(struct amod_handle *handle, void *p2, void *p3)
  *
  * @return 0 if successful, error value
  */
-static int module_thread_output(struct amod_handle *handle, void *p2, void *p3)
+static int module_thread_output(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
 
-	struct amod_message *msg_rx;
+	struct audio_module_message *msg_rx;
 	size_t size;
 
 	if (handle == NULL) {
@@ -294,12 +294,12 @@ static int module_thread_output(struct amod_handle *handle, void *p2, void *p3)
 		if (handle->description->functions->data_process != NULL) {
 			/* Process the input audio block and output from the audio system */
 			ret = handle->description->functions->data_process(
-				(struct amod_handle_private *)handle, &msg_rx->block, NULL);
+				(struct audio_module_handle_private *)handle, &msg_rx->block, NULL);
 			if (ret) {
 				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb(
-						(struct amod_handle_private *)msg_rx->tx_handle,
-						&msg_rx->block);
+					msg_rx->response_cb((struct audio_module_handle_private *)
+								    msg_rx->tx_handle,
+							    &msg_rx->block);
 				}
 
 				LOG_DBG("Data process error in module %s, ret %d", handle->name,
@@ -308,8 +308,9 @@ static int module_thread_output(struct amod_handle *handle, void *p2, void *p3)
 			}
 
 			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb((struct amod_handle_private *)msg_rx->tx_handle,
-						    &msg_rx->block);
+				msg_rx->response_cb(
+					(struct audio_module_handle_private *)msg_rx->tx_handle,
+					&msg_rx->block);
 			}
 		} else {
 			LOG_DBG("No process function for module %s, discarding input",
@@ -332,8 +333,8 @@ static int module_thread_output(struct amod_handle *handle, void *p2, void *p3)
 static void module_thread_in_out(void *p1, void *p2, void *p3)
 {
 	int ret;
-	struct amod_handle *handle = (struct amod_handle *)p1;
-	struct amod_message *msg_rx;
+	struct audio_module_handle *handle = (struct audio_module_handle *)p1;
+	struct audio_module_message *msg_rx;
 	struct ablk_block block;
 	void *data;
 	size_t size;
@@ -360,9 +361,9 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 			ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
 			if (ret) {
 				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb(
-						(struct amod_handle_private *)(msg_rx->tx_handle),
-						&msg_rx->block);
+					msg_rx->response_cb((struct audio_module_handle_private
+								     *)(msg_rx->tx_handle),
+							    &msg_rx->block);
 				}
 
 				data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
@@ -379,12 +380,13 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 
 			/* Process the input audio block into the output audio block */
 			ret = handle->description->functions->data_process(
-				(struct amod_handle_private *)handle, &msg_rx->block, &block);
+				(struct audio_module_handle_private *)handle, &msg_rx->block,
+				&block);
 			if (ret) {
 				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb(
-						(struct amod_handle_private *)(msg_rx->tx_handle),
-						&msg_rx->block);
+					msg_rx->response_cb((struct audio_module_handle_private
+								     *)(msg_rx->tx_handle),
+							    &msg_rx->block);
 				}
 
 				data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
@@ -400,8 +402,9 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 			send_to_connected(handle, &block);
 
 			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb((struct amod_handle_private *)msg_rx->tx_handle,
-						    &msg_rx->block);
+				msg_rx->response_cb(
+					(struct audio_module_handle_private *)msg_rx->tx_handle,
+					&msg_rx->block);
 			}
 		} else {
 			LOG_DBG("No process function for module %s, discarding input",
@@ -415,8 +418,9 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 /**
  * @brief  Function for opening a module.
  */
-int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      char *name, struct amod_context *context, struct amod_handle *handle)
+int audio_module_open(struct audio_module_parameters *parameters,
+		      struct audio_module_configuration *configuration, char *name,
+		      struct audio_module_context *context, struct audio_module_handle *handle)
 {
 	int ret;
 	k_thread_entry_t thread_entry;
@@ -438,7 +442,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		return ret;
 	}
 
-	memset(handle, 0, sizeof(struct amod_handle));
+	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	handle->description->type = parameters->description->type;
 	handle->previous_state = AMOD_STATE_UNDEFINED;
@@ -453,11 +457,12 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 	handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE - 1] = '\0';
 
 	handle->description = parameters->description;
-	memcpy(&handle->thread, &parameters->thread, sizeof(struct amod_thread_configuration));
+	memcpy(&handle->thread, &parameters->thread,
+	       sizeof(struct audio_module_thread_configuration));
 
 	if (handle->description->functions->open != NULL) {
-		ret = handle->description->functions->open((struct amod_handle_private *)handle,
-							   configuration);
+		ret = handle->description->functions->open(
+			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
 			return ret;
@@ -466,7 +471,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 
 	if (handle->description->functions->configuration_set != NULL) {
 		ret = handle->description->functions->configuration_set(
-			(struct amod_handle_private *)handle, configuration);
+			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
 				ret);
@@ -506,7 +511,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 		LOG_DBG("Failed to start thread for module %s thread, ret %d", handle->name, ret);
 
 		/* Clean up the handle */
-		memset(handle, 0, sizeof(struct amod_handle));
+		memset(handle, 0, sizeof(struct audio_module_handle));
 		return ret;
 	}
 
@@ -522,7 +527,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
 /**
  * @brief  Function to close an open module.
  */
-int amod_close(struct amod_handle *handle)
+int audio_module_close(struct audio_module_handle *handle)
 {
 	int ret;
 
@@ -538,7 +543,8 @@ int amod_close(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->close != NULL) {
-		ret = handle->description->functions->close((struct amod_handle_private *)handle);
+		ret = handle->description->functions->close(
+			(struct audio_module_handle_private *)handle);
 		if (ret) {
 			LOG_DBG("Failed close call to module %s, returned %d", handle->name, ret);
 			return ret;
@@ -563,7 +569,7 @@ int amod_close(struct amod_handle *handle)
 	LOG_DBG("Closed module %s", handle->name);
 
 	/* Clean up the handle */
-	memset(handle, 0, sizeof(struct amod_handle));
+	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	return 0;
 };
@@ -571,7 +577,8 @@ int amod_close(struct amod_handle *handle)
 /**
  * @brief  Function to reconfigure a module.
  */
-int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *configuration)
+int audio_module_reconfigure(struct audio_module_handle *handle,
+			     struct audio_module_configuration *configuration)
 {
 	int ret;
 
@@ -588,7 +595,7 @@ int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *conf
 
 	if (handle->description->functions->configuration_set != NULL) {
 		ret = handle->description->functions->configuration_set(
-			(struct amod_handle_private *)handle, configuration);
+			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
 				ret);
@@ -611,7 +618,8 @@ int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *conf
 /**
  * @brief  Function to get the configuration of a module.
  */
-int amod_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration)
+int audio_module_configuration_get(struct audio_module_handle *handle,
+				   struct audio_module_configuration *configuration)
 {
 	int ret;
 
@@ -628,7 +636,7 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
 
 	if (handle->description->functions->configuration_get != NULL) {
 		ret = handle->description->functions->configuration_get(
-			(struct amod_handle_private *)handle, configuration);
+			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
 			LOG_DBG("Get configuration for module %s failed, ret %d", handle->name,
 				ret);
@@ -646,9 +654,10 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
  * @brief Function to connect two modules together.
  *
  */
-int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
+int audio_module_connect(struct audio_module_handle *handle_from,
+			 struct audio_module_handle *handle_to)
 {
-	struct amod_handle *handle;
+	struct audio_module_handle *handle;
 
 	if (handle_from == NULL || handle_to == NULL) {
 		LOG_DBG("Invalid parameter for the connection function");
@@ -702,7 +711,8 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
  * @brief Function to disconnect modules from each other.
  *
  */
-int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disconnect)
+int audio_module_disconnect(struct audio_module_handle *handle,
+			    struct audio_module_handle *handle_disconnect)
 {
 	if (handle == NULL || handle_disconnect == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -749,7 +759,7 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
 /**
  * @brief Start processing data in the module given by handle.
  */
-int amod_start(struct amod_handle *handle)
+int audio_module_start(struct audio_module_handle *handle)
 {
 	int ret;
 
@@ -770,7 +780,8 @@ int amod_start(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->start != NULL) {
-		ret = handle->description->functions->start((struct amod_handle_private *)handle);
+		ret = handle->description->functions->start(
+			(struct audio_module_handle_private *)handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user start for module %s, ret %d", handle->name, ret);
 			return ret;
@@ -786,7 +797,7 @@ int amod_start(struct amod_handle *handle)
 /**
  * @brief Stop processing data in the module given by handle.
  */
-int amod_stop(struct amod_handle *handle)
+int audio_module_stop(struct audio_module_handle *handle)
 {
 	int ret;
 
@@ -806,7 +817,8 @@ int amod_stop(struct amod_handle *handle)
 	}
 
 	if (handle->description->functions->stop != NULL) {
-		ret = handle->description->functions->stop((struct amod_handle_private *)handle);
+		ret = handle->description->functions->stop(
+			(struct audio_module_handle_private *)handle);
 		if (ret < 0) {
 			LOG_DBG("Failed user pause for module %s, ret %d", handle->name, ret);
 			return ret;
@@ -822,7 +834,8 @@ int amod_stop(struct amod_handle *handle)
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.
  */
-int amod_data_tx(struct amod_handle *handle, struct ablk_block *block, amod_response_cb response_cb)
+int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *block,
+			 audio_module_response_cb response_cb)
 {
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -849,11 +862,12 @@ int amod_data_tx(struct amod_handle *handle, struct ablk_block *block, amod_resp
  * @brief Retrieve data from the module.
  *
  */
-int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout_t timeout)
+int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *block,
+			 k_timeout_t timeout)
 {
 	int ret;
 
-	struct amod_message *msg_tx;
+	struct audio_module_message *msg_tx;
 	size_t msg_tx_size;
 
 	if (handle == NULL) {
@@ -894,7 +908,7 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
 		       msg_tx->block.data_valid_size);
 	}
 
-	block_release_cb((struct amod_handle_private *)handle, &msg_tx->block);
+	block_release_cb((struct audio_module_handle_private *)handle, &msg_tx->block);
 
 	data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
 
@@ -910,11 +924,12 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
  *       maybe released once the function returns.
  *
  */
-int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx,
-		    struct ablk_block *block_tx, struct ablk_block *block_rx, k_timeout_t timeout)
+int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
+			    struct audio_module_handle *handle_rx, struct ablk_block *block_tx,
+			    struct ablk_block *block_rx, k_timeout_t timeout)
 {
 	int ret;
-	struct amod_message *msg_rx;
+	struct audio_module_message *msg_rx;
 	size_t msg_rx_size;
 
 	if (handle_tx == NULL || handle_rx == NULL) {
@@ -982,7 +997,7 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
 	}
 
 	if (handle_tx != handle_rx) {
-		block_release_cb((struct amod_handle_private *)handle_rx, &msg_rx->block);
+		block_release_cb((struct audio_module_handle_private *)handle_rx, &msg_rx->block);
 	}
 
 	data_fifo_block_free(handle_rx->thread.msg_rx, (void **)&msg_rx);
@@ -995,7 +1010,8 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
  *        module handle.
  *
  */
-int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_name)
+int audio_module_names_get(struct audio_module_handle *handle, char **base_name,
+			   char *instance_name)
 {
 	if (handle == NULL || base_name == NULL || instance_name == NULL) {
 		LOG_DBG("Input parameter is NULL");
@@ -1018,7 +1034,7 @@ int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_
  * @brief Helper function to get the state of a given module handle.
  *
  */
-int amod_state_get(struct amod_handle *handle, enum amod_state *state)
+int audio_module_state_get(struct audio_module_handle *handle, enum audio_module_state *state)
 {
 	if (handle == NULL || state == NULL) {
 		LOG_DBG("Input parameter is NULL");
@@ -1039,7 +1055,7 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state)
  * @brief Calculate the number of channels from the channel map for the given module handle.
  *
  */
-int amod_number_channels_calculate(uint32_t channel_map, int8_t *number_channels)
+int audio_module_number_channels_calculate(uint32_t channel_map, int8_t *number_channels)
 {
 	if (number_channels == NULL) {
 		LOG_DBG("Invalid parameters");

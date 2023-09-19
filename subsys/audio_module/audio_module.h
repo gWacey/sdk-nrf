@@ -33,7 +33,7 @@
  * @brief Module type.
  *
  */
-enum amod_type {
+enum audio_module_type {
 	/* The module type is undefined */
 	AMOD_TYPE_UNDEFINED = 0,
 
@@ -59,7 +59,7 @@ enum amod_type {
 /**
  * @brief Module state.
  */
-enum amod_state {
+enum audio_module_state {
 	/* Module state undefined */
 	AMOD_STATE_UNDEFINED = 0,
 
@@ -76,17 +76,17 @@ enum amod_state {
 /**
  * @brief Module's private handle.
  */
-struct amod_handle_private;
+struct audio_module_handle_private;
 
 /**
  * @brief Private context for the module.
  */
-struct amod_context;
+struct audio_module_context;
 
 /**
  * @brief Module's private configuration.
  */
-struct amod_configuration;
+struct audio_module_configuration;
 
 /**
  * @brief Callback function for a response to a data_send as
@@ -95,12 +95,13 @@ struct amod_configuration;
  * @param handle[in/out]  The handle of the module that sent the data message
  * @param block[in]       The audio block to operate on
  */
-typedef void (*amod_response_cb)(struct amod_handle_private *handle, struct ablk_block *block);
+typedef void (*audio_module_response_cb)(struct audio_module_handle_private *handle,
+					 struct ablk_block *block);
 
 /**
  * @brief Private pointer to a module's functions.
  */
-struct amod_functions {
+struct audio_module_functions {
 	/**
 	 * @brief Function for opening a module.
 	 *
@@ -109,7 +110,8 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*open)(struct amod_handle_private *handle, struct amod_configuration *configuration);
+	int (*open)(struct audio_module_handle_private *handle,
+		    struct audio_module_configuration *configuration);
 
 	/**
 	 * @brief Function to close an open module.
@@ -118,7 +120,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*close)(struct amod_handle_private *handle);
+	int (*close)(struct audio_module_handle_private *handle);
 
 	/**
 	 * @brief Function to configure a module.
@@ -128,8 +130,8 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*configuration_set)(struct amod_handle_private *handle,
-				 struct amod_configuration *configuration);
+	int (*configuration_set)(struct audio_module_handle_private *handle,
+				 struct audio_module_configuration *configuration);
 
 	/**
 	 * @brief Function to get the configuration of a module.
@@ -139,8 +141,8 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*configuration_get)(struct amod_handle_private *handle,
-				 struct amod_configuration *configuration);
+	int (*configuration_get)(struct audio_module_handle_private *handle,
+				 struct audio_module_configuration *configuration);
 
 	/**
 	 * @brief Start a module.
@@ -149,7 +151,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*start)(struct amod_handle_private *handle);
+	int (*start)(struct audio_module_handle_private *handle);
 
 	/**
 	 * @brief Stop a module.
@@ -158,7 +160,7 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*stop)(struct amod_handle_private *handle);
+	int (*stop)(struct audio_module_handle_private *handle);
 
 	/**
 	 * @brief The core data processing function for the module. Can be either an
@@ -170,28 +172,28 @@ struct amod_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*data_process)(struct amod_handle_private *handle, struct ablk_block *block_rx,
+	int (*data_process)(struct audio_module_handle_private *handle, struct ablk_block *block_rx,
 			    struct ablk_block *block_tx);
 };
 
 /**
  * @brief A module's minimum description.
  */
-struct amod_description {
+struct audio_module_description {
 	/* The module base name */
 	char *name;
 
 	/* The module type */
-	enum amod_type type;
+	enum audio_module_type type;
 
 	/* A pointer to the functions in the module */
-	const struct amod_functions *functions;
+	const struct audio_module_functions *functions;
 };
 
 /**
  * @brief Module's thread configuration structure.
  */
-struct amod_thread_configuration {
+struct audio_module_thread_configuration {
 	/* Thread stack */
 	k_thread_stack_t *stack;
 
@@ -219,29 +221,29 @@ struct amod_thread_configuration {
 /**
  * @brief Module's generic set-up structure.
  */
-struct amod_parameters {
+struct audio_module_parameters {
 	/* The module's private description */
-	struct amod_description *description;
+	struct audio_module_description *description;
 
 	/* The module's thread setting */
-	struct amod_thread_configuration thread;
+	struct audio_module_thread_configuration thread;
 };
 
 /**
  * @brief Private module handle.
  */
-struct amod_handle {
+struct audio_module_handle {
 	/* The unique name of this module instance */
 	char name[CONFIG_AUDIO_MODULE_NAME_SIZE];
 
 	/* The module's description */
-	struct amod_description *description;
+	struct audio_module_description *description;
 
 	/* Current state of the module */
-	enum amod_state state;
+	enum audio_module_state state;
 
 	/* Previous state of the module */
-	enum amod_state previous_state;
+	enum audio_module_state previous_state;
 
 	/* Thread ID */
 	k_tid_t thread_id;
@@ -268,24 +270,24 @@ struct amod_handle {
 	struct k_mutex dest_mutex;
 
 	/* Module's thread configuration */
-	struct amod_thread_configuration thread;
+	struct audio_module_thread_configuration thread;
 
 	/* Private context for the module */
-	struct amod_context *context;
+	struct audio_module_context *context;
 };
 
 /**
  * @brief Private structure describing a data_in message into the module thread.
  */
-struct amod_message {
+struct audio_module_message {
 	/* Audio data block to input */
 	struct ablk_block block;
 
 	/* Sending module's handle */
-	struct amod_handle *tx_handle;
+	struct audio_module_handle *tx_handle;
 
 	/* Callback for when the data has been consumed */
-	amod_response_cb response_cb;
+	audio_module_response_cb response_cb;
 };
 
 /**
@@ -299,8 +301,9 @@ struct amod_message {
  *
  * @return 0 if successful, error otherwise
  */
-int amod_open(struct amod_parameters *parameters, struct amod_configuration *configuration,
-	      char *name, struct amod_context *context, struct amod_handle *handle);
+int audio_module_open(struct audio_module_parameters *parameters,
+		      struct audio_module_configuration *configuration, char *name,
+		      struct audio_module_context *context, struct audio_module_handle *handle);
 
 /**
  * @brief Function to close an open module.
@@ -309,7 +312,7 @@ int amod_open(struct amod_parameters *parameters, struct amod_configuration *con
  *
  * @return 0 if successful, error otherwise
  */
-int amod_close(struct amod_handle *handle);
+int audio_module_close(struct audio_module_handle *handle);
 
 /**
  * @brief Function to reconfigure a module.
@@ -319,7 +322,8 @@ int amod_close(struct amod_handle *handle);
  *
  * @return 0 if successful, error otherwise
  */
-int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *configuration);
+int audio_module_reconfigure(struct audio_module_handle *handle,
+			     struct audio_module_configuration *configuration);
 
 /**
  * @brief Function to get the configuration of a module.
@@ -329,7 +333,8 @@ int amod_reconfigure(struct amod_handle *handle, struct amod_configuration *conf
  *
  * @return 0 if successful, error otherwise
  */
-int amod_configuration_get(struct amod_handle *handle, struct amod_configuration *configuration);
+int audio_module_configuration_get(struct audio_module_handle *handle,
+				   struct audio_module_configuration *configuration);
 
 /**
  * @brief Function to connect two modules together.
@@ -340,7 +345,8 @@ int amod_configuration_get(struct amod_handle *handle, struct amod_configuration
  *
  * @return 0 if successful, error otherwise
  */
-int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to);
+int audio_module_connect(struct audio_module_handle *handle_from,
+			 struct audio_module_handle *handle_to);
 
 /**
  * @brief Function to disconnect modules from each other.
@@ -350,7 +356,8 @@ int amod_connect(struct amod_handle *handle_from, struct amod_handle *handle_to)
  *
  * @return 0 if successful, error otherwise
  */
-int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disconnect);
+int audio_module_disconnect(struct audio_module_handle *handle,
+			    struct audio_module_handle *handle_disconnect);
 
 /**
  * @brief Start processing data in the module given by handle.
@@ -359,7 +366,7 @@ int amod_disconnect(struct amod_handle *handle, struct amod_handle *handle_disco
  *
  * @return 0 if successful, error otherwise
  */
-int amod_start(struct amod_handle *handle);
+int audio_module_start(struct audio_module_handle *handle);
 
 /**
  * @brief Stop processing data in the module given by handle.
@@ -368,7 +375,7 @@ int amod_start(struct amod_handle *handle);
  *
  * @return 0 if successful, error otherwise
  */
-int amod_stop(struct amod_handle *handle);
+int audio_module_stop(struct audio_module_handle *handle);
 
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.
@@ -380,8 +387,8 @@ int amod_stop(struct amod_handle *handle);
  *
  * @return 0 if successful, error otherwise
  */
-int amod_data_tx(struct amod_handle *handle, struct ablk_block *block,
-		 amod_response_cb response_cb);
+int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *block,
+			 audio_module_response_cb response_cb);
 
 /**
  * @brief Retrieve data from the module.
@@ -394,7 +401,8 @@ int amod_data_tx(struct amod_handle *handle, struct ablk_block *block,
  *
  * @return 0 if successful, error otherwise
  */
-int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout_t timeout);
+int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *block,
+			 k_timeout_t timeout);
 
 /**
  * @brief Send an audio data block to a module and retrieve an audio data block from a module.
@@ -414,8 +422,9 @@ int amod_data_rx(struct amod_handle *handle, struct ablk_block *block, k_timeout
  *
  * @return 0 if successful, error otherwise
  */
-int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx,
-		    struct ablk_block *block_tx, struct ablk_block *block_rx, k_timeout_t timeout);
+int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
+			    struct audio_module_handle *handle_rx, struct ablk_block *block_tx,
+			    struct ablk_block *block_rx, k_timeout_t timeout);
 
 /**
  * @brief Helper function to get the base and instance names for a given
@@ -427,7 +436,8 @@ int amod_data_tx_rx(struct amod_handle *handle_tx, struct amod_handle *handle_rx
  *
  * @return 0 if successful, error otherwise
  */
-int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_name);
+int audio_module_names_get(struct audio_module_handle *handle, char **base_name,
+			   char *instance_name);
 
 /**
  * @brief Helper function to get the state of a given module handle.
@@ -437,7 +447,7 @@ int amod_names_get(struct amod_handle *handle, char **base_name, char *instance_
  *
  * @return 0 if successful, error otherwise
  */
-int amod_state_get(struct amod_handle *handle, enum amod_state *state);
+int audio_module_state_get(struct audio_module_handle *handle, enum audio_module_state *state);
 
 /**
  * @brief Helper function to calculate the number of channels from the channel map for the given
@@ -448,6 +458,6 @@ int amod_state_get(struct amod_handle *handle, enum amod_state *state);
  *
  * @return 0 if successful, error otherwise
  */
-int amod_number_channels_calculate(uint32_t channel_map, int8_t *number_channels);
+int audio_module_number_channels_calculate(uint32_t channel_map, int8_t *number_channels);
 
 #endif /*_AMOD_API_H_ */

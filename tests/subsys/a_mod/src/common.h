@@ -7,11 +7,11 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
-#include "amod_api.h"
+#include "audio_module.h"
 
 #define FAKE_FIFO_QUEUE_SIZE	      (4)
 #define FAKE_FIFO_MSG_QUEUE_SIZE      (FAKE_FIFO_QUEUE_SIZE + 1)
-#define FAKE_FIFO_MSG_QUEUE_DATA_SIZE (sizeof(struct amod_message))
+#define FAKE_FIFO_MSG_QUEUE_DATA_SIZE (sizeof(struct audio_module_message))
 #define FAKE_FIFO_NUM		      (2)
 
 #define TEST_MOD_THREAD_STACK_SIZE (1024)
