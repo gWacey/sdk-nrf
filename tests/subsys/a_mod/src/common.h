@@ -12,7 +12,7 @@
 #define FAKE_FIFO_QUEUE_SIZE	      (4)
 #define FAKE_FIFO_MSG_QUEUE_SIZE      (FAKE_FIFO_QUEUE_SIZE + 1)
 #define FAKE_FIFO_MSG_QUEUE_DATA_SIZE (sizeof(struct audio_module_message))
-#define FAKE_FIFO_NUM		      (2)
+#define FAKE_FIFO_NUM		      (4)
 
 #define TEST_MOD_THREAD_STACK_SIZE (1024)
 #define TEST_MOD_THREAD_PRIORITY   (4)

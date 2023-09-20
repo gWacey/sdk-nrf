@@ -55,7 +55,7 @@ static int validate_parameters(struct audio_module_parameters *parameters)
  * @param handle  The handle of the sending modules instance
  * @param block   Pointer to the audio data block to send to the module
  */
-static void block_release_cb(struct audio_module_handle_private *handle, struct ablk_block *block)
+static void block_release_cb(struct audio_module_handle_private *handle, struct audio_data *block)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 
@@ -79,7 +79,7 @@ static void block_release_cb(struct audio_module_handle_private *handle, struct 
  * @return 0 if successful, error value
  */
 static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_handle *rx_handle,
-		   struct ablk_block *block, audio_module_response_cb data_in_response_cb)
+		   struct audio_data *block, audio_module_response_cb data_in_response_cb)
 {
 	int ret;
 	struct audio_module_message *data_msg_rx;
@@ -93,7 +93,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 		}
 
 		/* fill data */
-		memcpy(&data_msg_rx->block, block, sizeof(struct ablk_block));
+		memcpy(&data_msg_rx->block, block, sizeof(struct audio_data));
 		data_msg_rx->tx_handle = tx_handle;
 		data_msg_rx->response_cb = data_in_response_cb;
 
@@ -125,7 +125,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
  *
  * @return 0 if successful, error value
  */
-static int send_to_tx_fifo(struct audio_module_handle *handle, struct ablk_block *block)
+static int send_to_tx_fifo(struct audio_module_handle *handle, struct audio_data *block)
 {
 	int ret;
 	struct audio_module_message *data_msg_tx;
@@ -139,7 +139,7 @@ static int send_to_tx_fifo(struct audio_module_handle *handle, struct ablk_block
 	}
 
 	/* Configure audio block */
-	memcpy(&data_msg_tx->block, block, sizeof(struct ablk_block));
+	memcpy(&data_msg_tx->block, block, sizeof(struct audio_data));
 	data_msg_tx->tx_handle = handle;
 	data_msg_tx->response_cb = block_release_cb;
 
@@ -167,7 +167,7 @@ static int send_to_tx_fifo(struct audio_module_handle *handle, struct ablk_block
  *
  * @return 0 if successful, error value
  */
-static int send_to_connected(struct audio_module_handle *handle, struct ablk_block *block)
+static int send_to_connected(struct audio_module_handle *handle, struct audio_data *block)
 {
 	int ret;
 	struct audio_module_handle *handle_to;
@@ -216,7 +216,7 @@ static int send_to_connected(struct audio_module_handle *handle, struct ablk_blo
 static int module_thread_input(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
-	struct ablk_block block;
+	struct audio_data block;
 	void *data;
 
 	if (handle == NULL) {
@@ -335,7 +335,7 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 	int ret;
 	struct audio_module_handle *handle = (struct audio_module_handle *)p1;
 	struct audio_module_message *msg_rx;
-	struct ablk_block block;
+	struct audio_data block;
 	void *data;
 	size_t size;
 
@@ -376,7 +376,6 @@ static void module_thread_in_out(void *p1, void *p2, void *p3)
 			/* Configure new audio block */
 			block.data = data;
 			block.data_size = handle->thread.data_size;
-			block.data_valid_size = 0;
 
 			/* Process the input audio block into the output audio block */
 			ret = handle->description->functions->data_process(
@@ -834,7 +833,7 @@ int audio_module_stop(struct audio_module_handle *handle)
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.
  */
-int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *block,
+int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data *block,
 			 audio_module_response_cb response_cb)
 {
 	if (handle == NULL) {
@@ -862,13 +861,13 @@ int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *
  * @brief Retrieve data from the module.
  *
  */
-int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *block,
+int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *block,
 			 k_timeout_t timeout)
 {
 	int ret;
 
-	struct audio_module_message *msg_tx;
-	size_t msg_tx_size;
+	struct audio_module_message *msg_rx;
+	size_t msg_rx_size;
 
 	if (handle == NULL) {
 		LOG_DBG("Module handle is NULL");
@@ -888,29 +887,26 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *
 		return -ECONNREFUSED;
 	}
 
-	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_tx,
-						&msg_tx_size, timeout);
+	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
+						&msg_rx_size, timeout);
 	if (ret) {
 		LOG_DBG("Failed to retrieve data from module %s, ret %d", handle->name, ret);
 		return ret;
 	}
 
-	if (msg_tx->block.data == NULL || msg_tx->block.data_size > block->data_size) {
+	if (msg_rx->block.data == NULL || msg_rx->block.data_size > block->data_size) {
 		LOG_DBG("Data output buffer NULL or too small for received buffer from module %s",
 			handle->name);
 		ret = -EINVAL;
 	} else {
-
-		uint8_t *data_out = block->data;
-
-		memcpy(block, &msg_tx->block, sizeof(struct ablk_block));
-		memcpy((uint8_t *)data_out, (uint8_t *)msg_tx->block.data,
-		       msg_tx->block.data_valid_size);
+		memcpy(&block->meta, &msg_rx->block.meta, sizeof(struct audio_metadata));
+		memcpy((uint8_t *)block->data, (uint8_t *)msg_rx->block.data,
+		       msg_rx->block.data_size);
 	}
 
-	block_release_cb((struct audio_module_handle_private *)handle, &msg_tx->block);
+	block_release_cb((struct audio_module_handle_private *)handle, &msg_rx->block);
 
-	data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
+	data_fifo_block_free(handle->thread.msg_rx, (void **)&msg_rx);
 
 	return ret;
 }
@@ -925,8 +921,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *
  *
  */
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
-			    struct audio_module_handle *handle_rx, struct ablk_block *block_tx,
-			    struct ablk_block *block_rx, k_timeout_t timeout)
+			    struct audio_module_handle *handle_rx, struct audio_data *block_tx,
+			    struct audio_data *block_rx, k_timeout_t timeout)
 {
 	int ret;
 	struct audio_module_message *msg_rx;
@@ -981,19 +977,14 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 		return ret;
 	}
 
-	LOG_DBG("Retrieved new message");
-
-	if (msg_rx->block.data == NULL || msg_rx->block.data_valid_size == 0) {
+	if (msg_rx->block.data == NULL || msg_rx->block.data_size == 0) {
 		LOG_DBG("Data output buffer too small for received buffer from module %s (%d)",
-			handle_rx->name, msg_rx->block.data_valid_size);
+			handle_rx->name, msg_rx->block.data_size);
 		ret = -EINVAL;
 	} else {
-		uint8_t *pcm_out = (uint8_t *)block_rx->data;
-
-		memcpy(block_rx, &msg_rx->block, sizeof(struct ablk_block));
-		block_rx->data = (void *)pcm_out;
+		memcpy(&block_rx->meta, &msg_rx->block.meta, sizeof(struct audio_metadata));
 		memcpy((uint8_t *)block_rx->data, (uint8_t *)msg_rx->block.data,
-		       msg_rx->block.data_valid_size);
+		       msg_rx->block.data_size);
 	}
 
 	if (handle_tx != handle_rx) {
@@ -1055,7 +1046,7 @@ int audio_module_state_get(struct audio_module_handle *handle, enum audio_module
  * @brief Calculate the number of channels from the channel map for the given module handle.
  *
  */
-int audio_module_number_channels_calculate(uint32_t channel_map, int8_t *number_channels)
+int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels)
 {
 	if (number_channels == NULL) {
 		LOG_DBG("Invalid parameters");
@@ -1064,8 +1055,8 @@ int audio_module_number_channels_calculate(uint32_t channel_map, int8_t *number_
 
 	*number_channels = 0;
 	for (int i = 0; i < AMOD_BITS_IN_CHANNEL_MAP; i++) {
-		*number_channels += channel_map & 1;
-		channel_map >>= 1;
+		*number_channels += locations & 1;
+		locations >>= 1;
 	}
 
 	LOG_DBG("Found %d channel(s)", *number_channels);

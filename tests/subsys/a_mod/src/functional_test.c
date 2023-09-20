@@ -217,13 +217,13 @@ static int test_stop_start_function(struct audio_module_handle_private *handle)
  * @return 0 if successful, error otherwise
  */
 static int test_data_process_function(struct audio_module_handle_private *handle,
-				      struct ablk_block *block_rx, struct ablk_block *block_tx)
+				      struct audio_data *block_rx, struct audio_data *block_tx)
 {
 	ARG_UNUSED(handle);
 	ARG_UNUSED(block_rx);
 	ARG_UNUSED(block_tx);
 
-	memcpy(block_tx, block_rx, sizeof(struct ablk_block));
+	memcpy(block_tx, block_rx, sizeof(struct audio_data));
 	memcpy(block_tx->data, block_rx->data, block_rx->data_size);
 	block_tx->data_size = block_rx->data_size;
 
@@ -296,10 +296,11 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 {
 	int ret;
-	struct ablk_block block = {0};
+	struct audio_data block;
 	uint8_t number_channels;
 
-	ret = audio_module_number_channels_calculate(block.channel_map, &number_channels);
+	block.meta.locations = 0x00000000;
+	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -308,8 +309,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 0 (%d) channel count",
 		      number_channels);
 
-	block.channel_map = 0x00000001;
-	ret = audio_module_number_channels_calculate(block.channel_map, &number_channels);
+	block.meta.locations = 0x00000001;
+	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -318,8 +319,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.channel_map = 0x80000000;
-	ret = audio_module_number_channels_calculate(block.channel_map, &number_channels);
+	block.meta.locations = 0x80000000;
+	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -328,8 +329,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.channel_map = 0xFFFFFFFF;
-	ret = audio_module_number_channels_calculate(block.channel_map, &number_channels);
+	block.meta.locations = 0xFFFFFFFF;
+	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -338,8 +339,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 32 (%d) channel count",
 		      number_channels);
 
-	block.channel_map = 0x55555555;
-	ret = audio_module_number_channels_calculate(block.channel_map, &number_channels);
+	block.meta.locations = 0x55555555;
+	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -2202,7 +2203,7 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 	struct audio_module_handle handle = {0};
 	size_t size;
 	char test_data[TEST_MOD_DATA_SIZE];
-	struct ablk_block test_block = {0};
+	struct audio_data test_block;
 	struct audio_module_message *msg_rx;
 
 	test_context_set(&mod_context, &mod_config);
@@ -2236,7 +2237,6 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 
 	test_block.data = &test_data[0];
 	test_block.data_size = TEST_MOD_DATA_SIZE;
-	test_block.data_valid_size = TEST_MOD_DATA_SIZE / 2;
 
 	ret = audio_module_data_tx(&handle, &test_block, NULL);
 	zassert_equal(ret, 0, "Data TX function did not return successfully (0):: ret %d", ret);
@@ -2247,8 +2247,6 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 			  "Failed open, module contexts differ");
 	zassert_equal(msg_rx->block.data_size, TEST_MOD_DATA_SIZE,
 		      "Failed Data TX-RX function, block sizes differs");
-	zassert_equal(msg_rx->block.data_valid_size, TEST_MOD_DATA_SIZE / 2,
-		      "Failed Data TX-RX function, block valid data sizes differs");
 	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
 		      "Data TX-RX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
@@ -2278,8 +2276,8 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct ablk_block test_block = {1};
-	struct ablk_block block = {0};
+	struct audio_data test_block;
+	struct audio_data block;
 	struct audio_module_message data_msg_rx;
 
 	test_context_set(&mod_context, &mod_config);
@@ -2307,7 +2305,8 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 	handle.state = AMOD_STATE_RUNNING;
 	handle.context = (struct audio_module_context *)&mod_context;
 
-	ret = data_fifo_pointer_first_vacant_get(&mod_fifo_rx, (void **)&data_msg_rx, K_NO_WAIT);
+	ret = data_fifo_pointer_first_vacant_get(handle.thread.msg_rx, (void **)&data_msg_rx,
+						 K_NO_WAIT);
 	/* fill data */
 	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
 		test_data[i] = TEST_MOD_DATA_SIZE - i;
@@ -2315,13 +2314,12 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 
 	test_block.data = &test_data[0];
 	test_block.data_size = TEST_MOD_DATA_SIZE;
-	test_block.data_valid_size = TEST_MOD_DATA_SIZE / 4;
 
-	memcpy(&data_msg_rx.block, &test_block, sizeof(struct ablk_block));
+	memcpy(&data_msg_rx.block, &test_block, sizeof(struct audio_data));
 	data_msg_rx.tx_handle = NULL;
 	data_msg_rx.response_cb = NULL;
 
-	ret = data_fifo_block_lock(&mod_fifo_rx, (void **)&data_msg_rx,
+	ret = data_fifo_block_lock(handle.thread.msg_rx, (void **)&data_msg_rx,
 				   sizeof(struct audio_module_message));
 
 	block.data = &data[0];
@@ -2336,8 +2334,6 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 			  "Failed Data RX function, data differs");
 	zassert_equal(block.data_size, test_block.data_size,
 		      "Failed Data TX-RX function, block sizes differs");
-	zassert_equal(block.data_valid_size, test_block.data_valid_size,
-		      "Failed Data TX-RX function, block valid data sizes differs");
 	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 1,
 		      "Data TX-RX function failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_last_filled_get_fake.call_count);
@@ -2368,8 +2364,8 @@ ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct ablk_block test_block = {1};
-	struct ablk_block block = {0};
+	struct audio_data test_block;
+	struct audio_data block;
 
 	test_context_set(&mod_context, &mod_config);
 
@@ -2407,10 +2403,8 @@ ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
 
 	test_block.data = &test_data[0];
 	test_block.data_size = TEST_MOD_DATA_SIZE;
-	test_block.data_valid_size = TEST_MOD_DATA_SIZE;
 	block.data = &data[0];
 	block.data_size = TEST_MOD_DATA_SIZE;
-	block.data_valid_size = 0;
 
 	ret = audio_module_data_tx_rx(&handle, &handle, &test_block, &block, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data TX-RX function did not return successfully (0):: ret %d", ret);
@@ -2418,8 +2412,6 @@ ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
 			  "Failed Data TX-RX function, data in the blocks differs");
 	zassert_equal(block.data_size, test_block.data_size,
 		      "Failed Data TX-RX function, block sizes differs");
-	zassert_equal(block.data_valid_size, test_block.data_valid_size,
-		      "Failed Data TX-RX function, block valid data sizes differs");
 	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
 		      "Data TX-RX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);

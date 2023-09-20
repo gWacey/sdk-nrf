@@ -102,7 +102,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
 	struct audio_module_handle handle = {.description = &test_description,
 					     .previous_state = AMOD_STATE_CONFIGURED};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block = {0};
+	struct audio_data test_block = {0};
 
 	test_block.data = &test_data[0];
 	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -147,7 +147,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_null)
 					     .previous_state = AMOD_STATE_CONFIGURED,
 					     .state = AMOD_STATE_RUNNING};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block = {0};
+	struct audio_data test_block = {0};
 
 	test_block.data = &test_data[0];
 	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -187,7 +187,7 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
 					     .previous_state = AMOD_STATE_CONFIGURED,
 					     .state = AMOD_STATE_RUNNING};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block = {0};
+	struct audio_data test_block = {0};
 
 	test_block.data = &test_data[0];
 	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -232,7 +232,7 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_null)
 					     .previous_state = AMOD_STATE_CONFIGURED,
 					     .state = AMOD_STATE_RUNNING};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block = {0};
+	struct audio_data test_block = {0};
 
 	test_block.data = &test_data[0];
 	test_block.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -277,8 +277,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 						.previous_state = AMOD_STATE_CONFIGURED,
 						.state = AMOD_STATE_RUNNING};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block_tx = {0};
-	struct ablk_block test_block_rx = {0};
+	struct audio_data test_block_tx = {0};
+	struct audio_data test_block_rx = {0};
 
 	test_block_tx.data = &test_data[0];
 	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -373,8 +373,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 						.previous_state = AMOD_STATE_CONFIGURED,
 						.state = AMOD_STATE_RUNNING};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
-	struct ablk_block test_block_tx = {0};
-	struct ablk_block test_block_rx = {0};
+	struct audio_data test_block_tx = {0};
+	struct audio_data test_block_rx = {0};
 
 	test_block_tx.data = &test_data[0];
 	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;

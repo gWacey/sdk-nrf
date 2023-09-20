@@ -10,7 +10,7 @@
 #include <zephyr/kernel.h>
 
 #include "data_fifo.h"
-#include "ablk_api.h"
+#include "audio_defines.h"
 
 /**
  * @brief Number of valid least significant bits in the channel map
@@ -96,7 +96,7 @@ struct audio_module_configuration;
  * @param block[in]       The audio block to operate on
  */
 typedef void (*audio_module_response_cb)(struct audio_module_handle_private *handle,
-					 struct ablk_block *block);
+					 struct audio_data *block);
 
 /**
  * @brief Private pointer to a module's functions.
@@ -172,8 +172,8 @@ struct audio_module_functions {
 	 *
 	 * @return 0 if successful, error otherwise
 	 */
-	int (*data_process)(struct audio_module_handle_private *handle, struct ablk_block *block_rx,
-			    struct ablk_block *block_tx);
+	int (*data_process)(struct audio_module_handle_private *handle, struct audio_data *block_rx,
+			    struct audio_data *block_tx);
 };
 
 /**
@@ -281,7 +281,7 @@ struct audio_module_handle {
  */
 struct audio_module_message {
 	/* Audio data block to input */
-	struct ablk_block block;
+	struct audio_data block;
 
 	/* Sending module's handle */
 	struct audio_module_handle *tx_handle;
@@ -387,7 +387,7 @@ int audio_module_stop(struct audio_module_handle *handle);
  *
  * @return 0 if successful, error otherwise
  */
-int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *block,
+int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data *block,
 			 audio_module_response_cb response_cb);
 
 /**
@@ -401,7 +401,7 @@ int audio_module_data_tx(struct audio_module_handle *handle, struct ablk_block *
  *
  * @return 0 if successful, error otherwise
  */
-int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *block,
+int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *block,
 			 k_timeout_t timeout);
 
 /**
@@ -423,8 +423,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct ablk_block *
  * @return 0 if successful, error otherwise
  */
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
-			    struct audio_module_handle *handle_rx, struct ablk_block *block_tx,
-			    struct ablk_block *block_rx, k_timeout_t timeout);
+			    struct audio_module_handle *handle_rx, struct audio_data *block_tx,
+			    struct audio_data *block_rx, k_timeout_t timeout);
 
 /**
  * @brief Helper function to get the base and instance names for a given
@@ -453,11 +453,11 @@ int audio_module_state_get(struct audio_module_handle *handle, enum audio_module
  * @brief Helper function to calculate the number of channels from the channel map for the given
  *        block.
  *
- * @param channel_map[in]       Channel mapping to calculate the number of channels from
+ * @param locations[in]         Channel locations to calculate the number of channels from
  * @param number_channels[out]  Pointer to the calculated number of channels in the block
  *
  * @return 0 if successful, error otherwise
  */
-int audio_module_number_channels_calculate(uint32_t channel_map, int8_t *number_channels);
+int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels);
 
 #endif /*_AMOD_API_H_ */
