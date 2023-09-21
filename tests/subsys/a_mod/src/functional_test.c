@@ -84,8 +84,8 @@ static void test_initialise_handle(struct audio_module_handle *handle,
 	memset(handle, 0, sizeof(struct audio_module_handle));
 	memcpy(&handle->name[0], test_instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle->description = description;
-	handle->state = AMOD_STATE_CONFIGURED;
-	handle->previous_state = AMOD_STATE_UNDEFINED;
+	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle->previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 	handle->dest_count = 0;
 
 	if (configuration != NULL) {
@@ -211,21 +211,21 @@ static int test_stop_start_function(struct audio_module_handle_private *handle)
  * @brief Test process data function of a module.
  *
  * @param handle[in/out]  The handle to the module instance
- * @param block_rx[in]    Pointer to the input audio block or NULL for an input module
- * @param block_tx[out]   Pointer to the output audio block or NULL for an output module
+ * @param data_rx[in]     Pointer to the input audio data or NULL for an input module
+ * @param data_tx[out]    Pointer to the output audio data or NULL for an output module
  *
  * @return 0 if successful, error otherwise
  */
 static int test_data_process_function(struct audio_module_handle_private *handle,
-				      struct audio_data *block_rx, struct audio_data *block_tx)
+				      struct audio_data *data_rx, struct audio_data *data_tx)
 {
 	ARG_UNUSED(handle);
-	ARG_UNUSED(block_rx);
-	ARG_UNUSED(block_tx);
+	ARG_UNUSED(data_rx);
+	ARG_UNUSED(data_tx);
 
-	memcpy(block_tx, block_rx, sizeof(struct audio_data));
-	memcpy(block_tx->data, block_rx->data, block_rx->data_size);
-	block_tx->data_size = block_rx->data_size;
+	memcpy(data_tx, data_rx, sizeof(struct audio_data));
+	memcpy(data_tx->data, data_rx->data, data_rx->data_size);
+	data_tx->data_size = data_rx->data_size;
 
 	return 0;
 }
@@ -296,11 +296,11 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 {
 	int ret;
-	struct audio_data block;
+	struct audio_data data;
 	uint8_t number_channels;
 
-	block.meta.locations = 0x00000000;
-	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
+	data.meta.locations = 0x00000000;
+	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -309,8 +309,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 0 (%d) channel count",
 		      number_channels);
 
-	block.meta.locations = 0x00000001;
-	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
+	data.meta.locations = 0x00000001;
+	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -319,8 +319,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.meta.locations = 0x80000000;
-	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
+	data.meta.locations = 0x80000000;
+	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -329,8 +329,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	block.meta.locations = 0xFFFFFFFF;
-	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
+	data.meta.locations = 0xFFFFFFFF;
+	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -339,8 +339,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 32 (%d) channel count",
 		      number_channels);
 
-	block.meta.locations = 0x55555555;
-	ret = audio_module_number_channels_calculate(block.meta.locations, &number_channels);
+	data.meta.locations = 0x55555555;
+	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -358,30 +358,32 @@ ZTEST(suite_a_mod_functional, test_state_get_fnct)
 
 	ret = audio_module_state_get(&handle, &state);
 	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);
-	zassert_equal(state, AMOD_STATE_UNDEFINED,
-		      "Get state function did not return AMOD_STATE_UNDEFINED (%d) rather %d",
-		      AMOD_STATE_UNDEFINED, state);
+	zassert_equal(
+		state, AUDIO_MODULE_STATE_UNDEFINED,
+		"Get state function did not return AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
+		AUDIO_MODULE_STATE_UNDEFINED, state);
 
-	handle.state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_state_get(&handle, &state);
 	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);
-	zassert_equal(state, AMOD_STATE_CONFIGURED,
-		      "Get state function did not return AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, state);
+	zassert_equal(
+		state, AUDIO_MODULE_STATE_CONFIGURED,
+		"Get state function did not return AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		AUDIO_MODULE_STATE_CONFIGURED, state);
 
-	handle.state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_state_get(&handle, &state);
 	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);
-	zassert_equal(state, AMOD_STATE_RUNNING,
-		      "Get state function did not return AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, state);
+	zassert_equal(state, AUDIO_MODULE_STATE_RUNNING,
+		      "Get state function did not return AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, state);
 
-	handle.state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_state_get(&handle, &state);
 	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);
-	zassert_equal(state, AMOD_STATE_STOPPED,
-		      "Get state function did not return AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, state);
+	zassert_equal(state, AUDIO_MODULE_STATE_STOPPED,
+		      "Get state function did not return AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, state);
 }
 
 ZTEST(suite_a_mod_functional, test_names_get_fnct)
@@ -396,7 +398,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	char *test_base_name_long =
 		"Test base name that is longer than the size of CONFIG_AUDIO_MODULE_NAME_SIZE";
 
-	handle.state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	mod_description.name = test_base_name_empty;
 	handle.description = &mod_description;
 	memset(&handle.name[0], 0, CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -407,7 +409,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name: %s", instance_name);
 
-	handle.state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	mod_description.name = test_base_name;
 	handle.description = &mod_description;
 	memcpy(&handle.name, "Test instance name", sizeof("Test instance name"));
@@ -419,7 +421,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in configured state: %s", instance_name);
 
-	handle.state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	mod_description.name = test_base_name;
 	handle.description = &mod_description;
 	memcpy(&handle.name, "Instance name run", sizeof("Instance name run"));
@@ -431,7 +433,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in running state: %s", instance_name);
 
-	handle.state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	mod_description.name = test_base_name;
 	handle.description = &mod_description;
 	memcpy(&handle.name, "Instance name stop", sizeof("Instance name stop"));
@@ -443,7 +445,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 	zassert_mem_equal(instance_name, handle.name, CONFIG_AUDIO_MODULE_NAME_SIZE,
 			  "Failed to get the instance name in stopped state: %s", instance_name);
 
-	handle.state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	mod_description.name = test_base_name_long;
 	handle.description = &mod_description;
 	memcpy(&handle.name, "Test instance name", sizeof("Test instance name"));
@@ -470,83 +472,85 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_UNDEFINED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-		      "Reconfigure previous state not AMOD_STATE_UNDEFINED (%d) rather %d",
-		      AMOD_STATE_UNDEFINED, handle.previous_state);
+	zassert_equal(ret, -ENOTSUP, "Reconfigure function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
+		      AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (% d) rather % d ",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Reconfigure previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (% d) rather % d ",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Reconfigure previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&mod_context.config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 }
@@ -565,88 +569,89 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_UNDEFINED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-		      "Reconfigure previous state not AMOD_STATE_UNDEFINED (%d) rather %d",
-		      AMOD_STATE_UNDEFINED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
+		      AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Reconfigure state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Reconfigure state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 }
@@ -666,83 +671,84 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_UNDEFINED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-		      "Reconfigure previous state not AMOD_STATE_UNDEFINED (%d) rather %d",
-		      AMOD_STATE_UNDEFINED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
+		      AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Reconfigure previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Reconfigure previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 }
@@ -762,89 +768,90 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_UNDEFINED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-		      "Reconfigure previous state not AMOD_STATE_UNDEFINED (%d) rather %d",
-		      AMOD_STATE_UNDEFINED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
+		      AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED "
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED "
 		      "(%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d ",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d ",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Reconfigure state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Reconfigure previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_configuration_get(&handle,
 					     (struct audio_module_configuration *)&mod_config);
 	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Reconfigure state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Reconfigure previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Reconfigure state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Reconfigure previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 }
@@ -860,46 +867,47 @@ ZTEST(suite_a_mod_functional, test_stop_null_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
 		      -EALREADY, ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, 0, "Stop function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, 0, "Stop function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 }
 
 ZTEST(suite_a_mod_functional, test_start_null_fnct)
@@ -913,46 +921,47 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, -EALREADY, "Start function did not return -EALREADY (%d): ret %d",
 		      -EALREADY, ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Start previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Start previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 
 	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Start previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Start previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 }
 
 ZTEST(suite_a_mod_functional, test_stop_fnct)
@@ -969,38 +978,39 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 							 .stop = test_stop_start_function,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
 		      -EALREADY, ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed stop");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, 0, "Stop function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed stop");
 
@@ -1009,16 +1019,16 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_stop(&handle);
 	zassert_equal(ret, 0, "Stop function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_STOPPED,
-		      "Stop state not AMOD_STATE_STOPPED (%d) rather %d", AMOD_STATE_STOPPED,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_RUNNING,
-		      "Stop previous state not AMOD_STATE_RUNNING (%d) rather %d",
-		      AMOD_STATE_RUNNING, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_RUNNING,
+		      "Stop previous state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.previous_state);
 	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed stop");
 }
@@ -1037,24 +1047,25 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 							 .stop = NULL,
 							 .data_process = NULL};
 	char *test_base_name = "Test base name";
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_1_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_1_functions};
 	struct audio_module_handle handle = {0};
 	struct mod_context *handle_context;
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_RUNNING;
-	handle.previous_state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, -EALREADY, "Start function did not return -EALREADY (%d): ret %d",
 		      -EALREADY, ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Start previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed start");
 
 	mod_context.test_string = NULL;
@@ -1062,16 +1073,16 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_STOPPED;
-	handle.previous_state = AMOD_STATE_RUNNING;
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_STOPPED,
-		      "Start previous state not AMOD_STATE_STOPPED (%d) rather %d",
-		      AMOD_STATE_STOPPED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_STOPPED,
+		      "Start previous state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
+		      AUDIO_MODULE_STATE_STOPPED, handle.previous_state);
 	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed start");
 
@@ -1080,16 +1091,16 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 	memset(&mod_context.config, 0, sizeof(struct mod_config));
 	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AMOD_STATE_CONFIGURED;
-	handle.previous_state = AMOD_STATE_STOPPED;
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.previous_state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_start(&handle);
 	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AMOD_STATE_RUNNING,
-		      "Start state not AMOD_STATE_RUNNING (%d) rather %d", AMOD_STATE_RUNNING,
-		      handle.state);
-	zassert_equal(handle.previous_state, AMOD_STATE_CONFIGURED,
-		      "Start previous state not AMOD_STATE_CONFIGURED (%d) rather %d",
-		      AMOD_STATE_CONFIGURED, handle.previous_state);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
+		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	zassert_equal(handle.previous_state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Start previous state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.previous_state);
 	zassert_mem_equal(&test_mod_context, handle_context, sizeof(struct mod_context),
 			  "Failed start");
 }
@@ -1122,10 +1133,10 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			 test_inst_to_name, k);
 	}
 
-	test_from_description.type = AMOD_TYPE_INPUT;
-	test_to_description.type = AMOD_TYPE_OUTPUT;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1156,10 +1167,10 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		}
 	}
 
-	test_from_description.type = AMOD_TYPE_INPUT;
-	test_to_description.type = AMOD_TYPE_PROCESS;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1190,10 +1201,10 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		}
 	}
 
-	test_from_description.type = AMOD_TYPE_PROCESS;
-	test_to_description.type = AMOD_TYPE_OUTPUT;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1236,8 +1247,8 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			      handle_from.data_tx);
 	}
 
-	test_from_description.type = AMOD_TYPE_PROCESS;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
 		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 		handle_from.state = i;
@@ -1281,11 +1292,11 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	struct audio_module_description test_to_description = {.name = test_base_name,
 							       .functions = &mod_functions};
 
-	test_from_description.type = AMOD_TYPE_INPUT;
-	test_to_description.type = AMOD_TYPE_OUTPUT;
+	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
 
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1315,10 +1326,10 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 		}
 	}
 
-	test_from_description.type = AMOD_TYPE_INPUT;
-	test_to_description.type = AMOD_TYPE_PROCESS;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1348,10 +1359,10 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 		}
 	}
 
-	test_from_description.type = AMOD_TYPE_PROCESS;
-	test_to_description.type = AMOD_TYPE_OUTPUT;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
-		for (j = AMOD_STATE_CONFIGURED; j <= AMOD_STATE_STOPPED; j++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
+		for (j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
 			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -1389,8 +1400,8 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 		test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, true);
 	}
 
-	test_from_description.type = AMOD_TYPE_PROCESS;
-	for (i = AMOD_STATE_CONFIGURED; i <= AMOD_STATE_STOPPED; i++) {
+	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
+	for (i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
 		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 		handle_from.state = i;
@@ -1422,8 +1433,9 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 						       .stop = NULL,
 						       .data_process = NULL};
 	struct audio_module_functions test_mod_functions = mod_functions;
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_UNDEFINED,
+							   .functions = &mod_functions};
 	struct audio_module_description test_mod_description;
 	struct audio_module_parameters mod_parameters = {
 		.description = &mod_description,
@@ -1437,7 +1449,7 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 	struct audio_module_handle handle;
 	struct audio_module_handle handle_cleared;
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		/* Register resets */
 		DO_FOREACH_FAKE(RESET_FAKE);
 
@@ -1466,8 +1478,8 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 
 		start_thread(&handle);
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_CONFIGURED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 		ret = audio_module_close(&handle);
 
@@ -1510,8 +1522,8 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 
 		start_thread(&handle);
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_STOPPED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_STOPPED;
 
 		ret = audio_module_close(&handle);
 
@@ -1552,8 +1564,9 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		.stop = test_stop_start_function,
 		.data_process = test_data_process_function};
 	struct audio_module_functions test_mod_functions = mod_functions;
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_UNDEFINED,
+							   .functions = &mod_functions};
 	struct audio_module_description test_mod_description;
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
@@ -1570,7 +1583,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 	struct audio_module_handle handle;
 	struct audio_module_handle handle_cleared;
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		/* Register resets */
 		DO_FOREACH_FAKE(RESET_FAKE);
 
@@ -1609,8 +1622,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		start_thread(&handle);
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_CONFIGURED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 		ret = audio_module_close(&handle);
 
@@ -1658,8 +1671,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		handle.thread.msg_rx = &mod_fifo_rx;
 		handle.thread.msg_tx = &mod_fifo_tx;
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_STOPPED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_STOPPED;
 
 		start_thread(&handle);
 
@@ -1685,7 +1698,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 				  "Failed close, modified the modules context");
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		/* Register resets */
 		DO_FOREACH_FAKE(RESET_FAKE);
 
@@ -1722,8 +1735,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		start_thread(&handle);
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_CONFIGURED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 		ret = audio_module_close(&handle);
 
@@ -1769,8 +1782,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		handle.thread.msg_rx = &mod_fifo_rx;
 		handle.thread.msg_tx = NULL;
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_STOPPED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_STOPPED;
 
 		start_thread(&handle);
 
@@ -1796,7 +1809,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 				  "Failed close, modified the modules context");
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		/* Register resets */
 		DO_FOREACH_FAKE(RESET_FAKE);
 
@@ -1833,8 +1846,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		start_thread(&handle);
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_CONFIGURED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 		ret = audio_module_close(&handle);
 
@@ -1880,8 +1893,8 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		handle.thread.msg_rx = NULL;
 		handle.thread.msg_tx = &mod_fifo_tx;
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_STOPPED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_STOPPED;
 
 		start_thread(&handle);
 
@@ -1925,8 +1938,9 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 		.start = test_stop_start_function,
 		.stop = test_stop_start_function,
 		.data_process = test_data_process_function};
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_UNDEFINED, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_UNDEFINED,
+							   .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
 	struct audio_module_parameters mod_parameters = {
@@ -1947,7 +1961,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 	data_fifo_init(&mod_fifo_rx);
 	data_fifo_init(&mod_fifo_tx);
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		test_context_set(&test_mod_context, &mod_config);
 
 		mod_parameters.thread.msg_rx = &mod_fifo_rx;
@@ -1957,20 +1971,21 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_UNDEFINED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 
 		ret = audio_module_open(
 			&mod_parameters, (struct audio_module_configuration *)&mod_config,
 			test_inst_name, (struct audio_module_context *)&mod_context, &handle);
 
 		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
-			      AMOD_STATE_CONFIGURED, handle.state);
-		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-			      "Open failed previouse state is not AMOD_STATE_UNDEFINED (%d): %d",
-			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+			      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+			      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+		zassert_equal(
+			handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+			"Open failed previouse state is not AUDIO_MODULE_STATE_UNDEFINED (%d): %d",
+			AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 				  "Failed open, name should be %s, but is %s", test_inst_name,
 				  handle.name);
@@ -1993,7 +2008,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 		k_thread_abort(handle.thread_id);
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		test_context_set(&test_mod_context, &mod_config);
 
 		mod_parameters.thread.msg_rx = NULL;
@@ -2003,20 +2018,21 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_UNDEFINED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 
 		ret = audio_module_open(
 			&mod_parameters, (struct audio_module_configuration *)&mod_config,
 			test_inst_name, (struct audio_module_context *)&mod_context, &handle);
 
 		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
-			      AMOD_STATE_CONFIGURED, handle.state);
-		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-			      "Open failed previous state is not AMOD_STATE_UNDEFINED (%d): %d",
-			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+			      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+			      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+		zassert_equal(
+			handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+			"Open failed previous state is not AUDIO_MODULE_STATE_UNDEFINED (%d): %d",
+			AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 				  "Failed open, name should be %s, but is %s", test_inst_name,
 				  handle.name);
@@ -2039,7 +2055,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 		k_thread_abort(handle.thread_id);
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		test_context_set(&test_mod_context, &mod_config);
 
 		mod_parameters.thread.msg_rx = &mod_fifo_rx;
@@ -2049,20 +2065,21 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_UNDEFINED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 
 		ret = audio_module_open(
 			&mod_parameters, (struct audio_module_configuration *)&mod_config,
 			test_inst_name, (struct audio_module_context *)&mod_context, &handle);
 
 		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
-			      AMOD_STATE_CONFIGURED, handle.state);
-		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-			      "Open failed previous state is not AMOD_STATE_UNDEFINED (%d): %d",
-			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+			      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+			      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+		zassert_equal(
+			handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+			"Open failed previous state is not AUDIO_MODULE_STATE_UNDEFINED (%d): %d",
+			AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 				  "Failed open, name should be %s, but is %s", test_inst_name,
 				  handle.name);
@@ -2085,7 +2102,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 		k_thread_abort(handle.thread_id);
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		test_context_set(&test_mod_context, &mod_config);
 
 		mod_parameters.thread.msg_rx = &mod_fifo_rx;
@@ -2097,20 +2114,21 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_UNDEFINED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 
 		ret = audio_module_open(
 			&mod_parameters, (struct audio_module_configuration *)&mod_config,
 			test_inst_name, (struct audio_module_context *)&mod_context, &handle);
 
 		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
-			      AMOD_STATE_CONFIGURED, handle.state);
-		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-			      "Open failed previous state is not AMOD_STATE_UNDEFINED (%d): %d",
-			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+			      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+			      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+		zassert_equal(
+			handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+			"Open failed previous state is not AUDIO_MODULE_STATE_UNDEFINED (%d): %d",
+			AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 				  "Failed open, name should be %s, but is %s", test_inst_name,
 				  handle.name);
@@ -2133,7 +2151,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 		k_thread_abort(handle.thread_id);
 	}
 
-	for (int i = AMOD_TYPE_INPUT; i <= AMOD_TYPE_PROCESS; i++) {
+	for (int i = AUDIO_MODULE_TYPE_INPUT; i <= AUDIO_MODULE_TYPE_IN_OUT; i++) {
 		test_context_set(&test_mod_context, &mod_config);
 
 		mod_parameters.thread.msg_rx = &mod_fifo_rx;
@@ -2145,20 +2163,21 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 
-		handle.previous_state = AMOD_STATE_RUNNING;
-		handle.state = AMOD_STATE_UNDEFINED;
+		handle.previous_state = AUDIO_MODULE_STATE_RUNNING;
+		handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 
 		ret = audio_module_open(
 			&mod_parameters, (struct audio_module_configuration *)&mod_config,
 			test_inst_name, (struct audio_module_context *)&mod_context, &handle);
 
 		zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
-		zassert_equal(handle.state, AMOD_STATE_CONFIGURED,
-			      "Open state not AMOD_STATE_CONFIGURED (%d) rather %d",
-			      AMOD_STATE_CONFIGURED, handle.state);
-		zassert_equal(handle.previous_state, AMOD_STATE_UNDEFINED,
-			      "Open failed previous state is not AMOD_STATE_UNDEFINED (%d): %d",
-			      AMOD_STATE_UNDEFINED, handle.previous_state);
+		zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+			      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+			      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+		zassert_equal(
+			handle.previous_state, AUDIO_MODULE_STATE_UNDEFINED,
+			"Open failed previous state is not AUDIO_MODULE_STATE_UNDEFINED (%d): %d",
+			AUDIO_MODULE_STATE_UNDEFINED, handle.previous_state);
 		zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
 				  "Failed open, name should be %s, but is %s", test_inst_name,
 				  handle.name);
@@ -2196,14 +2215,15 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 						       .start = NULL,
 						       .stop = NULL,
 						       .data_process = NULL};
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct mod_context mod_context;
 	struct audio_module_handle handle = {0};
 	size_t size;
 	char test_data[TEST_MOD_DATA_SIZE];
-	struct audio_data test_block;
+	struct audio_data audio_data;
 	struct audio_module_message *msg_rx;
 
 	test_context_set(&mod_context, &mod_config);
@@ -2227,26 +2247,26 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 	handle.thread.msg_tx = NULL;
 	handle.thread.data_slab = &mod_data_slab;
 	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
-	handle.state = AMOD_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	handle.context = (struct audio_module_context *)&mod_context;
 
 	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
 		test_data[i] = TEST_MOD_DATA_SIZE - i;
 	}
 
-	test_block.data = &test_data[0];
-	test_block.data_size = TEST_MOD_DATA_SIZE;
+	audio_data.data = &test_data[0];
+	audio_data.data_size = TEST_MOD_DATA_SIZE;
 
-	ret = audio_module_data_tx(&handle, &test_block, NULL);
+	ret = audio_module_data_tx(&handle, &audio_data, NULL);
 	zassert_equal(ret, 0, "Data TX function did not return successfully (0):: ret %d", ret);
 
 	ret = data_fifo_pointer_last_filled_get(&mod_fifo_rx, (void **)&msg_rx, &size, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data TX function did not return 0: ret %d", 0, ret);
-	zassert_mem_equal(msg_rx->block.data, &test_data[0], TEST_MOD_DATA_SIZE / 2,
+	zassert_mem_equal(msg_rx->audio_data.data, &test_data[0], TEST_MOD_DATA_SIZE / 2,
 			  "Failed open, module contexts differ");
-	zassert_equal(msg_rx->block.data_size, TEST_MOD_DATA_SIZE,
-		      "Failed Data TX-RX function, block sizes differs");
+	zassert_equal(msg_rx->audio_data.data_size, TEST_MOD_DATA_SIZE,
+		      "Failed Data TX-RX function, data sizes differs");
 	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
 		      "Data TX-RX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
@@ -2269,16 +2289,17 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 						       .start = NULL,
 						       .stop = NULL,
 						       .data_process = NULL};
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct mod_context mod_context;
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct audio_data test_block;
-	struct audio_data block;
-	struct audio_module_message data_msg_rx;
+	struct audio_data audio_data_in;
+	struct audio_data audio_data_out;
+	struct audio_module_message *data_msg_rx;
 
 	test_context_set(&mod_context, &mod_config);
 
@@ -2301,8 +2322,8 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 	handle.thread.msg_tx = NULL;
 	handle.thread.data_slab = &mod_data_slab;
 	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
-	handle.state = AMOD_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	handle.context = (struct audio_module_context *)&mod_context;
 
 	ret = data_fifo_pointer_first_vacant_get(handle.thread.msg_rx, (void **)&data_msg_rx,
@@ -2312,28 +2333,28 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 		test_data[i] = TEST_MOD_DATA_SIZE - i;
 	}
 
-	test_block.data = &test_data[0];
-	test_block.data_size = TEST_MOD_DATA_SIZE;
+	audio_data_in.data = &test_data[0];
+	audio_data_in.data_size = TEST_MOD_DATA_SIZE;
 
-	memcpy(&data_msg_rx.block, &test_block, sizeof(struct audio_data));
-	data_msg_rx.tx_handle = NULL;
-	data_msg_rx.response_cb = NULL;
+	memcpy(&data_msg_rx->audio_data, &audio_data_in, sizeof(struct audio_data));
+	data_msg_rx->tx_handle = NULL;
+	data_msg_rx->response_cb = NULL;
 
 	ret = data_fifo_block_lock(handle.thread.msg_rx, (void **)&data_msg_rx,
 				   sizeof(struct audio_module_message));
 
-	block.data = &data[0];
-	block.data_size = TEST_MOD_DATA_SIZE;
+	audio_data_out.data = &data[0];
+	audio_data_out.data_size = TEST_MOD_DATA_SIZE;
 
 	/* Register resets */
 	DO_FOREACH_FAKE(RESET_FAKE);
 
-	ret = audio_module_data_rx(&handle, &block, K_NO_WAIT);
+	ret = audio_module_data_rx(&handle, &audio_data_out, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data RX function did not return successfully (0):: ret %d", ret);
-	zassert_mem_equal(block.data, test_block.data, TEST_MOD_DATA_SIZE / 4,
+	zassert_mem_equal(&test_data[0], audio_data_out.data, TEST_MOD_DATA_SIZE,
 			  "Failed Data RX function, data differs");
-	zassert_equal(block.data_size, test_block.data_size,
-		      "Failed Data TX-RX function, block sizes differs");
+	zassert_equal(audio_data_in.data_size, audio_data_out.data_size,
+		      "Failed Data TX-RX function, data sizes differs");
 	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 1,
 		      "Data TX-RX function failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_last_filled_get_fake.call_count);
@@ -2356,16 +2377,17 @@ ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
 						       .start = NULL,
 						       .stop = NULL,
 						       .data_process = test_data_process_function};
-	struct audio_module_description mod_description = {
-		.name = test_base_name, .type = AMOD_TYPE_PROCESS, .functions = &mod_functions};
+	struct audio_module_description mod_description = {.name = test_base_name,
+							   .type = AUDIO_MODULE_TYPE_IN_OUT,
+							   .functions = &mod_functions};
 	struct data_fifo mod_fifo_rx;
 	struct data_fifo mod_fifo_tx;
 	struct mod_context mod_context;
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct audio_data test_block;
-	struct audio_data block;
+	struct audio_data audio_data_in;
+	struct audio_data audio_data_out;
 
 	test_context_set(&mod_context, &mod_config);
 
@@ -2393,25 +2415,25 @@ ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
 	handle.thread.msg_tx = &mod_fifo_tx;
 	handle.thread.data_slab = &mod_data_slab;
 	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.previous_state = AMOD_STATE_CONFIGURED;
-	handle.state = AMOD_STATE_RUNNING;
+	handle.previous_state = AUDIO_MODULE_STATE_CONFIGURED;
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	handle.context = (struct audio_module_context *)&mod_context;
 
 	for (int i = 0; i < TEST_MOD_DATA_SIZE; i++) {
 		test_data[i] = TEST_MOD_DATA_SIZE - i;
 	}
 
-	test_block.data = &test_data[0];
-	test_block.data_size = TEST_MOD_DATA_SIZE;
-	block.data = &data[0];
-	block.data_size = TEST_MOD_DATA_SIZE;
+	audio_data_in.data = &test_data[0];
+	audio_data_in.data_size = TEST_MOD_DATA_SIZE;
+	audio_data_out.data = &data[0];
+	audio_data_out.data_size = TEST_MOD_DATA_SIZE;
 
-	ret = audio_module_data_tx_rx(&handle, &handle, &test_block, &block, K_NO_WAIT);
+	ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_in, &audio_data_out, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data TX-RX function did not return successfully (0):: ret %d", ret);
-	zassert_mem_equal(block.data, &test_data[0], TEST_MOD_DATA_SIZE,
-			  "Failed Data TX-RX function, data in the blocks differs");
-	zassert_equal(block.data_size, test_block.data_size,
-		      "Failed Data TX-RX function, block sizes differs");
+	zassert_mem_equal(audio_data_in.data, audio_data_out.data, TEST_MOD_DATA_SIZE,
+			  "Failed Data TX-RX function, data returned differs");
+	zassert_equal(audio_data_in.data_size, audio_data_out.data_size,
+		      "Failed Data TX-RX function, data sizes differs");
 	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
 		      "Data TX-RX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);

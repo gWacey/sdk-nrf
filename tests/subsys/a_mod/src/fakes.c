@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Nordic Semiconductor ASA
+ * Copyright (c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
@@ -51,7 +51,7 @@ void data_fifo_deinit(struct data_fifo *data_fifo)
 }
 
 /*
- * Stubs are defined here, so that multiple .C files can share them
+ * Stubs are defined here, so that multiple *.c files can share them
  * without having linker issues.
  */
 DEFINE_FFF_GLOBALS;
@@ -122,7 +122,7 @@ int fake_data_fifo_block_lock__succeeds(struct data_fifo *data_fifo, void **data
 		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
 	if (((test_fifo_msg->head + 1) % test_fifo_msg->size) == test_fifo_msg->tail) {
-		return -1;
+		return -EINVAL;
 	}
 
 	test_fifo_msg->data[test_fifo_msg->head] = *data;
@@ -168,7 +168,7 @@ int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo
 		(struct test_msg_fifo_queue *)data_fifo->msgq_buffer;
 
 	if (test_fifo_msg->tail == test_fifo_msg->head) {
-		return -1;
+		return -EINVAL;
 	}
 
 	msg = (struct audio_module_message *)test_fifo_msg->data[test_fifo_msg->tail];

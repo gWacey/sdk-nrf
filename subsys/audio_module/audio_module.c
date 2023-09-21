@@ -17,31 +17,37 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
 
+/* Define a timeout to prevent system locking */
+#define LOCK_TIMEOUT_US (K_USEC(100))
+
 /**
  * @brief Helper function to validate the module description.
  *
- * @param parameters  The module parameters
+ * @param parameters  The module parameters.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
 static int validate_parameters(struct audio_module_parameters *parameters)
 {
 	if (parameters == NULL) {
-		LOG_DBG("No description for module");
+		LOG_ERR("No parameters for module");
 		return -EINVAL;
 	}
 
 	if (parameters->description == NULL ||
-	    (parameters->description->type != AMOD_TYPE_INPUT &&
-	     parameters->description->type != AMOD_TYPE_OUTPUT &&
-	     parameters->description->type != AMOD_TYPE_PROCESS) ||
+	    (parameters->description->type != AUDIO_MODULE_TYPE_INPUT &&
+	     parameters->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
+	     parameters->description->type != AUDIO_MODULE_TYPE_IN_OUT) ||
 	    parameters->description->name == NULL || parameters->description->functions == NULL) {
-		LOG_DBG("Invalid description for module");
+		return -EINVAL;
+	}
+
+	if (parameters->description->functions->configuration_set == NULL ||
+	    parameters->description->functions->data_process == NULL) {
 		return -EINVAL;
 	}
 
 	if (parameters->thread.stack == NULL || parameters->thread.stack_size == 0) {
-		LOG_DBG("Invalid thread settings for module");
 		return -EINVAL;
 	}
 
@@ -49,42 +55,68 @@ static int validate_parameters(struct audio_module_parameters *parameters)
 }
 
 /**
- * @brief General callback for releasing the audio block when inter-module block
+ * @brief Helper function to validate the module types for connecting and disconnecting.
+ *
+ * @param handle_from  The from/sending handle.
+ * @param handle_to    The to/receiving handle.
+ *
+ * @return 0 if successful, error value.
+ */
+static int handle_connection_type_test(struct audio_module_handle *handle_from,
+				       struct audio_module_handle *handle_to)
+{
+	if (handle_from->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle_from->description->type == AUDIO_MODULE_TYPE_OUTPUT ||
+	    handle_to->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle_to->description->type == AUDIO_MODULE_TYPE_INPUT) {
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief General callback for releasing the audio data when inter-module data
  *        passing.
  *
- * @param handle  The handle of the sending modules instance
- * @param block   Pointer to the audio data block to send to the module
+ * @param handle      The handle of the sending modules instance.
+ * @param audio_data  Pointer to the audio data to send to the module.
  */
-static void block_release_cb(struct audio_module_handle_private *handle, struct audio_data *block)
+static void audio_data_release_cb(struct audio_module_handle_private *handle,
+				  struct audio_data *audio_data)
 {
+	int ret;
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 
-	k_sem_take(&hdl->sem, K_NO_WAIT);
+	ret = k_sem_take(&hdl->sem, K_NO_WAIT);
+	if (ret) {
+		LOG_ERR("Failed to take semaphore for data release callback function");
+	}
 
 	if (k_sem_count_get(&hdl->sem) == 0) {
-		/* Object data has been consumed by all modules so now can free the memory */
-		k_mem_slab_free(hdl->thread.data_slab, (void **)&block->data);
+		/* Object data has been consumed by all modules so now can free the memory. */
+		k_mem_slab_free(hdl->thread.data_slab, (void **)&audio_data->data);
 	}
 }
 
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.
  *
- * @param tx_handle    The handle for the sending module instance
- * @param rx_handle    The handle for the receiving module instance
- * @param block        Pointer to the audio data block to send to the module
+ * @param tx_handle    The handle for the sending module instance.
+ * @param rx_handle    The handle for the receiving module instance.
+ * @param audio_data   Pointer to the audio data  to send to the module.
  * @param response_cb  A pointer to a callback to run when the buffer is
- *                     fully comsumed
+ *                     fully consumed.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
 static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_handle *rx_handle,
-		   struct audio_data *block, audio_module_response_cb data_in_response_cb)
+		   struct audio_data *audio_data, audio_module_response_cb data_in_response_cb)
 {
 	int ret;
 	struct audio_module_message *data_msg_rx;
 
-	if (rx_handle->state == AMOD_STATE_RUNNING) {
+	if (rx_handle->state == AUDIO_MODULE_STATE_RUNNING) {
 		ret = data_fifo_pointer_first_vacant_get(rx_handle->thread.msg_rx,
 							 (void **)&data_msg_rx, K_NO_WAIT);
 		if (ret) {
@@ -92,8 +124,8 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 			return ret;
 		}
 
-		/* fill data */
-		memcpy(&data_msg_rx->block, block, sizeof(struct audio_data));
+		/* Copy. The audio data itself will remain in its original location. */
+		memcpy(&data_msg_rx->audio_data, audio_data, sizeof(struct audio_data));
 		data_msg_rx->tx_handle = tx_handle;
 		data_msg_rx->response_cb = data_in_response_cb;
 
@@ -102,7 +134,8 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 		if (ret) {
 			data_fifo_block_free(rx_handle->thread.msg_rx, (void **)&data_msg_rx);
 
-			LOG_DBG("Module %s failed to queue block, ret %d", rx_handle->name, ret);
+			LOG_WRN("Module %s failed to queue audio data, ret %d", rx_handle->name,
+				ret);
 			return ret;
 		}
 
@@ -120,34 +153,35 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 /**
  * @brief Send to modules TX message queue.
  *
- * @param handle  The handle for this modules instance
- * @param block   A pointer to the audio block
+ * @param handle      The handle for this modules instance.
+ * @param audio_data  A pointer to the audio data.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int send_to_tx_fifo(struct audio_module_handle *handle, struct audio_data *block)
+static int tx_fifo_put(struct audio_module_handle *handle, struct audio_data *audio_data)
 {
 	int ret;
 	struct audio_module_message *data_msg_tx;
 
-	/* Take a TX message */
+	/* Take a TX message. */
 	ret = data_fifo_pointer_first_vacant_get(handle->thread.msg_tx, (void **)&data_msg_tx,
-						 K_FOREVER);
+						 K_NO_WAIT);
 	if (ret) {
-		LOG_DBG("No free message for module %s, ret %d", handle->name, ret);
+		LOG_DBG("No free space in TX FIFO for module %s, ret %d", handle->name, ret);
 		return ret;
 	}
 
-	/* Configure audio block */
-	memcpy(&data_msg_tx->block, block, sizeof(struct audio_data));
+	/* Configure audio data. */
+	memcpy(&data_msg_tx->audio_data, audio_data, sizeof(struct audio_data));
 	data_msg_tx->tx_handle = handle;
-	data_msg_tx->response_cb = block_release_cb;
+	data_msg_tx->response_cb = audio_data_release_cb;
 
-	/* Send audio block to modules output message queue */
+	/* Send audio data to modules output message queue. */
 	ret = data_fifo_block_lock(handle->thread.msg_tx, (void **)&data_msg_tx,
 				   sizeof(struct audio_module_message));
 	if (ret) {
-		LOG_DBG("Failed to send block to output of module %s, ret %d", handle->name, ret);
+		LOG_ERR("Failed to send audio data to output of module %s, ret %d", handle->name,
+			ret);
 
 		data_fifo_block_free(handle->thread.msg_tx, (void **)&data_msg_tx);
 
@@ -160,48 +194,57 @@ static int send_to_tx_fifo(struct audio_module_handle *handle, struct audio_data
 }
 
 /**
- * @brief Send output audio block to next module(s)
+ * @brief Send output audio data to next module(s).
  *
- * @param handle  The handle for this modules instance
- * @param block   A pointer to the audio block
+ * @param handle      The handle for this modules instance.
+ * @param audio_data  A pointer to the audio data.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int send_to_connected(struct audio_module_handle *handle, struct audio_data *block)
+static int send_to_connected_modules(struct audio_module_handle *handle,
+				     struct audio_data *audio_data)
 {
 	int ret;
 	struct audio_module_handle *handle_to;
 
 	if (handle->dest_count == 0) {
-		LOG_DBG("No where to send the data from module %s so releasing it", handle->name);
+		LOG_WRN("Nowhere to send the data from module %s so releasing it", handle->name);
 
-		k_mem_slab_free(handle->thread.data_slab, (void **)block->data);
+		k_mem_slab_free(handle->thread.data_slab, (void **)audio_data->data);
 
 		return 0;
 	}
 
-	k_mutex_lock(&handle->dest_mutex, K_FOREVER);
+	/* We need to ensure that all receiving modules have got the audio.
+	 * This is so the first receiver cannot free the data before all receivers
+	 * have gotten the data.
+	 */
+	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
+	if (ret) {
+		return ret;
+	}
 
 	k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_to, node) {
-		ret = data_tx(handle, handle_to, block, &block_release_cb);
+		ret = data_tx(handle, handle_to, audio_data, &audio_data_release_cb);
 		if (ret) {
-			LOG_DBG("Failed to send to module %s from %s, ret %d", handle_to->name,
-				handle->name, ret);
-			k_sem_take(&handle->sem, K_NO_WAIT);
-		}
-	}
-
-	if (handle->data_tx && handle->thread.msg_tx) {
-		ret = send_to_tx_fifo(handle, block);
-		if (ret) {
-			LOG_DBG("Failed to send block on module %s TX message queue", handle->name);
+			LOG_ERR("Failed to send audio data to module %s from %s, ret %d",
+				handle_to->name, handle->name, ret);
 			k_sem_take(&handle->sem, K_NO_WAIT);
 		}
 	}
 
 	k_mutex_unlock(&handle->dest_mutex);
+
+	if (handle->data_tx && handle->thread.msg_tx) {
+		ret = tx_fifo_put(handle, audio_data);
+		if (ret) {
+			LOG_ERR("Failed to send audio data on module %s TX message queue",
+				handle->name);
+			k_sem_take(&handle->sem, K_NO_WAIT);
+		}
+	}
 
 	return 0;
 }
@@ -209,209 +252,186 @@ static int send_to_connected(struct audio_module_handle *handle, struct audio_da
 /**
  * @brief The thread that receives data from outside the system and passes it into the audio system.
  *
- * @param handle  The handle for this modules instance
+ * @param handle  The handle for this modules instance.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int module_thread_input(struct audio_module_handle *handle, void *p2, void *p3)
+static void module_thread_input(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
-	struct audio_data block;
+	struct audio_data audio_data;
 	void *data;
 
-	if (handle == NULL) {
-		LOG_DBG("Module task has NULL handle");
-		return -EINVAL;
-	}
+	__ASSERT(handle != NULL, "Module task has NULL handle");
 
 	/* Execute thread */
 	while (1) {
 		data = NULL;
 
-		if (handle->description->functions->data_process != NULL) {
-			/* Get a new output buffer */
-			ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_FOREVER);
-			if (ret) {
-				LOG_DBG("No free data for module %s, ret %d", handle->name, ret);
-				continue;
-			}
-
-			/* Configure new audio block */
-			block.data = data;
-			block.data_size = handle->thread.data_size;
-
-			/* Process the input audio block */
-			ret = handle->description->functions->data_process(
-				(struct audio_module_handle_private *)handle, NULL, &block);
-			if (ret) {
-				k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
-
-				LOG_DBG("Data process error in module %s, ret %d", handle->name,
-					ret);
-				continue;
-			}
-
-			/* Send input audio block to next module(s) */
-			send_to_connected(handle, &block);
-		} else {
-			LOG_DBG("No process function for module %s, no input", handle->name);
+		/* Get a new output buffer.
+		 * Since this input module generates data within itself, the module itself
+		 * will control the data flow.
+		 */
+		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
+		if (ret) {
+			LOG_ERR("No free data for module %s, ret %d", handle->name, ret);
+			continue;
 		}
+
+		/* Configure new audio data. */
+		audio_data.data = data;
+		audio_data.data_size = handle->thread.data_size;
+
+		/* Process the input audio data */
+		ret = handle->description->functions->data_process(
+			(struct audio_module_handle_private *)handle, NULL, &audio_data);
+		if (ret) {
+			k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
+
+			LOG_ERR("Data process error in module %s, ret %d", handle->name, ret);
+			continue;
+		}
+
+		/* Send input audio data to next module(s). */
+		send_to_connected_modules(handle, &audio_data);
 	}
 
-	return 0;
+	CODE_UNREACHABLE;
 }
 
 /**
  * @brief The thread that processes inputs and outputs them out of the audio system.
  *
- * @param handle  The handle for this modules instance
+ * @param handle  The handle for this modules instance.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int module_thread_output(struct audio_module_handle *handle, void *p2, void *p3)
+static void module_thread_output(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
 
 	struct audio_module_message *msg_rx;
 	size_t size;
 
-	if (handle == NULL) {
-		LOG_DBG("Module task has NULL handle");
-		return -EINVAL;
-	}
+	__ASSERT(handle != NULL, "Module task has NULL handle");
 
-	/* Execute thread */
+	/* Execute thread. */
 	while (1) {
 		msg_rx = NULL;
 
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
 		if (ret) {
-			LOG_DBG("No new data for module %s, ret %d", handle->name, ret);
-			continue;
+			LOG_ERR("No new data for module %s, ret %d", handle->name, ret);
 		}
 
-		if (handle->description->functions->data_process != NULL) {
-			/* Process the input audio block and output from the audio system */
-			ret = handle->description->functions->data_process(
-				(struct audio_module_handle_private *)handle, &msg_rx->block, NULL);
-			if (ret) {
-				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb((struct audio_module_handle_private *)
-								    msg_rx->tx_handle,
-							    &msg_rx->block);
-				}
-
-				LOG_DBG("Data process error in module %s, ret %d", handle->name,
-					ret);
-				continue;
-			}
-
+		/* Process the input audio data and output from the audio system. */
+		ret = handle->description->functions->data_process(
+			(struct audio_module_handle_private *)handle, &msg_rx->audio_data, NULL);
+		if (ret) {
 			if (msg_rx->response_cb != NULL) {
 				msg_rx->response_cb(
 					(struct audio_module_handle_private *)msg_rx->tx_handle,
-					&msg_rx->block);
+					&msg_rx->audio_data);
 			}
-		} else {
-			LOG_DBG("No process function for module %s, discarding input",
-				handle->name);
+
+			LOG_ERR("Data process error in module %s, ret %d", handle->name, ret);
+			continue;
+		}
+
+		if (msg_rx->response_cb != NULL) {
+			msg_rx->response_cb((struct audio_module_handle_private *)msg_rx->tx_handle,
+					    &msg_rx->audio_data);
 		}
 
 		data_fifo_block_free(handle->thread.msg_rx, (void **)&msg_rx);
 	}
 
-	return 0;
+	CODE_UNREACHABLE;
 }
 
 /**
- * @brief The thread that processes inputs and outputs the data from the module
+ * @brief The thread that processes inputs and outputs the data from the module.
  *
- * @param handle  The handle for this modules instance
+ * @param handle  The handle for this modules instance.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static void module_thread_in_out(void *p1, void *p2, void *p3)
+static void module_thread_in_out(struct audio_module_handle *handle, void *p2, void *p3)
 {
 	int ret;
-	struct audio_module_handle *handle = (struct audio_module_handle *)p1;
 	struct audio_module_message *msg_rx;
-	struct audio_data block;
+	struct audio_data audio_data;
 	void *data;
 	size_t size;
 
-	LOG_DBG("Module %s task started", handle->name);
+	__ASSERT(handle != NULL, "Module task has NULL handle");
 
-	/* Execute thread */
+	/* Execute thread. */
 	while (1) {
 		data = NULL;
 
-		LOG_DBG("Module %s waiting for a message", handle->name);
+		LOG_DBG("Module %s is waiting for audio data", handle->name);
 
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
 		if (ret) {
-			LOG_DBG("No new message for module %s, ret %d", handle->name, ret);
-			continue;
+			LOG_ERR("No new message for module %s, ret %d", handle->name, ret);
 		}
 
 		LOG_DBG("Module %s new message received", handle->name);
 
-		if (handle->description->functions->data_process != NULL) {
-			/* Get a new output buffer from outside the audio system */
-			ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
-			if (ret) {
-				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb((struct audio_module_handle_private
-								     *)(msg_rx->tx_handle),
-							    &msg_rx->block);
-				}
-
-				data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
-
-				LOG_DBG("No free data buffer for module %s, dropping input, ret %d",
-					handle->name, ret);
-				continue;
-			}
-
-			/* Configure new audio block */
-			block.data = data;
-			block.data_size = handle->thread.data_size;
-
-			/* Process the input audio block into the output audio block */
-			ret = handle->description->functions->data_process(
-				(struct audio_module_handle_private *)handle, &msg_rx->block,
-				&block);
-			if (ret) {
-				if (msg_rx->response_cb != NULL) {
-					msg_rx->response_cb((struct audio_module_handle_private
-								     *)(msg_rx->tx_handle),
-							    &msg_rx->block);
-				}
-
-				data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
-
-				k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
-
-				LOG_DBG("Data process error in module %s, ret %d", handle->name,
-					ret);
-				continue;
-			}
-
-			/* Send input audio block to next module(s) */
-			send_to_connected(handle, &block);
-
+		/* Get a new output buffer from outside the audio system. */
+		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
+		if (ret) {
 			if (msg_rx->response_cb != NULL) {
 				msg_rx->response_cb(
-					(struct audio_module_handle_private *)msg_rx->tx_handle,
-					&msg_rx->block);
+					(struct audio_module_handle_private *)(msg_rx->tx_handle),
+					&msg_rx->audio_data);
 			}
-		} else {
-			LOG_DBG("No process function for module %s, discarding input",
-				handle->name);
+
+			data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
+
+			LOG_DBG("No free data buffer for module %s, dropping input, ret %d",
+				handle->name, ret);
+			continue;
+		}
+
+		/* Configure new audio audio_data. */
+		audio_data.data = data;
+		audio_data.data_size = handle->thread.data_size;
+
+		/* Process the input audio data into the output audio data. */
+		ret = handle->description->functions->data_process(
+			(struct audio_module_handle_private *)handle, &msg_rx->audio_data,
+			&audio_data);
+		if (ret) {
+			if (msg_rx->response_cb != NULL) {
+				msg_rx->response_cb(
+					(struct audio_module_handle_private *)(msg_rx->tx_handle),
+					&msg_rx->audio_data);
+			}
+
+			data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
+
+			k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
+
+			LOG_DBG("Data process error in module %s, ret %d", handle->name, ret);
+			continue;
+		}
+
+		/* Send input audio data to next module(s). */
+		send_to_connected_modules(handle, &audio_data);
+
+		if (msg_rx->response_cb != NULL) {
+			msg_rx->response_cb((struct audio_module_handle_private *)msg_rx->tx_handle,
+					    &msg_rx->audio_data);
 		}
 
 		data_fifo_block_free(handle->thread.msg_rx, (void **)&msg_rx);
 	}
+
+	CODE_UNREACHABLE;
 }
 
 /**
@@ -426,32 +446,32 @@ int audio_module_open(struct audio_module_parameters *parameters,
 
 	if (parameters == NULL || configuration == NULL || name == NULL || handle == NULL ||
 	    context == NULL) {
-		LOG_DBG("Parameter is NULL for module open function");
+		LOG_ERR("Parameter is NULL for module open function");
 		return -EINVAL;
 	}
 
-	if (handle->state != AMOD_STATE_UNDEFINED) {
-		LOG_DBG("The module is already open");
+	if (handle->state != AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_ERR("The module is already open");
 		return -EALREADY;
 	}
 
 	ret = validate_parameters(parameters);
 	if (ret) {
-		LOG_DBG("Invalid parameters for module, ret %d", ret);
+		LOG_ERR("Invalid parameters for module, ret %d", ret);
 		return ret;
 	}
 
 	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	handle->description->type = parameters->description->type;
-	handle->previous_state = AMOD_STATE_UNDEFINED;
+	handle->previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 
-	/* Allocate the context memory */
+	/* Allocate the context memory. */
 	handle->context = context;
 
 	memcpy(handle->name, name, CONFIG_AUDIO_MODULE_NAME_SIZE - 1);
 	if (strlen(name) > CONFIG_AUDIO_MODULE_NAME_SIZE - 1) {
-		LOG_INF("Module's instance name truncated to %s", handle->name);
+		LOG_WRN("Module's instance name truncated to %s", handle->name);
 	}
 	handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE - 1] = '\0';
 
@@ -463,36 +483,33 @@ int audio_module_open(struct audio_module_parameters *parameters,
 		ret = handle->description->functions->open(
 			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
-			LOG_DBG("Failed open call to module %s, ret %d", name, ret);
+			LOG_ERR("Failed open call to module %s, ret %d", name, ret);
 			return ret;
 		}
 	}
 
-	if (handle->description->functions->configuration_set != NULL) {
-		ret = handle->description->functions->configuration_set(
-			(struct audio_module_handle_private *)handle, configuration);
-		if (ret) {
-			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
-				ret);
-			return ret;
-		}
+	ret = handle->description->functions->configuration_set(
+		(struct audio_module_handle_private *)handle, configuration);
+	if (ret) {
+		LOG_ERR("Set configuration for module %s send failed, ret %d", handle->name, ret);
+		return ret;
 	}
 
 	switch (handle->description->type) {
-	case AMOD_TYPE_INPUT:
+	case AUDIO_MODULE_TYPE_INPUT:
 		thread_entry = (k_thread_entry_t)module_thread_input;
 		break;
 
-	case AMOD_TYPE_OUTPUT:
+	case AUDIO_MODULE_TYPE_OUTPUT:
 		thread_entry = (k_thread_entry_t)module_thread_output;
 		break;
 
-	case AMOD_TYPE_PROCESS:
+	case AUDIO_MODULE_TYPE_IN_OUT:
 		thread_entry = (k_thread_entry_t)module_thread_in_out;
 		break;
 
 	default:
-		LOG_DBG("Invalid module type %d for module %s", handle->description->type,
+		LOG_ERR("Invalid module type %d for module %s", handle->description->type,
 			handle->name);
 		return -EINVAL;
 	}
@@ -507,18 +524,18 @@ int audio_module_open(struct audio_module_parameters *parameters,
 
 	ret = k_thread_name_set(handle->thread_id, &handle->name[0]);
 	if (ret) {
-		LOG_DBG("Failed to start thread for module %s thread, ret %d", handle->name, ret);
+		LOG_ERR("Failed to start thread for module %s thread, ret %d", handle->name, ret);
 
-		/* Clean up the handle */
+		/* Clean up the handle. */
 		memset(handle, 0, sizeof(struct audio_module_handle));
 		return ret;
 	}
 
-	handle->state = AMOD_STATE_CONFIGURED;
+	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
 
 	k_thread_start(handle->thread_id);
 
-	LOG_DBG("Start thread");
+	LOG_DBG("Thread started");
 
 	return 0;
 }
@@ -531,12 +548,13 @@ int audio_module_close(struct audio_module_handle *handle)
 	int ret;
 
 	if (handle == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
-		LOG_DBG("Module %s in an invalid state, %d, for close", handle->name,
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
+	    handle->state == AUDIO_MODULE_STATE_RUNNING) {
+		LOG_ERR("Module %s in an invalid state, %d, for close", handle->name,
 			handle->state);
 		return -ENOTSUP;
 	}
@@ -545,7 +563,7 @@ int audio_module_close(struct audio_module_handle *handle)
 		ret = handle->description->functions->close(
 			(struct audio_module_handle_private *)handle);
 		if (ret) {
-			LOG_DBG("Failed close call to module %s, returned %d", handle->name, ret);
+			LOG_ERR("Failed close call to module %s, returned %d", handle->name, ret);
 			return ret;
 		}
 	}
@@ -567,7 +585,7 @@ int audio_module_close(struct audio_module_handle *handle)
 
 	LOG_DBG("Closed module %s", handle->name);
 
-	/* Clean up the handle */
+	/* Clean up the handle. */
 	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	return 0;
@@ -582,34 +600,34 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 	int ret;
 
 	if (handle == NULL || configuration == NULL) {
-		LOG_DBG("Module input parameter error");
+		LOG_ERR("Module input parameter error");
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED || handle->state == AMOD_STATE_RUNNING) {
-		LOG_DBG("Module %s in an invalid state, %d, for setting the configuration",
+	if (handle->description->functions->configuration_set == NULL) {
+		LOG_ERR("Module %s has no reconfigure function", handle->name);
+		return -ENOTSUP;
+	}
+
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
+	    handle->state == AUDIO_MODULE_STATE_RUNNING) {
+		LOG_ERR("Module %s in an invalid state, %d, for setting the configuration",
 			handle->name, handle->state);
 		return -ENOTSUP;
 	}
 
-	if (handle->description->functions->configuration_set != NULL) {
-		ret = handle->description->functions->configuration_set(
-			(struct audio_module_handle_private *)handle, configuration);
-		if (ret) {
-			LOG_DBG("Set configuration for module %s send failed, ret %d", handle->name,
-				ret);
-			return ret;
-		}
-	} else {
-		LOG_DBG("Reconfiguration for module %s has no set configuration function",
-			handle->name);
+	ret = handle->description->functions->configuration_set(
+		(struct audio_module_handle_private *)handle, configuration);
+	if (ret) {
+		LOG_ERR("Set configuration for module %s send failed, ret %d", handle->name, ret);
+		return ret;
 	}
 
-	if (handle->state != AMOD_STATE_CONFIGURED) {
+	if (handle->state != AUDIO_MODULE_STATE_CONFIGURED) {
 		handle->previous_state = handle->state;
 	}
 
-	handle->state = AMOD_STATE_CONFIGURED;
+	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
 
 	return 0;
 };
@@ -623,12 +641,12 @@ int audio_module_configuration_get(struct audio_module_handle *handle,
 	int ret;
 
 	if (handle == NULL || configuration == NULL) {
-		LOG_DBG("Module input parameter error");
+		LOG_ERR("Module input parameter error");
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED) {
-		LOG_DBG("Module %s in an invalid state, %d, for getting the configuration",
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_ERR("Module %s in an invalid state, %d, for getting the configuration",
 			handle->name, handle->state);
 		return -ENOTSUP;
 	}
@@ -642,7 +660,7 @@ int audio_module_configuration_get(struct audio_module_handle *handle,
 			return ret;
 		}
 	} else {
-		LOG_DBG("Get configuration for module %s has no get configuration function",
+		LOG_WRN("Get configuration for module %s has no get configuration function",
 			handle->name);
 	}
 
@@ -656,30 +674,32 @@ int audio_module_configuration_get(struct audio_module_handle *handle,
 int audio_module_connect(struct audio_module_handle *handle_from,
 			 struct audio_module_handle *handle_to)
 {
+	int ret;
 	struct audio_module_handle *handle;
 
 	if (handle_from == NULL || handle_to == NULL) {
-		LOG_DBG("Invalid parameter for the connection function");
+		LOG_ERR("Invalid parameter for the connection function");
 		return -EINVAL;
 	}
 
-	if (handle_from->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle_from->description->type == AMOD_TYPE_OUTPUT ||
-	    handle_to->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle_to->description->type == AMOD_TYPE_INPUT) {
-		LOG_DBG("Connections between these modules, %s to %s, is not supported",
+	ret = handle_connection_type_test(handle_from, handle_to);
+	if (ret) {
+		LOG_WRN("Connections between these modules, %s to %s, is not supported",
 			handle_from->name, handle_to->name);
 		return -ENOTSUP;
 	}
 
-	if (handle_from->state == AMOD_STATE_UNDEFINED ||
-	    handle_to->state == AMOD_STATE_UNDEFINED) {
-		LOG_DBG("A module is in an invalid state for connecting modules %s to %s",
+	if (handle_from->state == AUDIO_MODULE_STATE_UNDEFINED ||
+	    handle_to->state == AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_WRN("A module is in an invalid state for connecting modules %s to %s",
 			handle_from->name, handle_to->name);
 		return -ENOTSUP;
 	}
 
-	k_mutex_lock(&handle_from->dest_mutex, K_FOREVER);
+	ret = k_mutex_lock(&handle_from->dest_mutex, LOCK_TIMEOUT_US);
+	if (ret) {
+		return ret;
+	}
 
 	if (handle_from == handle_to) {
 		handle_from->data_tx = true;
@@ -688,7 +708,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 	} else {
 		SYS_SLIST_FOR_EACH_CONTAINER(&handle_from->hdl_dest_list, handle, node) {
 			if (handle_to == handle) {
-				LOG_DBG("Already attached %s to %s", handle_to->name,
+				LOG_WRN("Already attached %s to %s", handle_to->name,
 					handle_from->name);
 				return -EALREADY;
 			}
@@ -713,42 +733,45 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 int audio_module_disconnect(struct audio_module_handle *handle,
 			    struct audio_module_handle *handle_disconnect)
 {
+	int ret;
+
 	if (handle == NULL || handle_disconnect == NULL) {
 		LOG_DBG("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (handle->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle->description->type == AMOD_TYPE_OUTPUT ||
-	    handle_disconnect->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle_disconnect->description->type == AMOD_TYPE_INPUT) {
-		LOG_DBG("Disonnection of modules %s from %s, is not supported",
+	ret = handle_connection_type_test(handle, handle_disconnect);
+	if (ret) {
+		LOG_WRN("Disconnection of modules %s from %s, is not supported",
 			handle_disconnect->name, handle->name);
 		return -ENOTSUP;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED ||
-	    handle_disconnect->state == AMOD_STATE_UNDEFINED) {
-		LOG_DBG("A module is an invalid state or type for disconnection");
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
+	    handle_disconnect->state == AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_WRN("A module is an invalid state or type for disconnection");
 		return -ENOTSUP;
 	}
 
-	k_mutex_lock(&handle->dest_mutex, K_FOREVER);
+	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
+	if (ret) {
+		return ret;
+	}
 
 	if (handle == handle_disconnect) {
 		handle->data_tx = false;
-		handle->dest_count -= 1;
 	} else {
 		if (!sys_slist_find_and_remove(&handle->hdl_dest_list, &handle_disconnect->node)) {
-			LOG_DBG("Connection to module %s has not been found for module %s",
+			LOG_ERR("Connection to module %s has not been found for module %s",
 				handle_disconnect->name, handle->name);
 			return -EALREADY;
-		} else {
-			LOG_DBG("Disconnect module %s from module %s", handle_disconnect->name,
-				handle->name);
-			handle->dest_count -= 1;
 		}
+
+		LOG_DBG("Disconnect module %s from module %s", handle_disconnect->name,
+			handle->name);
 	}
+
+	handle->dest_count -= 1;
 
 	k_mutex_unlock(&handle->dest_mutex);
 
@@ -767,13 +790,13 @@ int audio_module_start(struct audio_module_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED) {
-		LOG_DBG("Module %s in an invalid state, %d, for start", handle->name,
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_WRN("Module %s in an invalid state, %d, for start", handle->name,
 			handle->state);
 		return -ENOTSUP;
 	}
 
-	if (handle->state == AMOD_STATE_RUNNING) {
+	if (handle->state == AUDIO_MODULE_STATE_RUNNING) {
 		LOG_DBG("Module %s already running", handle->name);
 		return -EALREADY;
 	}
@@ -782,13 +805,13 @@ int audio_module_start(struct audio_module_handle *handle)
 		ret = handle->description->functions->start(
 			(struct audio_module_handle_private *)handle);
 		if (ret < 0) {
-			LOG_DBG("Failed user start for module %s, ret %d", handle->name, ret);
+			LOG_ERR("Failed user start for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
 	}
 
 	handle->previous_state = handle->state;
-	handle->state = AMOD_STATE_RUNNING;
+	handle->state = AUDIO_MODULE_STATE_RUNNING;
 
 	return 0;
 }
@@ -801,17 +824,17 @@ int audio_module_stop(struct audio_module_handle *handle)
 	int ret;
 
 	if (handle == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_STOPPED) {
+	if (handle->state == AUDIO_MODULE_STATE_STOPPED) {
 		LOG_DBG("Module %s already stopped", handle->name);
 		return -EALREADY;
 	}
 
-	if (handle->state != AMOD_STATE_RUNNING) {
-		LOG_DBG("Module %s in an invalid state, %d, for stop", handle->name, handle->state);
+	if (handle->state != AUDIO_MODULE_STATE_RUNNING) {
+		LOG_WRN("Module %s in an invalid state, %d, for stop", handle->name, handle->state);
 		return -ENOTSUP;
 	}
 
@@ -819,13 +842,13 @@ int audio_module_stop(struct audio_module_handle *handle)
 		ret = handle->description->functions->stop(
 			(struct audio_module_handle_private *)handle);
 		if (ret < 0) {
-			LOG_DBG("Failed user pause for module %s, ret %d", handle->name, ret);
+			LOG_ERR("Failed user pause for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
 	}
 
 	handle->previous_state = handle->state;
-	handle->state = AMOD_STATE_STOPPED;
+	handle->state = AUDIO_MODULE_STATE_STOPPED;
 
 	return 0;
 }
@@ -833,35 +856,35 @@ int audio_module_stop(struct audio_module_handle *handle)
 /**
  * @brief Send a data buffer to a module, all data is consumed by the module.
  */
-int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data *block,
+int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data *audio_data,
 			 audio_module_response_cb response_cb)
 {
 	if (handle == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (block == NULL || block->data == NULL || block->data_size == 0) {
-		LOG_DBG("Module , %s, data parameter error", handle->name);
+	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
+		LOG_ERR("Module , %s, data parameter error", handle->name);
 		return -ECONNREFUSED;
 	}
 
-	if (handle->state != AMOD_STATE_RUNNING ||
-	    handle->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle->description->type == AMOD_TYPE_INPUT) {
-		LOG_DBG("Module %s in an invalid state (%d) or type (%d) to transmit data",
+	if (handle->state != AUDIO_MODULE_STATE_RUNNING ||
+	    handle->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle->description->type == AUDIO_MODULE_TYPE_INPUT) {
+		LOG_WRN("Module %s in an invalid state (%d) or type (%d) to transmit data",
 			handle->name, handle->state, handle->description->type);
 		return -ENOTSUP;
 	}
 
-	return data_tx((void *)NULL, handle, block, response_cb);
+	return data_tx((void *)NULL, handle, audio_data, response_cb);
 }
 
 /**
  * @brief Retrieve data from the module.
  *
  */
-int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *block,
+int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *audio_data,
 			 k_timeout_t timeout)
 {
 	int ret;
@@ -870,41 +893,42 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 	size_t msg_rx_size;
 
 	if (handle == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle error");
 		return -EINVAL;
 	}
 
-	if (handle->state != AMOD_STATE_RUNNING ||
-	    handle->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle->description->type == AMOD_TYPE_OUTPUT) {
-		LOG_DBG("Module %s in an invalid state (%d) or type (%d) to receive data",
+	if (handle->state != AUDIO_MODULE_STATE_RUNNING ||
+	    handle->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle->description->type == AUDIO_MODULE_TYPE_OUTPUT) {
+		LOG_WRN("Module %s in an invalid state (%d) or type (%d) to receive data",
 			handle->name, handle->state, handle->description->type);
 		return -ENOTSUP;
 	}
 
-	if (block == NULL || block->data == NULL || block->data_size == 0) {
-		LOG_DBG("Error in audio block for module %s", handle->name);
+	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
+		LOG_ERR("Error in audio data for module %s", handle->name);
 		return -ECONNREFUSED;
 	}
 
 	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
-		LOG_DBG("Failed to retrieve data from module %s, ret %d", handle->name, ret);
+		LOG_ERR("Failed to retrieve data from module %s, ret %d", handle->name, ret);
 		return ret;
 	}
 
-	if (msg_rx->block.data == NULL || msg_rx->block.data_size > block->data_size) {
-		LOG_DBG("Data output buffer NULL or too small for received buffer from module %s",
+	if (msg_rx->audio_data.data == NULL ||
+	    msg_rx->audio_data.data_size > audio_data->data_size) {
+		LOG_ERR("Data output buffer NULL or too small for received buffer from module %s",
 			handle->name);
 		ret = -EINVAL;
 	} else {
-		memcpy(&block->meta, &msg_rx->block.meta, sizeof(struct audio_metadata));
-		memcpy((uint8_t *)block->data, (uint8_t *)msg_rx->block.data,
-		       msg_rx->block.data_size);
+		memcpy(&audio_data->meta, &msg_rx->audio_data.meta, sizeof(struct audio_metadata));
+		memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_rx->audio_data.data,
+		       msg_rx->audio_data.data_size);
 	}
 
-	block_release_cb((struct audio_module_handle_private *)handle, &msg_rx->block);
+	audio_data_release_cb((struct audio_module_handle_private *)handle, &msg_rx->audio_data);
 
 	data_fifo_block_free(handle->thread.msg_rx, (void **)&msg_rx);
 
@@ -912,59 +936,59 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 }
 
 /**
- * @brief Send an audio data block to a module and retrieve an audio data block from a module.
+ * @brief Send an audio data to a module and retrieve an audio data from a module.
  *
- * @note The block is processed within the module or sequence of modules. The result is returned
- *       via the module or final module's output FIFO.
- *       All the input data is consumed within the call and thus the input data buffer
- *       maybe released once the function returns.
+ * @note The audio data is processed within the module or sequence of modules. The result is
+ * returned via the module or final module's output FIFO. All the input data is consumed within the
+ * call and thus the input data buffer maybe released once the function returns.
  *
  */
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
-			    struct audio_module_handle *handle_rx, struct audio_data *block_tx,
-			    struct audio_data *block_rx, k_timeout_t timeout)
+			    struct audio_module_handle *handle_rx, struct audio_data *audio_data_tx,
+			    struct audio_data *audio_data_rx, k_timeout_t timeout)
 {
 	int ret;
 	struct audio_module_message *msg_rx;
 	size_t msg_rx_size;
 
 	if (handle_tx == NULL || handle_rx == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (handle_tx->state != AMOD_STATE_RUNNING || handle_rx->state != AMOD_STATE_RUNNING) {
-		LOG_DBG("Module is in an invalid state or type to send-receive data");
+	if (handle_tx->state != AUDIO_MODULE_STATE_RUNNING ||
+	    handle_rx->state != AUDIO_MODULE_STATE_RUNNING) {
+		LOG_WRN("Module is in an invalid state or type to send-receive data");
 		return -ENOTSUP;
 	}
 
-	if (handle_tx->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle_tx->description->type == AMOD_TYPE_INPUT ||
-	    handle_rx->description->type == AMOD_TYPE_UNDEFINED ||
-	    handle_rx->description->type == AMOD_TYPE_OUTPUT) {
-		LOG_DBG("Module not of the right type for operation");
+	if (handle_tx->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle_tx->description->type == AUDIO_MODULE_TYPE_INPUT ||
+	    handle_rx->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
+	    handle_rx->description->type == AUDIO_MODULE_TYPE_OUTPUT) {
+		LOG_WRN("Module not of the right type for operation");
 		return -ENOTSUP;
 	}
 
-	if (block_tx == NULL || block_rx == NULL) {
-		LOG_DBG("Block pointer for module is NULL");
+	if (audio_data_tx == NULL || audio_data_rx == NULL) {
+		LOG_WRN("Block pointer for module is NULL");
 		return -ECONNREFUSED;
 	}
 
-	if (block_tx->data == NULL || block_tx->data_size == 0 || block_rx->data == NULL ||
-	    block_rx->data_size == 0) {
-		LOG_DBG("Invalid output audio block");
+	if (audio_data_tx->data == NULL || audio_data_tx->data_size == 0 ||
+	    audio_data_rx->data == NULL || audio_data_rx->data_size == 0) {
+		LOG_WRN("Invalid output audio data");
 		return -ECONNREFUSED;
 	}
 
 	if (handle_tx->thread.msg_rx == NULL || handle_rx->thread.msg_tx == NULL) {
-		LOG_DBG("Modules have message queue set to NULL");
+		LOG_ERR("Modules have message queue set to NULL");
 		return -ENOTSUP;
 	}
 
-	ret = data_tx(NULL, handle_tx, block_tx, NULL);
+	ret = data_tx(NULL, handle_tx, audio_data_tx, NULL);
 	if (ret) {
-		LOG_DBG("Failed to send data to module %s, ret %d", handle_tx->name, ret);
+		LOG_ERR("Failed to send data to module %s, ret %d", handle_tx->name, ret);
 		return ret;
 	}
 
@@ -973,22 +997,24 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 	ret = data_fifo_pointer_last_filled_get(handle_rx->thread.msg_rx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
-		LOG_DBG("Failed to retrieve data from module %s, ret %d", handle_rx->name, ret);
+		LOG_ERR("Failed to retrieve data from module %s, ret %d", handle_rx->name, ret);
 		return ret;
 	}
 
-	if (msg_rx->block.data == NULL || msg_rx->block.data_size == 0) {
-		LOG_DBG("Data output buffer too small for received buffer from module %s (%d)",
-			handle_rx->name, msg_rx->block.data_size);
+	if (msg_rx->audio_data.data == NULL || msg_rx->audio_data.data_size == 0) {
+		LOG_ERR("Data output buffer too small for received buffer from module %s (%d)",
+			handle_rx->name, msg_rx->audio_data.data_size);
 		ret = -EINVAL;
 	} else {
-		memcpy(&block_rx->meta, &msg_rx->block.meta, sizeof(struct audio_metadata));
-		memcpy((uint8_t *)block_rx->data, (uint8_t *)msg_rx->block.data,
-		       msg_rx->block.data_size);
+		memcpy(&audio_data_rx->meta, &msg_rx->audio_data.meta,
+		       sizeof(struct audio_metadata));
+		memcpy((uint8_t *)audio_data_rx->data, (uint8_t *)msg_rx->audio_data.data,
+		       msg_rx->audio_data.data_size);
 	}
 
 	if (handle_tx != handle_rx) {
-		block_release_cb((struct audio_module_handle_private *)handle_rx, &msg_rx->block);
+		audio_data_release_cb((struct audio_module_handle_private *)handle_rx,
+				      &msg_rx->audio_data);
 	}
 
 	data_fifo_block_free(handle_rx->thread.msg_rx, (void **)&msg_rx);
@@ -1005,12 +1031,12 @@ int audio_module_names_get(struct audio_module_handle *handle, char **base_name,
 			   char *instance_name)
 {
 	if (handle == NULL || base_name == NULL || instance_name == NULL) {
-		LOG_DBG("Input parameter is NULL");
+		LOG_ERR("Input parameter is NULL");
 		return -EINVAL;
 	}
 
-	if (handle->state == AMOD_STATE_UNDEFINED) {
-		LOG_DBG("Module %s is in an invalid state, %d, for get names", handle->name,
+	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+		LOG_WRN("Module %s is in an invalid state, %d, for get names", handle->name,
 			handle->state);
 		return -ENOTSUP;
 	}
@@ -1028,12 +1054,12 @@ int audio_module_names_get(struct audio_module_handle *handle, char **base_name,
 int audio_module_state_get(struct audio_module_handle *handle, enum audio_module_state *state)
 {
 	if (handle == NULL || state == NULL) {
-		LOG_DBG("Input parameter is NULL");
+		LOG_ERR("Input parameter is NULL");
 		return -EINVAL;
 	}
 
-	if (handle->state > AMOD_STATE_STOPPED) {
-		LOG_DBG("Module state is invalid");
+	if (handle->state > AUDIO_MODULE_STATE_STOPPED) {
+		LOG_WRN("Module state is invalid");
 		return -EINVAL;
 	}
 
@@ -1049,12 +1075,12 @@ int audio_module_state_get(struct audio_module_handle *handle, enum audio_module
 int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels)
 {
 	if (number_channels == NULL) {
-		LOG_DBG("Invalid parameters");
+		LOG_ERR("Invalid parameters");
 		return -EINVAL;
 	}
 
 	*number_channels = 0;
-	for (int i = 0; i < AMOD_BITS_IN_CHANNEL_MAP; i++) {
+	for (int i = 0; i < AUDIO_MODULE_BITS_IN_CHANNEL_MAP; i++) {
 		*number_channels += locations & 1;
 		locations >>= 1;
 	}
