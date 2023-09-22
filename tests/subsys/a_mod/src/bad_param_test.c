@@ -851,8 +851,8 @@ ZTEST(suite_a_mod_bad_param, test_connect_null)
 		      ret);
 
 	ret = audio_module_connect(&handle_tx, NULL);
-	zassert_equal(ret, -EINVAL, "Connectt function did not return -EINVAL (%d): ret %d",
-		      -EINVAL, ret);
+	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx);
 	zassert_equal(ret, 0, "Connect function did not return 0L (0): ret %d", ret);
@@ -1156,7 +1156,7 @@ ZTEST(suite_a_mod_bad_param, test_open_null)
 	ret = audio_module_open(&test_params, config, inst_name,
 				(struct audio_module_context *)&context, NULL);
 	zassert_equal(ret, -EINVAL,
-		      "The module open functio with NULLn did not return -EINVAL (%d): ret %d",
+		      "The module open function with NULLn did not return -EINVAL (%d): ret %d",
 		      -EINVAL, ret);
 
 	handle.state = AUDIO_MODULE_STATE_UNDEFINED;

@@ -233,7 +233,7 @@ static int test_data_process_function(struct audio_module_handle_private *handle
  * @brief Initialise a list of connections.
  *
  * @param handle_from[in/out]  The handle for the module to initialise the list
- * @param handles_to[in]       Pointer to an array of handles to initislise the list with
+ * @param handles_to[in]       Pointer to an array of handles to initialise the list with
  * @param list_size[in]        The number of handles to initialise the list with
  * @param data_tx[in]          The state to set for data_tx in the handle
  *
@@ -988,7 +988,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 {
 	int ret;
 	int i, j, k;
-	int num_destionations;
+	int num_destinations;
 	char *test_base_name = "Test base name";
 	char *test_inst_from_name = "TEST instance from";
 	char *test_inst_to_name = "TEST instance";
@@ -1022,7 +1022,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
-			num_destionations = test_initialise_connection_list(
+			num_destinations = test_initialise_connection_list(
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
@@ -1034,13 +1034,13 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 					"ret %d (%d)",
 					ret, k);
 
-				num_destionations -= 1;
+				num_destinations -= 1;
 
-				zassert_equal(handle_from.dest_count, num_destionations,
+				zassert_equal(handle_from.dest_count, num_destinations,
 					      "Destination count should be %d, but is %d",
-					      num_destionations, handle_from.dest_count);
+					      num_destinations, handle_from.dest_count);
 
-				test_list(&handle_from, &handles_to[k + 1], num_destionations,
+				test_list(&handle_from, &handles_to[k + 1], num_destinations,
 					  false);
 			}
 		}
@@ -1056,7 +1056,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
-			num_destionations = test_initialise_connection_list(
+			num_destinations = test_initialise_connection_list(
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
@@ -1068,13 +1068,13 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 					"ret %d (%d)",
 					ret, k);
 
-				num_destionations -= 1;
+				num_destinations -= 1;
 
-				zassert_equal(handle_from.dest_count, num_destionations,
+				zassert_equal(handle_from.dest_count, num_destinations,
 					      "Destination count should be %d, but is %d",
-					      num_destionations, handle_from.dest_count);
+					      num_destinations, handle_from.dest_count);
 
-				test_list(&handle_from, &handles_to[k + 1], num_destionations,
+				test_list(&handle_from, &handles_to[k + 1], num_destinations,
 					  false);
 			}
 		}
@@ -1090,7 +1090,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			handle_from.state = i;
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
-			num_destionations = test_initialise_connection_list(
+			num_destinations = test_initialise_connection_list(
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, true);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
@@ -1102,14 +1102,13 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 					"ret %d (%d)",
 					ret, k);
 
-				num_destionations -= 1;
+				num_destinations -= 1;
 
-				zassert_equal(handle_from.dest_count, num_destionations,
+				zassert_equal(handle_from.dest_count, num_destinations,
 					      "Destination count should be %d, but is %d",
-					      num_destionations, handle_from.dest_count);
+					      num_destinations, handle_from.dest_count);
 
-				test_list(&handle_from, &handles_to[k + 1], num_destionations,
-					  true);
+				test_list(&handle_from, &handles_to[k + 1], num_destinations, true);
 			}
 		}
 
@@ -1117,7 +1116,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		zassert_equal(ret, 0, "Disconnect function did not return successfully (0): ret %d",
 			      ret);
 
-		num_destionations -= 1;
+		num_destinations -= 1;
 
 		zassert_equal(handle_from.dest_count, 0, "Destination count is not %d, %d", 0,
 			      handle_from.dest_count);
@@ -1133,7 +1132,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		handle_from.state = i;
 		sys_slist_init(&handle_from.hdl_dest_list);
 		k_mutex_init(&handle_from.dest_mutex);
-		num_destionations = test_initialise_connection_list(&handle_from, NULL, 0, true);
+		num_destinations = test_initialise_connection_list(&handle_from, NULL, 0, true);
 
 		ret = audio_module_disconnect(&handle_from, &handle_from);
 
@@ -2142,9 +2141,8 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct audio_data audio_data_in;
-	struct audio_data audio_data_out;
-	struct audio_module_message *data_msg_tx;
+	struct audio_data audio_data_in struct audio_data audio_data_out struct audio_module_message
+		*data_msg_tx;
 
 	test_context_set(&mod_context, &mod_config);
 
