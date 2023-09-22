@@ -915,7 +915,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 	}
 
 	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
-		LOG_ERR("Error in audio data for module %s", handle->name);
+		LOG_ERR("Input audio data for module %s has NULL pointer or a zero size buffer",
+			handle->name);
 		return -ECONNREFUSED;
 	}
 
@@ -936,8 +937,6 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_tx->audio_data.data,
 		       msg_tx->audio_data.data_size);
 	}
-
-	audio_data_release_cb((struct audio_module_handle_private *)handle, &msg_tx->audio_data);
 
 	data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
 

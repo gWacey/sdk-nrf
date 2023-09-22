@@ -2107,7 +2107,7 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 
 	ret = data_fifo_pointer_last_filled_get(&mod_fifo_rx, (void **)&msg_rx, &size, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data TX function did not return 0: ret %d", 0, ret);
-	zassert_mem_equal(msg_rx->audio_data.data, &test_data[0], TEST_MOD_DATA_SIZE / 2,
+	zassert_mem_equal(msg_rx->audio_data.data, &test_data[0], TEST_MOD_DATA_SIZE,
 			  "Failed open, module contexts differ");
 	zassert_equal(msg_rx->audio_data.data_size, TEST_MOD_DATA_SIZE,
 		      "Failed Data TX-RX function, data sizes differs");
@@ -2141,8 +2141,9 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 	struct audio_module_handle handle = {0};
 	char test_data[TEST_MOD_DATA_SIZE];
 	char data[TEST_MOD_DATA_SIZE] = {0};
-	struct audio_data audio_data_in struct audio_data audio_data_out struct audio_module_message
-		*data_msg_tx;
+	struct audio_data audio_data_in;
+	struct audio_data audio_data_out = {0};
+	struct audio_module_message *data_msg_tx;
 
 	test_context_set(&mod_context, &mod_config);
 
@@ -2187,9 +2188,6 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 
 	audio_data_out.data = &data[0];
 	audio_data_out.data_size = TEST_MOD_DATA_SIZE;
-
-	/* Register resets */
-	DO_FOREACH_FAKE(RESET_FAKE);
 
 	ret = audio_module_data_rx(&handle, &audio_data_out, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data RX function did not return successfully (0):: ret %d", ret);
