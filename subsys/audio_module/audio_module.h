@@ -243,9 +243,6 @@ struct audio_module_handle {
 	/* Current state of the module. */
 	enum audio_module_state state;
 
-	/* Previous state of the module. */
-	enum audio_module_state previous_state;
-
 	/* Thread ID. */
 	k_tid_t thread_id;
 

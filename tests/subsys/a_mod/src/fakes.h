@@ -48,8 +48,8 @@ int fake_data_fifo_block_lock__size_0_fails(struct data_fifo *data_fifo, void **
 int fake_data_fifo_block_lock__put_fails(struct data_fifo *data_fifo, void **data, size_t size);
 int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo, void **data,
 						     size_t *size, k_timeout_t timeout);
-int fake_data_fifo_pointer_last_filled_get_no_wait_fails(struct data_fifo *data_fifo, void **data,
-							 size_t *size, k_timeout_t timeout);
+int fake_data_fifo_pointer_last_filled_get__no_wait_fails(struct data_fifo *data_fifo, void **data,
+							  size_t *size, k_timeout_t timeout);
 int fake_data_fifo_pointer_last_filled_get__timeout_fails(struct data_fifo *data_fifo, void **data,
 							  size_t *size, k_timeout_t timeout);
 void fake_data_fifo_block_free__succeeds(struct data_fifo *data_fifo, void **data);

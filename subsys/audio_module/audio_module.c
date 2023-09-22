@@ -263,6 +263,8 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
 	void *data;
 
 	__ASSERT(handle != NULL, "Module task has NULL handle");
+	__ASSERT(handle->description->functions->data_process != NULL,
+		 "Module task has NULL process function pointer");
 
 	/* Execute thread */
 	while (1) {
@@ -314,6 +316,8 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 	size_t size;
 
 	__ASSERT(handle != NULL, "Module task has NULL handle");
+	__ASSERT(handle->description->functions->data_process != NULL,
+		 "Module task has NULL process function pointer");
 
 	/* Execute thread. */
 	while (1) {
@@ -366,6 +370,8 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 	size_t size;
 
 	__ASSERT(handle != NULL, "Module task has NULL handle");
+	__ASSERT(handle->description->functions->data_process != NULL,
+		 "Module task has NULL process function pointer");
 
 	/* Execute thread. */
 	while (1) {
@@ -464,7 +470,6 @@ int audio_module_open(struct audio_module_parameters *parameters,
 	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	handle->description->type = parameters->description->type;
-	handle->previous_state = AUDIO_MODULE_STATE_UNDEFINED;
 
 	/* Allocate the context memory. */
 	handle->context = context;
@@ -621,10 +626,6 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 	if (ret) {
 		LOG_ERR("Set configuration for module %s send failed, ret %d", handle->name, ret);
 		return ret;
-	}
-
-	if (handle->state != AUDIO_MODULE_STATE_CONFIGURED) {
-		handle->previous_state = handle->state;
 	}
 
 	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
@@ -810,7 +811,6 @@ int audio_module_start(struct audio_module_handle *handle)
 		}
 	}
 
-	handle->previous_state = handle->state;
 	handle->state = AUDIO_MODULE_STATE_RUNNING;
 
 	return 0;
@@ -847,7 +847,6 @@ int audio_module_stop(struct audio_module_handle *handle)
 		}
 	}
 
-	handle->previous_state = handle->state;
 	handle->state = AUDIO_MODULE_STATE_STOPPED;
 
 	return 0;
@@ -864,17 +863,22 @@ int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data *
 		return -EINVAL;
 	}
 
-	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
-		LOG_ERR("Module , %s, data parameter error", handle->name);
-		return -ECONNREFUSED;
-	}
-
 	if (handle->state != AUDIO_MODULE_STATE_RUNNING ||
 	    handle->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
 	    handle->description->type == AUDIO_MODULE_TYPE_INPUT) {
 		LOG_WRN("Module %s in an invalid state (%d) or type (%d) to transmit data",
 			handle->name, handle->state, handle->description->type);
 		return -ENOTSUP;
+	}
+
+	if (handle->thread.msg_rx == NULL) {
+		LOG_ERR("Module has message queue set to NULL");
+		return -ENOTSUP;
+	}
+
+	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
+		LOG_ERR("Module , %s, data parameter error", handle->name);
+		return -ECONNREFUSED;
 	}
 
 	return data_tx((void *)NULL, handle, audio_data, response_cb);
@@ -889,8 +893,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 {
 	int ret;
 
-	struct audio_module_message *msg_rx;
-	size_t msg_rx_size;
+	struct audio_module_message *msg_tx;
+	size_t msg_tx_size;
 
 	if (handle == NULL) {
 		LOG_ERR("Module handle error");
@@ -905,32 +909,37 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return -ENOTSUP;
 	}
 
+	if (handle->thread.msg_tx == NULL) {
+		LOG_ERR("Module has message queue set to NULL");
+		return -ENOTSUP;
+	}
+
 	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
 		LOG_ERR("Error in audio data for module %s", handle->name);
 		return -ECONNREFUSED;
 	}
 
-	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
-						&msg_rx_size, timeout);
+	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_tx,
+						&msg_tx_size, timeout);
 	if (ret) {
 		LOG_ERR("Failed to retrieve data from module %s, ret %d", handle->name, ret);
 		return ret;
 	}
 
-	if (msg_rx->audio_data.data == NULL ||
-	    msg_rx->audio_data.data_size > audio_data->data_size) {
+	if (msg_tx->audio_data.data == NULL ||
+	    msg_tx->audio_data.data_size > audio_data->data_size) {
 		LOG_ERR("Data output buffer NULL or too small for received buffer from module %s",
 			handle->name);
 		ret = -EINVAL;
 	} else {
-		memcpy(&audio_data->meta, &msg_rx->audio_data.meta, sizeof(struct audio_metadata));
-		memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_rx->audio_data.data,
-		       msg_rx->audio_data.data_size);
+		memcpy(&audio_data->meta, &msg_tx->audio_data.meta, sizeof(struct audio_metadata));
+		memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_tx->audio_data.data,
+		       msg_tx->audio_data.data_size);
 	}
 
-	audio_data_release_cb((struct audio_module_handle_private *)handle, &msg_rx->audio_data);
+	audio_data_release_cb((struct audio_module_handle_private *)handle, &msg_tx->audio_data);
 
-	data_fifo_block_free(handle->thread.msg_rx, (void **)&msg_rx);
+	data_fifo_block_free(handle->thread.msg_tx, (void **)&msg_tx);
 
 	return ret;
 }

@@ -203,6 +203,7 @@ int fake_data_fifo_pointer_last_filled_get__timeout_fails(struct data_fifo *data
 	ARG_UNUSED(data_fifo);
 	ARG_UNUSED(data);
 	ARG_UNUSED(size);
+	ARG_UNUSED(timeout);
 
 	return -EAGAIN;
 }

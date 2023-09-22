@@ -97,10 +97,11 @@ ZTEST(suite_a_mod_bad_param, test_names_get_null)
 ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
 {
 	int ret;
+	struct data_fifo mod_fifo_rx;
 	struct audio_module_description test_description = {
 		.name = "Module 1", .type = AUDIO_MODULE_TYPE_UNDEFINED, .functions = NULL};
 	struct audio_module_handle handle = {.description = &test_description,
-					     .previous_state = AUDIO_MODULE_STATE_CONFIGURED};
+					     .thread = {.msg_tx = NULL, .msg_rx = &mod_fifo_rx}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block = {0};
 
@@ -141,11 +142,12 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
 ZTEST(suite_a_mod_bad_param, test_data_tx_null)
 {
 	int ret;
+	struct data_fifo mod_fifo_rx;
 	struct audio_module_description test_description = {
 		.name = "Module 1", .type = AUDIO_MODULE_TYPE_IN_OUT, .functions = NULL};
 	struct audio_module_handle handle = {.description = &test_description,
-					     .previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-					     .state = AUDIO_MODULE_STATE_RUNNING};
+					     .state = AUDIO_MODULE_STATE_RUNNING,
+					     .thread = {.msg_tx = NULL, .msg_rx = NULL}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block = {0};
 
@@ -155,6 +157,12 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_null)
 	ret = audio_module_data_tx(NULL, &test_block, NULL);
 	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
+
+	ret = audio_module_data_tx(&handle, &test_block, NULL);
+	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.thread.msg_rx = &mod_fifo_rx;
 
 	ret = audio_module_data_tx(&handle, NULL, NULL);
 	zassert_equal(ret, -ECONNREFUSED,
@@ -181,11 +189,12 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_null)
 ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
 {
 	int ret;
+	struct data_fifo mod_fifo_tx;
 	struct audio_module_description test_description = {
 		.name = "Module RX", .type = AUDIO_MODULE_TYPE_UNDEFINED, .functions = NULL};
 	struct audio_module_handle handle = {.description = &test_description,
-					     .previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-					     .state = AUDIO_MODULE_STATE_RUNNING};
+					     .state = AUDIO_MODULE_STATE_RUNNING,
+					     .thread = {.msg_tx = &mod_fifo_tx, .msg_rx = NULL}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block = {0};
 
@@ -226,11 +235,12 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
 ZTEST(suite_a_mod_bad_param, test_data_rx_null)
 {
 	int ret;
+	struct data_fifo mod_fifo_tx;
 	struct audio_module_description test_description = {
 		.name = "Module 1", .type = AUDIO_MODULE_TYPE_IN_OUT, .functions = NULL};
 	struct audio_module_handle handle = {.description = &test_description,
-					     .previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-					     .state = AUDIO_MODULE_STATE_RUNNING};
+					     .state = AUDIO_MODULE_STATE_RUNNING,
+					     .thread = {.msg_tx = NULL, .msg_rx = NULL}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block = {0};
 
@@ -240,6 +250,12 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_null)
 	ret = audio_module_data_rx(NULL, &test_block, K_NO_WAIT);
 	zassert_equal(ret, -EINVAL, "Data RX function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
+
+	ret = audio_module_data_rx(&handle, &test_block, K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle.thread.msg_tx = &mod_fifo_tx;
 
 	ret = audio_module_data_rx(&handle, NULL, K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
@@ -266,16 +282,20 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_null)
 ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 {
 	int ret;
+	struct data_fifo mod_fifo_tx;
+	struct data_fifo mod_fifo_rx;
 	struct audio_module_description test_description_tx = {
 		.name = "Module TX", .type = AUDIO_MODULE_TYPE_UNDEFINED, .functions = NULL};
 	struct audio_module_description test_description_rx = {
 		.name = "Module RX", .type = AUDIO_MODULE_TYPE_IN_OUT, .functions = NULL};
-	struct audio_module_handle handle_tx = {.description = &test_description_tx,
-						.previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-						.state = AUDIO_MODULE_STATE_RUNNING};
-	struct audio_module_handle handle_rx = {.description = &test_description_rx,
-						.previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-						.state = AUDIO_MODULE_STATE_RUNNING};
+	struct audio_module_handle handle_tx = {
+		.description = &test_description_tx,
+		.state = AUDIO_MODULE_STATE_RUNNING,
+		.thread = {.msg_tx = &mod_fifo_tx, .msg_rx = &mod_fifo_rx}};
+	struct audio_module_handle handle_rx = {
+		.description = &test_description_rx,
+		.state = AUDIO_MODULE_STATE_RUNNING,
+		.thread = {.msg_tx = &mod_fifo_tx, .msg_rx = &mod_fifo_rx}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block_tx = {0};
 	struct audio_data test_block_rx = {0};
@@ -287,14 +307,14 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	test_description_tx.type = AUDIO_MODULE_TYPE_INPUT;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	test_description_tx.type = AUDIO_MODULE_TYPE_IN_OUT;
@@ -302,14 +322,14 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	test_description_rx.type = AUDIO_MODULE_TYPE_OUTPUT;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	test_description_tx.type = AUDIO_MODULE_TYPE_IN_OUT;
@@ -319,21 +339,21 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_STOPPED;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_RUNNING;
@@ -341,37 +361,39 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	handle_rx.state = AUDIO_MODULE_STATE_CONFIGURED;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 
 	handle_rx.state = AUDIO_MODULE_STATE_STOPPED;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
-	zassert_equal(ret, -ENOTSUP, "Data TX function did not return -ENOTSUP (%d): ret %d",
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
 		      -ENOTSUP, ret);
 }
 
 ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 {
 	int ret;
+	struct data_fifo mod_fifo_tx;
+	struct data_fifo mod_fifo_rx;
 	struct audio_module_description test_description_tx = {
 		.name = "Module TX", .type = AUDIO_MODULE_TYPE_IN_OUT, .functions = NULL};
 	struct audio_module_description test_description_rx = {
 		.name = "Module RX", .type = AUDIO_MODULE_TYPE_IN_OUT, .functions = NULL};
 	struct audio_module_handle handle_tx = {.description = &test_description_tx,
-						.previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-						.state = AUDIO_MODULE_STATE_RUNNING};
+						.state = AUDIO_MODULE_STATE_RUNNING,
+						.thread = {.msg_tx = NULL, .msg_rx = NULL}};
 	struct audio_module_handle handle_rx = {.description = &test_description_rx,
-						.previous_state = AUDIO_MODULE_STATE_CONFIGURED,
-						.state = AUDIO_MODULE_STATE_RUNNING};
+						.state = AUDIO_MODULE_STATE_RUNNING,
+						.thread = {.msg_tx = NULL, .msg_rx = NULL}};
 	uint8_t test_data[FAKE_FIFO_MSG_QUEUE_DATA_SIZE];
 	struct audio_data test_block_tx = {0};
 	struct audio_data test_block_rx = {0};
@@ -382,22 +404,36 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 	test_block_rx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
 
 	ret = audio_module_data_tx_rx(NULL, &handle_rx, &test_block_tx, &test_block_rx, K_NO_WAIT);
-	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Data TX/RX function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
 	ret = audio_module_data_tx_rx(&handle_tx, NULL, &test_block_tx, &test_block_rx, K_NO_WAIT);
-	zassert_equal(ret, -EINVAL, "Data TX function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Data TX/RX function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
+
+	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
+				      K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_tx.thread.msg_rx = &mod_fifo_rx;
+
+	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
+				      K_NO_WAIT);
+	zassert_equal(ret, -ENOTSUP, "Data TX/RX function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
+
+	handle_rx.thread.msg_tx = &mod_fifo_tx;
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, NULL, &test_block_rx, K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
+		      "Data /RX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
 		      ret);
 
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, NULL, K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
-		      ret);
+		      "Data TX/RX function did not return -ECONNREFUSED (%d): ret %d",
+		      -ECONNREFUSED, ret);
 
 	test_block_tx.data = NULL;
 	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -405,8 +441,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
-		      ret);
+		      "Data TX/RX function did not return -ECONNREFUSED (%d): ret %d",
+		      -ECONNREFUSED, ret);
 
 	test_block_tx.data = &test_data[0];
 	test_block_tx.data_size = 0;
@@ -414,8 +450,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
-		      ret);
+		      "Data TX/RX function did not return -ECONNREFUSED (%d): ret %d",
+		      -ECONNREFUSED, ret);
 
 	test_block_tx.data = &test_data[0];
 	test_block_tx.data_size = FAKE_FIFO_MSG_QUEUE_DATA_SIZE;
@@ -425,8 +461,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
-		      ret);
+		      "Data TX/RX function did not return -ECONNREFUSED (%d): ret %d",
+		      -ECONNREFUSED, ret);
 
 	test_block_rx.data = &test_data[0];
 	test_block_rx.data_size = 0;
@@ -434,8 +470,8 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 	ret = audio_module_data_tx_rx(&handle_tx, &handle_rx, &test_block_tx, &test_block_rx,
 				      K_NO_WAIT);
 	zassert_equal(ret, -ECONNREFUSED,
-		      "Data TX function did not return -ECONNREFUSED (%d): ret %d", -ECONNREFUSED,
-		      ret);
+		      "Data TX/RX function did not return -ECONNREFUSED (%d): ret %d",
+		      -ECONNREFUSED, ret);
 }
 
 ZTEST(suite_a_mod_bad_param, test_stop_bad_state)
