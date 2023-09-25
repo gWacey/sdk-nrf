@@ -28,7 +28,7 @@ struct mod_config {
 };
 
 struct mod_context {
-	char *test_string;
+	const char *test_string;
 	uint32_t test_uint32;
 
 	struct mod_config config;

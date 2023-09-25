@@ -13,21 +13,10 @@
 #include "audio_defines.h"
 
 /**
- * @brief Number of valid least significant bits in the channel map.
+ * @brief Number of valid location bits.
  *
  */
-#define AUDIO_MODULE_BITS_IN_CHANNEL_MAP (32)
-
-/**
- * @brief Channel positions within the channel map.
- *
- */
-#define AUDIO_MODULE_CHANNEL_LEFT_FRONT	 1
-#define AUDIO_MODULE_CHANNEL_RIGHT_FRONT 2
-#define AUDIO_MODULE_CHANNEL_CENTRE	 4
-#define AUDIO_MODULE_CHANNEL_LFE	 8
-#define AUDIO_MODULE_CHANNEL_LEFT_BACK	 16
-#define AUDIO_MODULE_CHANNEL_RIGHT_BACK	 32
+#define AUDIO_MODULE_LOCATIONS_NUM (32)
 
 /**
  * @brief Module type.
@@ -240,7 +229,7 @@ struct audio_module_handle {
 	char name[CONFIG_AUDIO_MODULE_NAME_SIZE];
 
 	/* The module's description. */
-	struct audio_module_description *description;
+	const struct audio_module_description *description;
 
 	/* Current state of the module. */
 	enum audio_module_state state;
@@ -251,8 +240,8 @@ struct audio_module_handle {
 	/* Thread data. */
 	struct k_thread thread_data;
 
-	/* Flag to indicate if the module should send data to its TX FIFO. */
-	bool data_tx;
+	/* Flag to indicate if the module should put it's output data onto it's TX FIFO. */
+	bool use_tx_queue;
 
 	/* List node (pointer to next audio module). */
 	sys_snode_t node;
@@ -296,7 +285,7 @@ struct audio_module_message {
  * @param parameters[in]     Pointer to the module set-up parameters.
  * @param configuration[in]  Pointer to the module's configuration.
  * @param name[in]           A unique name for this instance of the module.
- * @param context[in]        Pointer to the private context for the module.
+ * @param context[in/out]    Pointer to the private context for the module.
  * @param handle[out]        Pointer to the module's private handle.
  *
  * @return 0 if successful, error otherwise.
@@ -329,7 +318,7 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 /**
  * @brief Function to get the configuration of a module.
  *
- * @param handle[in/out]      The handle to the module instance.
+ * @param handle[in]          The handle to the module instance.
  * @param configuration[out]  Pointer to the module's current configuration.
  *
  * @return 0 if successful, error otherwise.

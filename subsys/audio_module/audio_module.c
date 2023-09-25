@@ -91,6 +91,7 @@ static void audio_data_release_cb(struct audio_module_handle_private *handle,
 	ret = k_sem_take(&hdl->sem, K_NO_WAIT);
 	if (ret) {
 		LOG_ERR("Failed to take semaphore for data release callback function");
+		return;
 	}
 
 	if (k_sem_count_get(&hdl->sem) == 0) {
@@ -121,7 +122,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 		ret = data_fifo_pointer_first_vacant_get(rx_handle->thread.msg_rx,
 							 (void **)&data_msg_rx, K_NO_WAIT);
 		if (ret) {
-			LOG_DBG("Module %s no free data buffer, ret %d", rx_handle->name, ret);
+			LOG_ERR("Module %s no free data buffer, ret %d", rx_handle->name, ret);
 			return ret;
 		}
 
@@ -229,7 +230,10 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 		return ret;
 	}
 
-	k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
+	ret = k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
+	if (ret) {
+		return ret;
+	}
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_to, node) {
 		ret = data_tx(handle, handle_to, audio_data, &audio_data_release_cb);
@@ -237,17 +241,16 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 			LOG_ERR("Failed to send audio data to module %s from %s, ret %d",
 				handle_to->name, handle->name, ret);
 
-			ret = k_sem_take(&handle->sem, K_NO_WAIT);
-			if (ret) {
-				LOG_ERR("Failed to take semaphore for data release callback "
-					"function");
-			}
+			return ret;
 		}
 	}
 
-	k_mutex_unlock(&handle->dest_mutex);
+	ret = k_mutex_unlock(&handle->dest_mutex);
+	if (ret) {
+		return ret;
+	}
 
-	if (handle->data_tx && handle->thread.msg_tx) {
+	if (handle->use_tx_queue && handle->thread.msg_tx) {
 		ret = tx_fifo_put(handle, audio_data);
 		if (ret) {
 			LOG_ERR("Failed to send audio data on module %s TX message queue",
@@ -291,7 +294,7 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
 		 */
 		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
 		if (ret) {
-			LOG_ERR("No free data for module %s, ret %d", handle->name, ret);
+			LOG_WRN("No free data for module %s, ret %d", handle->name, ret);
 			continue;
 		}
 
@@ -308,6 +311,8 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
 			LOG_ERR("Data process error in module %s, ret %d", handle->name, ret);
 			continue;
 		}
+
+		LOG_DBG("Module %s received new audio data ", handle->name);
 
 		/* Send input audio data to next module(s). */
 		send_to_connected_modules(handle, &audio_data);
@@ -338,12 +343,16 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 	while (1) {
 		msg_rx = NULL;
 
+		LOG_DBG("Module %s waiting for a message", handle->name);
+
 		/* Get a new input message.
 		 * Since this input message is queued outside the module, this will then control the
 		 * data flow.
 		 */
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
+
+		LOG_DBG("Module %s new message received", handle->name);
 
 		/* Process the input audio data and output from the audio system. */
 		ret = handle->description->functions->data_process(
@@ -415,7 +424,7 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 
 			data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
 
-			LOG_DBG("No free data buffer for module %s, dropping input, ret %d",
+			LOG_WRN("No free data buffer for module %s, dropping input, ret %d",
 				handle->name, ret);
 			continue;
 		}
@@ -439,7 +448,7 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 
 			k_mem_slab_free(handle->thread.data_slab, (void **)(&data));
 
-			LOG_DBG("Data process error in module %s, ret %d", handle->name, ret);
+			LOG_ERR("Data process error in module %s, ret %d", handle->name, ret);
 			continue;
 		}
 
@@ -486,8 +495,6 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 	}
 
 	memset(handle, 0, sizeof(struct audio_module_handle));
-
-	handle->description->type = parameters->description->type;
 
 	/* Allocate the context memory. */
 	handle->context = context;
@@ -703,7 +710,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 
 	ret = handle_connection_type_test(handle_from, handle_to);
 	if (ret) {
-		LOG_WRN("Connections between these modules, %s to %s, is not supported",
+		LOG_ERR("Connections between these modules, %s to %s, is not supported",
 			handle_from->name, handle_to->name);
 		return -ENOTSUP;
 	}
@@ -725,7 +732,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 	 * to audio_module_data_rx() with the same handle.
 	 */
 	if (handle_from == handle_to) {
-		handle_from->data_tx = true;
+		handle_from->use_tx_queue = true;
 		handle_from->dest_count += 1;
 		LOG_DBG("Return the output of %s on it's TX message queue", handle_from->name);
 	} else {
@@ -744,7 +751,10 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			handle_to->name);
 	}
 
-	k_mutex_unlock(&handle_from->dest_mutex);
+	ret = k_mutex_unlock(&handle_from->dest_mutex);
+	if (ret) {
+		return ret;
+	}
 
 	return 0;
 }
@@ -782,7 +792,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 	}
 
 	if (handle == handle_disconnect) {
-		handle->data_tx = false;
+		handle->use_tx_queue = false;
 	} else {
 		if (!sys_slist_find_and_remove(&handle->hdl_dest_list, &handle_disconnect->node)) {
 			LOG_ERR("Connection to module %s has not been found for module %s",
@@ -796,7 +806,10 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 
 	handle->dest_count -= 1;
 
-	k_mutex_unlock(&handle->dest_mutex);
+	ret = k_mutex_unlock(&handle->dest_mutex);
+	if (ret) {
+		return ret;
+	}
 
 	return 0;
 }
@@ -1113,7 +1126,7 @@ int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_ch
 	}
 
 	*number_channels = 0;
-	for (int i = 0; i < AUDIO_MODULE_BITS_IN_CHANNEL_MAP; i++) {
+	for (int i = 0; i < AUDIO_MODULE_LOCATIONS_NUM; i++) {
 		*number_channels += locations & 1;
 		locations >>= 1;
 	}

@@ -14,9 +14,9 @@
 
 extern void data_fifo_deinit(struct data_fifo *data_fifo);
 
-static char *test_instance_name = "Test instance";
-static char *test_string = "This is a test string";
-static uint32_t test_uint32 = 0XDEADBEEF;
+static const char *test_instance_name = "Test instance";
+static const char *test_string = "This is a test string";
+static const uint32_t test_uint32 = 0XDEADBEEF;
 
 K_THREAD_STACK_DEFINE(mod_stack, TEST_MOD_THREAD_STACK_SIZE);
 K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, FAKE_FIFO_MSG_QUEUE_SIZE, 4);
@@ -28,7 +28,7 @@ K_MEM_SLAB_DEFINE(mod_data_slab, TEST_MOD_DATA_SIZE, FAKE_FIFO_MSG_QUEUE_SIZE, 4
  *
  * @return 0 if successful, error value
  */
-static int test_thread_handle(struct audio_module_handle *handle)
+static int test_thread_handle(struct audio_module_handle const *const handle)
 {
 	/* Execute thread */
 	while (1) {
@@ -43,7 +43,7 @@ static int test_thread_handle(struct audio_module_handle *handle)
 /**
  * @brief Simple function to start a test thread with handle.
  *
- * @param handle[in]  The handle to the module instance
+ * @param handle[in/out]  The handle to the module instance
  *
  * @return 0 if successful, error value
  */
@@ -71,14 +71,15 @@ static int start_thread(struct audio_module_handle *handle)
  *
  * @param handle[in/out]     The handle to the module instance
  * @param description[in]    Pointer to the modules description
- * @param context[in]        Pointer to the modules context
+ * @param context[in/out]    Pointer to the modules context
  * @param configuration[in]  Pointer to the module's configuration
  *
  * @return 0 if successful, error otherwise
  */
 static void test_initialise_handle(struct audio_module_handle *handle,
-				   struct audio_module_description *description,
-				   struct mod_context *context, struct mod_config *configuration)
+				   struct audio_module_description const *const description,
+				   struct mod_context *context,
+				   struct mod_config const *const configuration)
 {
 	memset(handle, 0, sizeof(struct audio_module_handle));
 	memcpy(&handle->name[0], test_instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
@@ -103,7 +104,7 @@ static void test_initialise_handle(struct audio_module_handle *handle,
  *
  * @return 0 if successful, error otherwise
  */
-static void test_context_set(struct mod_context *ctx, struct mod_config *config)
+static void test_context_set(struct mod_context *ctx, struct mod_config const *const config)
 {
 	memcpy(&ctx->test_string, test_string, sizeof(test_string));
 	ctx->test_uint32 = test_uint32;
@@ -136,7 +137,7 @@ static int test_open_function(struct audio_module_handle_private *handle,
 /**
  * @brief Test function to close a module.
  *
- * @param handle[in/out]     The handle to the module instance
+ * @param handle[in/out]  The handle to the module instance
  *
  * @return 0 if successful, error otherwise
  */
@@ -231,15 +232,15 @@ static int test_data_process_function(struct audio_module_handle_private *handle
  * @brief Initialise a list of connections.
  *
  * @param handle_from[in/out]  The handle for the module to initialise the list
- * @param handles_to[in]       Pointer to an array of handles to initialise the list with
+ * @param handles_to[in/out]   Pointer to an array of handles to initialise the list with
  * @param list_size[in]        The number of handles to initialise the list with
- * @param data_tx[in]          The state to set for data_tx in the handle
+ * @param use_tx_queue[in]     The state to set for use_tx_queue in the handle
  *
  * @return Number of destinations
  */
 static int test_initialise_connection_list(struct audio_module_handle *handle_from,
 					   struct audio_module_handle *handles_to, size_t list_size,
-					   bool data_tx)
+					   bool use_tx_queue)
 {
 	for (int i = 0; i < list_size; i++) {
 		sys_slist_append(&handle_from->hdl_dest_list, &handles_to->node);
@@ -247,9 +248,9 @@ static int test_initialise_connection_list(struct audio_module_handle *handle_fr
 		handles_to += 1;
 	}
 
-	handle_from->data_tx = data_tx;
+	handle_from->use_tx_queue = use_tx_queue;
 
-	if (handle_from->data_tx) {
+	if (handle_from->use_tx_queue) {
 		handle_from->dest_count += 1;
 	}
 
@@ -260,16 +261,16 @@ static int test_initialise_connection_list(struct audio_module_handle *handle_fr
  * @brief Test a list of connections, both that the handle is in the list and that the list is in
  *        the correct order.
  *
- * @param handle[in]      The handle for the module to test the list
- * @param handles_to[in]  Pointer to an array of handles that should be in the list and are in the
- *                        order expected
- * @param list_size[in]   The number of handles expected in the list
- * @param data_tx[in]     The expected state of data_tx in the handle
+ * @param handle[in]        The handle for the module to test the list
+ * @param handles_to[in]    Pointer to an array of handles that should be in the list and are in the
+ *                          order expected
+ * @param list_size[in]     The number of handles expected in the list
+ * @param use_tx_queue[in]  The expected state of use_tx_queue in the handle
  *
  * @return 0 if successful, assert otherwise
  */
 static int test_list(struct audio_module_handle *handle, struct audio_module_handle *handles_to,
-		     size_t list_size, bool data_tx)
+		     size_t list_size, bool use_tx_queue)
 {
 	struct audio_module_handle *handle_get;
 	int i = 0;
@@ -278,9 +279,9 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 		      "List is the incorrect size, it is %d but should be %d", handle->dest_count,
 		      list_size);
 
-	zassert_equal(handle->data_tx, data_tx,
-		      "List is the incorrect, data_tx flag is %d but should be %d", handle->data_tx,
-		      data_tx);
+	zassert_equal(handle->use_tx_queue, use_tx_queue,
+		      "List is the incorrect, use_tx_queue flag is %d but should be %d",
+		      handle->use_tx_queue, use_tx_queue);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_get, node) {
 		zassert_equal_ptr(&handles_to[i], handle_get, "List is incorrect for item %d", i);
@@ -293,11 +294,11 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 {
 	int ret;
-	struct audio_data data;
+	struct audio_data audio_data;
 	uint8_t number_channels;
 
-	data.meta.locations = 0x00000000;
-	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
+	audio_data.meta.locations = 0x00000000;
+	ret = audio_module_number_channels_calculate(audio_data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -306,8 +307,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 0 (%d) channel count",
 		      number_channels);
 
-	data.meta.locations = 0x00000001;
-	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
+	audio_data.meta.locations = 0x00000001;
+	ret = audio_module_number_channels_calculate(audio_data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -316,8 +317,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	data.meta.locations = 0x80000000;
-	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
+	audio_data.meta.locations = 0x80000000;
+	ret = audio_module_number_channels_calculate(audio_data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -326,8 +327,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 1 (%d) channel count",
 		      number_channels);
 
-	data.meta.locations = 0xFFFFFFFF;
-	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
+	audio_data.meta.locations = 0xFFFFFFFF;
+	ret = audio_module_number_channels_calculate(audio_data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -336,8 +337,8 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      "Calculate number of channels function did not return 32 (%d) channel count",
 		      number_channels);
 
-	data.meta.locations = 0x55555555;
-	ret = audio_module_number_channels_calculate(data.meta.locations, &number_channels);
+	audio_data.meta.locations = 0x55555555;
+	ret = audio_module_number_channels_calculate(audio_data.meta.locations, &number_channels);
 	zassert_equal(
 		ret, 0,
 		"Calculate number of channels function did not return successfully (0): ret %d",
@@ -1118,9 +1119,9 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 
 		zassert_equal(handle_from.dest_count, 0, "Destination count is not %d, %d", 0,
 			      handle_from.dest_count);
-		zassert_equal(handle_from.data_tx, false,
+		zassert_equal(handle_from.use_tx_queue, false,
 			      "Flag for retuning data from module not false, %d",
-			      handle_from.data_tx);
+			      handle_from.use_tx_queue);
 	}
 
 	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
@@ -1141,9 +1142,9 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		zassert_equal(handle_from.dest_count, 0,
 			      "Destination count should be %d, but is %d", 0,
 			      handle_from.dest_count);
-		zassert_equal(handle_from.data_tx, false,
+		zassert_equal(handle_from.use_tx_queue, false,
 			      "Flag for retuning data from module not false, %d",
-			      handle_from.data_tx);
+			      handle_from.use_tx_queue);
 	}
 }
 
@@ -1288,9 +1289,9 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 
 		zassert_equal(ret, 0, "Connect function did not return successfully (0): ret %d",
 			      ret);
-		zassert_equal(handle_from.data_tx, true,
+		zassert_equal(handle_from.use_tx_queue, true,
 			      "Flag for retuning data from module not true, %d",
-			      handle_from.data_tx);
+			      handle_from.use_tx_queue);
 		zassert_equal(handle_from.dest_count, 1, "Destination count is not 1, %d",
 			      handle_from.dest_count);
 	}
@@ -1337,7 +1338,7 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1380,7 +1381,7 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1472,7 +1473,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = 1;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1522,7 +1523,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1585,7 +1586,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1633,7 +1634,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1694,7 +1695,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1742,7 +1743,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 		memset(&handle, 0, sizeof(struct audio_module_handle));
 		memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
 		handle.description = &mod_description;
-		handle.data_tx = true;
+		handle.use_tx_queue = true;
 		handle.dest_count = TEST_MODULES_NUM;
 		handle.thread.stack = mod_stack;
 		handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
@@ -1863,8 +1864,8 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 				  "Failed open, module thread settings differ");
 		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 				  "Failed open, module contexts differ");
-		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-			      handle.data_tx);
+		zassert_equal(handle.use_tx_queue, false,
+			      "Open failed use_tx_queue is not false: %d", handle.use_tx_queue);
 		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 			      handle.dest_count);
 
@@ -1905,8 +1906,8 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 				  "Failed open, module thread settings differ");
 		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 				  "Failed open, module contexts differ");
-		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-			      handle.data_tx);
+		zassert_equal(handle.use_tx_queue, false,
+			      "Open failed use_tx_queue is not false: %d", handle.use_tx_queue);
 		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 			      handle.dest_count);
 
@@ -1947,8 +1948,8 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 				  "Failed open, module thread settings differ");
 		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 				  "Failed open, module contexts differ");
-		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-			      handle.data_tx);
+		zassert_equal(handle.use_tx_queue, false,
+			      "Open failed use_tx_queue is not false: %d", handle.use_tx_queue);
 		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 			      handle.dest_count);
 
@@ -1991,8 +1992,8 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 				  "Failed open, module thread settings differ");
 		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 				  "Failed open, module contexts differ");
-		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-			      handle.data_tx);
+		zassert_equal(handle.use_tx_queue, false,
+			      "Open failed use_tx_queue is not false: %d", handle.use_tx_queue);
 		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 			      handle.dest_count);
 
@@ -2035,8 +2036,8 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 				  "Failed open, module thread settings differ");
 		zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
 				  "Failed open, module contexts differ");
-		zassert_equal(handle.data_tx, false, "Open failed data_tx is not false: %d",
-			      handle.data_tx);
+		zassert_equal(handle.use_tx_queue, false,
+			      "Open failed use_tx_queue is not false: %d", handle.use_tx_queue);
 		zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
 			      handle.dest_count);
 
