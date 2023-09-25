@@ -34,7 +34,6 @@ static int test_thread_handle(struct audio_module_handle *handle)
 	while (1) {
 		zassert_not_null(handle, NULL, "handle is NULL!");
 
-		/* Sleep for 0.001s */
 		k_sleep(K_MSEC(100));
 	}
 
@@ -120,7 +119,7 @@ static void test_context_set(struct mod_context *ctx, struct mod_config *config)
  * @return 0 if successful, error otherwise
  */
 static int test_open_function(struct audio_module_handle_private *handle,
-			      struct audio_module_configuration *configuration)
+			      struct audio_module_configuration const *const configuration)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct mod_context *ctx = (struct mod_context *)hdl->context;
@@ -157,7 +156,7 @@ static int test_close_function(struct audio_module_handle_private *handle)
  * @return 0 if successful, error otherwise
  */
 static int test_config_set_function(struct audio_module_handle_private *handle,
-				    struct audio_module_configuration *configuration)
+				    struct audio_module_configuration const *const configuration)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct mod_context *ctx = (struct mod_context *)hdl->context;
@@ -176,7 +175,7 @@ static int test_config_set_function(struct audio_module_handle_private *handle,
  *
  * @return 0 if successful, error otherwise
  */
-static int test_config_get_function(struct audio_module_handle_private *handle,
+static int test_config_get_function(struct audio_module_handle_private const *const handle,
 				    struct audio_module_configuration *configuration)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
@@ -209,22 +208,21 @@ static int test_stop_start_function(struct audio_module_handle_private *handle)
 /**
  * @brief Test process data function of a module.
  *
- * @param handle[in/out]  The handle to the module instance
- * @param data_rx[in]     Pointer to the input audio data or NULL for an input module
- * @param data_tx[out]    Pointer to the output audio data or NULL for an output module
+ * @param handle[in/out]      The handle to the module instance
+ * @param audio_data_rx[in]   Pointer to the input audio data or NULL for an input module
+ * @param audio_data_tx[out]  Pointer to the output audio data or NULL for an output module
  *
  * @return 0 if successful, error otherwise
  */
 static int test_data_process_function(struct audio_module_handle_private *handle,
-				      struct audio_data *data_rx, struct audio_data *data_tx)
+				      struct audio_data const *const audio_data_rx,
+				      struct audio_data *audio_data_tx)
 {
 	ARG_UNUSED(handle);
-	ARG_UNUSED(data_rx);
-	ARG_UNUSED(data_tx);
 
-	memcpy(data_tx, data_rx, sizeof(struct audio_data));
-	memcpy(data_tx->data, data_rx->data, data_rx->data_size);
-	data_tx->data_size = data_rx->data_size;
+	memcpy(audio_data_tx, audio_data_rx, sizeof(struct audio_data));
+	memcpy(audio_data_tx->data, audio_data_rx->data, audio_data_rx->data_size);
+	audio_data_tx->data_size = audio_data_rx->data_size;
 
 	return 0;
 }

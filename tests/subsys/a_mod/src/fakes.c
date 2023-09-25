@@ -74,7 +74,7 @@ int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fif
 		(struct test_slab_queue *)data_fifo->slab_buffer;
 
 	if (test_fifo_slab_data->head == test_fifo_slab_data->tail) {
-		return -1;
+		return -EINVAL;
 	}
 
 	*data = &test_fifo_slab_data->msg[test_fifo_slab_data->tail % test_fifo_slab_data->size];
