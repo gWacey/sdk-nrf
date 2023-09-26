@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
 /**
  * @brief Helper function to validate the module description.
  *
- * @param parameters  The module parameters.
+ * @param parameters[in]  The module parameters.
  *
  * @return 0 if successful, error value.
  */
@@ -57,8 +57,8 @@ static int validate_parameters(struct audio_module_parameters const *const param
 /**
  * @brief Helper function to validate the module types for connecting and disconnecting.
  *
- * @param handle_from  The from/sending handle.
- * @param handle_to    The to/receiving handle.
+ * @param handle_from[in]  The from/sending handle.
+ * @param handle_to[in]    The to/receiving handle.
  *
  * @return 0 if successful, error value.
  */
@@ -76,11 +76,11 @@ static int handle_connection_type_test(struct audio_module_handle const *const h
 }
 
 /**
- * @brief General callback for releasing the audio data when inter-module data
+ * @brief General callback for releasing the data when inter-module data
  *        passing.
  *
- * @param handle      The handle of the sending modules instance.
- * @param audio_data  Pointer to the audio data to send to the module.
+ * @param handle[in/out]  The handle of the sending modules instance.
+ * @param audio_data[in]  Pointer to the audio data to release.
  */
 static void audio_data_release_cb(struct audio_module_handle_private *handle,
 				  struct audio_data const *const audio_data)
@@ -95,19 +95,19 @@ static void audio_data_release_cb(struct audio_module_handle_private *handle,
 	}
 
 	if (k_sem_count_get(&hdl->sem) == 0) {
-		/* Object data has been consumed by all modules so now can free the memory. */
+		/* Audio data has been consumed by all modules so now can free the data memory. */
 		k_mem_slab_free(hdl->thread.data_slab, (void **)&audio_data->data);
 	}
 }
 
 /**
- * @brief Send a data buffer to a module, all data is consumed by the module.
+ * @brief Send an audio data buffer to a module, all data is consumed by the module.
  *
- * @param tx_handle            The handle for the sending module instance.
- * @param rx_handle            The handle for the receiving module instance.
- * @param audio_data           Pointer to the audio data to send to the module.
- * @param data_in_response_cb  A pointer to a callback to run when the buffer is
- *                             fully consumed.
+ * @param tx_handle[in/out]        The handle for the sending module instance.
+ * @param rx_handle[in/out]        The handle for the receiving module instance.
+ * @param audio_data[in]           Pointer to the audio data to send to the module.
+ * @param data_in_response_cb[in]  A pointer to a callback to run when the buffer is
+ *                                 fully consumed.
  *
  * @return 0 if successful, error value.
  */
@@ -155,8 +155,8 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 /**
  * @brief Send to modules TX message queue.
  *
- * @param handle      The handle for this modules instance.
- * @param audio_data  A pointer to the audio data.
+ * @param handle[in/out]  The handle for this modules instance.
+ * @param audio_data[in]  A pointer to the audio data.
  *
  * @return 0 if successful, error value.
  */
@@ -170,7 +170,7 @@ static int tx_fifo_put(struct audio_module_handle *handle,
 	ret = data_fifo_pointer_first_vacant_get(handle->thread.msg_tx, (void **)&data_msg_tx,
 						 K_NO_WAIT);
 	if (ret) {
-		LOG_DBG("No free space in TX FIFO for module %s, ret %d", handle->name, ret);
+		LOG_WRN("No free space in TX FIFO for module %s, ret %d", handle->name, ret);
 		return ret;
 	}
 
@@ -202,8 +202,8 @@ static int tx_fifo_put(struct audio_module_handle *handle,
 /**
  * @brief Send output audio data to next module(s).
  *
- * @param handle      The handle for this modules instance.
- * @param audio_data  A pointer to the audio data.
+ * @param handle[in/out]  The handle for this modules instance.
+ * @param audio_data[in]  A pointer to the audio data.
  *
  * @return 0 if successful, error value.
  */
@@ -214,16 +214,17 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 	struct audio_module_handle *handle_to;
 
 	if (handle->dest_count == 0) {
-		LOG_WRN("Nowhere to send the data from module %s so releasing it", handle->name);
+		LOG_WRN("Nowhere to send the audio data from module %s so releasing it",
+			handle->name);
 
 		k_mem_slab_free(handle->thread.data_slab, (void **)audio_data->data);
 
 		return 0;
 	}
 
-	/* We need to ensure that all receiving modules have got the audio.
-	 * This is so the first receiver cannot free the data before all receivers
-	 * have gotten the data.
+	/* We need to ensure that all receiving modules have got the audio data.
+	 * This is so the first receiver cannot free the audio data before all receivers
+	 * have all gotten the audio data.
 	 */
 	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
 	if (ret) {
@@ -270,7 +271,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 /**
  * @brief The thread that receives data from outside the system and passes it into the audio system.
  *
- * @param handle  The handle for this modules instance.
+ * @param handle[in/out]  The handle for this modules instance.
  *
  * @return 0 if successful, error value.
  */
@@ -324,7 +325,7 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
 /**
  * @brief The thread that processes inputs and outputs them out of the audio system.
  *
- * @param handle  The handle for this modules instance.
+ * @param handle[in/out]  The handle for this modules instance.
  *
  * @return 0 if successful, error value.
  */
@@ -343,7 +344,7 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 	while (1) {
 		msg_rx = NULL;
 
-		LOG_DBG("Module %s waiting for a message", handle->name);
+		LOG_DBG("Module %s waiting for audio data", handle->name);
 
 		/* Get a new input message.
 		 * Since this input message is queued outside the module, this will then control the
@@ -352,7 +353,7 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
 
-		LOG_DBG("Module %s new message received", handle->name);
+		LOG_DBG("Module %s new audio data received", handle->name);
 
 		/* Process the input audio data and output from the audio system. */
 		ret = handle->description->functions->data_process(
@@ -382,7 +383,7 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 /**
  * @brief The thread that processes inputs and outputs the data from the module.
  *
- * @param handle  The handle for this modules instance.
+ * @param handle[in/out]  The handle for this modules instance.
  *
  * @return 0 if successful, error value.
  */
@@ -411,7 +412,7 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
 
-		LOG_DBG("Module %s new message received", handle->name);
+		LOG_DBG("Module %s new audio data received", handle->name);
 
 		/* Get a new output buffer from outside the audio system. */
 		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
@@ -452,7 +453,7 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 			continue;
 		}
 
-		/* Send input audio data to next module(s). */
+		/* Send processed audio data to next module(s). */
 		send_to_connected_modules(handle, &audio_data);
 
 		if (msg_rx->response_cb != NULL) {
@@ -852,7 +853,7 @@ int audio_module_start(struct audio_module_handle *handle)
 }
 
 /**
- * @brief Stop processing data in the module given by handle.
+ * @brief Stop processing audio data in the module given by handle.
  */
 int audio_module_stop(struct audio_module_handle *handle)
 {
@@ -888,7 +889,7 @@ int audio_module_stop(struct audio_module_handle *handle)
 }
 
 /**
- * @brief Send a data buffer to a module, all data is consumed by the module.
+ * @brief Send an audio data item to a module, all data is consumed by the module.
  */
 int audio_module_data_tx(struct audio_module_handle *handle,
 			 struct audio_data const *const audio_data,
@@ -921,7 +922,7 @@ int audio_module_data_tx(struct audio_module_handle *handle,
 }
 
 /**
- * @brief Retrieve data from the module.
+ * @brief Retrieve an audio data item from the module.
  *
  */
 int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *audio_data,
@@ -980,7 +981,7 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 }
 
 /**
- * @brief Send an audio data to a module and retrieve an audio data from a module.
+ * @brief Send an audio data item to a module and retrieve an audio data item from a module.
  *
  * @note The audio data is processed within the module or sequence of modules. The result is
  * returned via the module or final module's output FIFO. All the input data is consumed within the
@@ -1003,7 +1004,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 
 	if (handle_tx->state != AUDIO_MODULE_STATE_RUNNING ||
 	    handle_rx->state != AUDIO_MODULE_STATE_RUNNING) {
-		LOG_WRN("Module is in an invalid state or type to send-receive data");
+		LOG_WRN("Module is in an invalid state or type to send-receive audio data");
 		return -ENOTSUP;
 	}
 
@@ -1033,7 +1034,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 
 	ret = data_tx(NULL, handle_tx, audio_data_tx, NULL);
 	if (ret) {
-		LOG_ERR("Failed to send data to module %s, ret %d", handle_tx->name, ret);
+		LOG_ERR("Failed to send audio data to module %s, ret %d", handle_tx->name, ret);
 		return ret;
 	}
 
@@ -1042,7 +1043,8 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 	ret = data_fifo_pointer_last_filled_get(handle_rx->thread.msg_rx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
-		LOG_ERR("Failed to retrieve data from module %s, ret %d", handle_rx->name, ret);
+		LOG_ERR("Failed to retrieve audio data from module %s, ret %d", handle_rx->name,
+			ret);
 		return ret;
 	}
 
