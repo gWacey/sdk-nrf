@@ -27,19 +27,23 @@ enum audio_module_type {
 	AUDIO_MODULE_TYPE_UNDEFINED = 0,
 
 	/* This is an input processing module.
-	 * Note: An input module obtains data internally within the
+	 *
+	 * @note An input module obtains data internally within the
 	 *       module (e.g. I2S) and hence has no RX FIFO.
 	 */
 	AUDIO_MODULE_TYPE_INPUT,
 
 	/* This is an output processing module.
-	 * Note: An output module takes data from an input or in/out module. It then outputs data
-	 *       internally within the module (e.g. I2S) and hence has no TX FIFO.
+	 *
+	 * @note An output module takes audio data from an input or in/out module.
+	 *       It then outputs data internally within the module (e.g. I2S) and hence has no TX
+	 *       FIFO.
 	 */
 	AUDIO_MODULE_TYPE_OUTPUT,
 
 	/* This is a processing module.
-	 * Note: An processing module takes input and outputs from/to another
+	 *
+	 * @note An processing module takes input and outputs from/to another
 	 *       module, thus having RX and TX FIFOs.
 	 */
 	AUDIO_MODULE_TYPE_IN_OUT
@@ -81,7 +85,7 @@ struct audio_module_configuration;
  * @brief Callback function for a response to a data_send as
  *        supplied by the module user.
  *
- * @param handle[in/out]  The handle of the module that sent the data message.
+ * @param handle[in/out]  The handle of the module that sent the audio data.
  * @param audio_data[in]  The audio data to operate on.
  */
 typedef void (*audio_module_response_cb)(struct audio_module_handle_private *handle,
@@ -156,9 +160,9 @@ struct audio_module_functions {
 	 * @brief The core data processing function for the module. Can be either an
 	 *		  input, output or input/output module type.
 	 *
-	 * @param handle[in/out]  The handle to the module instance.
-	 * @param audio_data_rx[in]     Pointer to the input audio data or NULL for an input module.
-	 * @param audio_data_tx[out]    Pointer to the output audio data or NULL for an output
+	 * @param handle[in/out]      The handle to the module instance.
+	 * @param audio_data_rx[in]   Pointer to the input audio data or NULL for an input module.
+	 * @param audio_data_tx[out]  Pointer to the output audio data or NULL for an output
 	 *module.
 	 *
 	 * @return 0 if successful, error otherwise.
@@ -195,17 +199,17 @@ struct audio_module_thread_configuration {
 	/* Thread priority. */
 	int priority;
 
-	/* A pointer to a module's data receiver FIFO, can be NULL. */
+	/* A pointer to a module's audio data receiver FIFO, can be NULL. */
 	struct data_fifo *msg_rx;
 
-	/* A pointer to a module's data transmitter FIFO, can be NULL. */
+	/* A pointer to a module's audio data transmitter FIFO, can be NULL. */
 	struct data_fifo *msg_tx;
 
-	/* A pointer to the data buffer slab, can be NULL. */
+	/* A pointer to the audio data buffer slab, can be NULL. */
 	struct k_mem_slab *data_slab;
 
-	/* Size of each memory data in bytes that will be
-	 * taken from the data buffer slab or 0.
+	/* Size of each memory data buffer in bytes that will be
+	 * taken from the audio data buffer slab or 0.
 	 */
 	size_t data_size;
 };
@@ -240,7 +244,7 @@ struct audio_module_handle {
 	/* Thread data. */
 	struct k_thread thread_data;
 
-	/* Flag to indicate if the module should put it's output data onto it's TX FIFO. */
+	/* Flag to indicate if the module should put it's output audio data onto it's TX FIFO. */
 	bool use_tx_queue;
 
 	/* List node (pointer to next audio module). */
@@ -275,7 +279,7 @@ struct audio_module_message {
 	/* Sending module's handle. */
 	struct audio_module_handle *tx_handle;
 
-	/* Callback for when the data has been consumed. */
+	/* Callback for when the audio data has been consumed. */
 	audio_module_response_cb response_cb;
 };
 
@@ -330,8 +334,8 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
  * @brief Function to connect two modules together.
  *
  * @param handle_from[in/out]  The handle for the module for output.
- * @param handle_to[in/out]    The handle of the module for input. If it is the same as handle_from.
- *                             the data will be put on the handle_from->output_message_queue.
+ * @param handle_to[in/out]    The handle of the module for input. If it is the same as handle_from,
+ *                             the audio data will be put on the handle_from->output_message_queue.
  *
  * @return 0 if successful, error otherwise.
  */
@@ -350,7 +354,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 			    struct audio_module_handle *handle_disconnect);
 
 /**
- * @brief Start processing data in the module given by handle.
+ * @brief Start processing audio data in the module given by handle.
  *
  * @param handle[in/out]  The handle for the module to start.
  *
@@ -359,7 +363,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 int audio_module_start(struct audio_module_handle *handle);
 
 /**
- * @brief Stop processing data in the module given by handle.
+ * @brief Stop processing audio data in the module given by handle.
  *
  * @param handle[in/out]  The handle for the module to be stopped.
  *
@@ -368,20 +372,21 @@ int audio_module_start(struct audio_module_handle *handle);
 int audio_module_stop(struct audio_module_handle *handle);
 
 /**
- * @brief Send a data buffer to a module, all data is consumed by the module.
+ * @brief Send an audio data item to a module, all data is consumed by the module.
  *
  * @param handle[in/out]   The handle for the receiving module instance.
- * @param data[in]         Pointer to the audio data to send to the module.
+ * @param audio_data[in]   Pointer to the audio data to send to the module.
  * @param response_cb[in]  Pointer to a callback to run when the buffer is
  *                         fully consumed in a module.
  *
  * @return 0 if successful, error otherwise.
  */
-int audio_module_data_tx(struct audio_module_handle *handle, struct audio_data const *const data,
+int audio_module_data_tx(struct audio_module_handle *handle,
+			 struct audio_data const *const audio_data,
 			 audio_module_response_cb response_cb);
 
 /**
- * @brief Retrieve data from the module.
+ * @brief Retrieve an audio data item from the module.
  *
  * @param handle[in/out]   The handle to the module instance.
  * @param audio_data[out]  Pointer to the audio data from the module.
@@ -397,13 +402,12 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 /**
  * @brief Send an audio data to a module and retrieve an audio data from a module.
  *
- * @note The data is processed within the module or sequence of modules. The result is returned
- *       via the module or final module's output FIFO.
- *       All the input data is consumed within the call and thus the input data buffer
- *       maybe released once the function returns.
+ * @note The audio data is processed within the module or sequence of modules. The result is
+ *       returned via the module or final module's output FIFO. All the input data is consumed
+ *       within the call and thus the input data buffer maybe released once the function returns.
  *
- * @param handle_tx[in/out]  The handle to the module to send the input data to.
- * @param handle_rx[in/out]  The handle to the module to receive data from.
+ * @param handle_tx[in/out]   The handle to the module to send the input audio data to.
+ * @param handle_rx[in/out]   The handle to the module to receive audio data from.
  * @param audio_data_tx[in]   Pointer to the audio data to send.
  * @param audio_data_rx[out]  Pointer to the audio data received.
  * @param timeout[in]         Non-negative waiting period to wait for operation to complete
