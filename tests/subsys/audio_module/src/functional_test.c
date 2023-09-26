@@ -291,7 +291,7 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 	return 0;
 }
 
-ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
+ZTEST(suite_audio_module_functional, test_number_channels_calculate_fnct)
 {
 	int ret;
 	struct audio_data audio_data;
@@ -348,7 +348,7 @@ ZTEST(suite_a_mod_functional, test_number_channels_calculate_fnct)
 		      number_channels);
 }
 
-ZTEST(suite_a_mod_functional, test_state_get_fnct)
+ZTEST(suite_audio_module_functional, test_state_get_fnct)
 {
 	int ret;
 	struct audio_module_handle handle = {0};
@@ -384,7 +384,7 @@ ZTEST(suite_a_mod_functional, test_state_get_fnct)
 		      AUDIO_MODULE_STATE_STOPPED, state);
 }
 
-ZTEST(suite_a_mod_functional, test_names_get_fnct)
+ZTEST(suite_audio_module_functional, test_names_get_fnct)
 {
 	int ret;
 	struct audio_module_description mod_description = {0};
@@ -456,7 +456,7 @@ ZTEST(suite_a_mod_functional, test_names_get_fnct)
 			  "Failed to get the instance name in configured state: %s", instance_name);
 }
 
-ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
+ZTEST(suite_audio_module_functional, test_reconfigure_null_fnct)
 {
 	int ret;
 	struct mod_context mod_context = {0};
@@ -542,7 +542,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_null_fnct)
 			  "Failed reconfigure");
 }
 
-ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
+ZTEST(suite_audio_module_functional, test_configuration_get_null_fnct)
 {
 	int ret;
 	struct mod_context mod_context = {0};
@@ -623,7 +623,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_null_fnct)
 			  "Failed reconfigure");
 }
 
-ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
+ZTEST(suite_audio_module_functional, test_reconfigure_fnct)
 {
 	int ret;
 	struct mod_context mod_context = {0};
@@ -700,7 +700,7 @@ ZTEST(suite_a_mod_functional, test_reconfigure_fnct)
 			  "Failed reconfigure");
 }
 
-ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
+ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 {
 	int ret;
 	struct mod_context mod_context = {0};
@@ -782,7 +782,7 @@ ZTEST(suite_a_mod_functional, test_configuration_get_fnct)
 			  "Failed reconfigure");
 }
 
-ZTEST(suite_a_mod_functional, test_stop_null_fnct)
+ZTEST(suite_audio_module_functional, test_stop_null_fnct)
 {
 	int ret;
 	struct audio_module_functions mod_1_functions = {.open = NULL,
@@ -824,7 +824,7 @@ ZTEST(suite_a_mod_functional, test_stop_null_fnct)
 		      AUDIO_MODULE_STATE_STOPPED, handle.state);
 }
 
-ZTEST(suite_a_mod_functional, test_start_null_fnct)
+ZTEST(suite_audio_module_functional, test_start_null_fnct)
 {
 	int ret;
 	struct audio_module_functions mod_1_functions = {.open = NULL,
@@ -866,7 +866,7 @@ ZTEST(suite_a_mod_functional, test_start_null_fnct)
 		      AUDIO_MODULE_STATE_RUNNING, handle.state);
 }
 
-ZTEST(suite_a_mod_functional, test_stop_fnct)
+ZTEST(suite_audio_module_functional, test_stop_fnct)
 {
 	int ret;
 	struct mod_context test_mod_context = {
@@ -923,7 +923,7 @@ ZTEST(suite_a_mod_functional, test_stop_fnct)
 			  "Failed stop");
 }
 
-ZTEST(suite_a_mod_functional, test_start_fnct)
+ZTEST(suite_audio_module_functional, test_start_fnct)
 {
 	int ret;
 	struct mod_context test_mod_context = {
@@ -983,7 +983,7 @@ ZTEST(suite_a_mod_functional, test_start_fnct)
 			  "Failed start");
 }
 
-ZTEST(suite_a_mod_functional, test_disconnect_fnct)
+ZTEST(suite_audio_module_functional, test_disconnect_fnct)
 {
 	int ret;
 	int i, j, k;
@@ -1025,7 +1025,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k]);
+				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
 
 				zassert_equal(
 					ret, 0,
@@ -1059,7 +1059,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k]);
+				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
 
 				zassert_equal(
 					ret, 0,
@@ -1093,7 +1093,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, true);
 
 			for (k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k]);
+				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
 
 				zassert_equal(
 					ret, 0,
@@ -1111,7 +1111,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 			}
 		}
 
-		ret = audio_module_disconnect(&handle_from, &handle_from);
+		ret = audio_module_disconnect(&handle_from, NULL, true);
 		zassert_equal(ret, 0, "Disconnect function did not return successfully (0): ret %d",
 			      ret);
 
@@ -1133,7 +1133,7 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 		k_mutex_init(&handle_from.dest_mutex);
 		num_destinations = test_initialise_connection_list(&handle_from, NULL, 0, true);
 
-		ret = audio_module_disconnect(&handle_from, &handle_from);
+		ret = audio_module_disconnect(&handle_from, NULL, true);
 
 		zassert_equal(ret, 0,
 			      "Disconnect function did not return successfully (0): "
@@ -1148,10 +1148,11 @@ ZTEST(suite_a_mod_functional, test_disconnect_fnct)
 	}
 }
 
-ZTEST(suite_a_mod_functional, test_connect_fnct)
+ZTEST(suite_audio_module_functional, test_connect_fnct)
 {
 	int ret;
 	int i, j, k;
+	struct data_fifo mod_fifo_tx;
 	char *test_base_name = "Test base name";
 	char *test_inst_from_name = "TEST instance from";
 	char *test_inst_to_name = "TEST instance";
@@ -1169,6 +1170,9 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	struct audio_module_description test_to_description = {.name = test_base_name,
 							       .functions = &mod_functions};
 
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+
 	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
 	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
 
@@ -1178,6 +1182,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
+
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 
@@ -1188,7 +1193,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
-				ret = audio_module_connect(&handle_from, &handle_to[k]);
+				ret = audio_module_connect(&handle_from, &handle_to[k], false);
 
 				zassert_equal(ret, 0,
 					      "Connect function did not return successfully (0): "
@@ -1221,7 +1226,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
-				ret = audio_module_connect(&handle_from, &handle_to[k]);
+				ret = audio_module_connect(&handle_from, &handle_to[k], false);
 
 				zassert_equal(ret, 0,
 					      "Connect function did not return "
@@ -1244,6 +1249,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 			memcpy(&handle_from.name, test_inst_from_name,
 			       CONFIG_AUDIO_MODULE_NAME_SIZE);
 			handle_from.state = i;
+
 			sys_slist_init(&handle_from.hdl_dest_list);
 			k_mutex_init(&handle_from.dest_mutex);
 
@@ -1254,7 +1260,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 					 test_inst_to_name, k);
 				handle_to[k].state = j;
 
-				ret = audio_module_connect(&handle_from, &handle_to[k]);
+				ret = audio_module_connect(&handle_from, &handle_to[k], false);
 
 				zassert_equal(ret, 0,
 					      "Connect function did not return "
@@ -1265,7 +1271,11 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 					      handle_from.dest_count);
 			}
 
-			ret = audio_module_connect(&handle_from, &handle_from);
+			data_fifo_deinit(&mod_fifo_tx);
+			data_fifo_init(&mod_fifo_tx);
+			handle_from.thread.msg_tx = &mod_fifo_tx;
+
+			ret = audio_module_connect(&handle_from, NULL, true);
 			zassert_equal(ret, 0,
 				      "Connect function did not return successfully (0): ret %d",
 				      ret);
@@ -1282,10 +1292,15 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 		handle_from.state = i;
+
+		data_fifo_deinit(&mod_fifo_tx);
+		data_fifo_init(&mod_fifo_tx);
+		handle_from.thread.msg_tx = &mod_fifo_tx;
+
 		sys_slist_init(&handle_from.hdl_dest_list);
 		k_mutex_init(&handle_from.dest_mutex);
 
-		ret = audio_module_connect(&handle_from, &handle_from);
+		ret = audio_module_connect(&handle_from, NULL, true);
 
 		zassert_equal(ret, 0, "Connect function did not return successfully (0): ret %d",
 			      ret);
@@ -1297,7 +1312,7 @@ ZTEST(suite_a_mod_functional, test_connect_fnct)
 	}
 }
 
-ZTEST(suite_a_mod_functional, test_close_null_fnct)
+ZTEST(suite_audio_module_functional, test_close_null_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";
@@ -1423,7 +1438,7 @@ ZTEST(suite_a_mod_functional, test_close_null_fnct)
 	}
 }
 
-ZTEST(suite_a_mod_functional, test_close_fnct)
+ZTEST(suite_audio_module_functional, test_close_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";
@@ -1790,7 +1805,7 @@ ZTEST(suite_a_mod_functional, test_close_fnct)
 	}
 }
 
-ZTEST(suite_a_mod_functional, test_open_fnct)
+ZTEST(suite_audio_module_functional, test_open_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";
@@ -2045,7 +2060,7 @@ ZTEST(suite_a_mod_functional, test_open_fnct)
 	}
 }
 
-ZTEST(suite_a_mod_functional, test_data_tx_fnct)
+ZTEST(suite_audio_module_functional, test_data_tx_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";
@@ -2118,7 +2133,7 @@ ZTEST(suite_a_mod_functional, test_data_tx_fnct)
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
 }
 
-ZTEST(suite_a_mod_functional, test_data_rx_fnct)
+ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";
@@ -2202,7 +2217,7 @@ ZTEST(suite_a_mod_functional, test_data_rx_fnct)
 		      data_fifo_block_free_fake.call_count);
 }
 
-ZTEST(suite_a_mod_functional, test_data_tx_rx_fnct)
+ZTEST(suite_audio_module_functional, test_data_tx_rx_fnct)
 {
 	int ret;
 	char *test_base_name = "Test base name";

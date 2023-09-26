@@ -333,25 +333,31 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 /**
  * @brief Function to connect two modules together.
  *
- * @param handle_from[in/out]  The handle for the module for output.
- * @param handle_to[in/out]    The handle of the module for input. If it is the same as handle_from,
- *                             the audio data will be put on the handle_from->output_message_queue.
+ * @param handle_from[in/out]   The handle for the module for output.
+ * @param handle_to[in/out]     The handle of the module for input, should be NULL if
+ *                              connect_external flag is true.
+ * @param connect_external[in]  Flag to indicate if the from module should put it's output audio
+ *                              data items onto it's TX FIFO for access via an external system.
  *
  * @return 0 if successful, error otherwise.
  */
 int audio_module_connect(struct audio_module_handle *handle_from,
-			 struct audio_module_handle *handle_to);
+			 struct audio_module_handle *handle_to, bool connect_external);
 
 /**
  * @brief Function to disconnect modules from each other.
  *
  * @param handle[in/out]             The handle for the module.
- * @param handle_disconnect[in/out]  The handle of the module to disconnect.
+ * @param handle_disconnect[in/out]  The handle of the module to disconnect, should be NULL if
+ *                                   disconnect_external flag is true.
+ * @param disconnect_external[in]    Flag to indicate that the output audio data items should stop
+ *                                   being put on handle TX FIFO.
  *
  * @return 0 if successful, error otherwise.
  */
 int audio_module_disconnect(struct audio_module_handle *handle,
-			    struct audio_module_handle *handle_disconnect);
+			    struct audio_module_handle *handle_disconnect,
+			    bool disconnect_external);
 
 /**
  * @brief Start processing audio data in the module given by handle.

@@ -20,7 +20,7 @@ endmenu # Modules
 
 #----------------------------------------------------------------------------#
 module = AUDIO_MODULE
-module-str = Audio modules
+module-str = audio_modules
 source "subsys/logging/Kconfig.template.log_config"
 
 endmenu # Audio

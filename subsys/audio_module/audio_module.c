@@ -55,20 +55,17 @@ static int validate_parameters(struct audio_module_parameters const *const param
 }
 
 /**
- * @brief Helper function to validate the module types for connecting and disconnecting.
+ * @brief Helper function to validate the module states are valid.
  *
- * @param handle_from[in]  The from/sending handle.
- * @param handle_to[in]    The to/receiving handle.
+ * @param handle[in]  The module's handle to test the state of.
  *
  * @return 0 if successful, error value.
  */
-static int handle_connection_type_test(struct audio_module_handle const *const handle_from,
-				       struct audio_module_handle const *const handle_to)
+static int handle_valid_state_test(struct audio_module_handle const *const handle)
 {
-	if (handle_from->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle_from->description->type == AUDIO_MODULE_TYPE_OUTPUT ||
-	    handle_to->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle_to->description->type == AUDIO_MODULE_TYPE_INPUT) {
+	if (handle->state != AUDIO_MODULE_STATE_CONFIGURED &&
+	    handle->state != AUDIO_MODULE_STATE_RUNNING &&
+	    handle->state != AUDIO_MODULE_STATE_STOPPED) {
 		return -ENOTSUP;
 	}
 
@@ -101,7 +98,7 @@ static void audio_data_release_cb(struct audio_module_handle_private *handle,
 }
 
 /**
- * @brief Send an audio data buffer to a module, all data is consumed by the module.
+ * @brief Send an audio data item to a module, all data is consumed by the module.
  *
  * @param tx_handle[in/out]        The handle for the sending module instance.
  * @param rx_handle[in/out]        The handle for the receiving module instance.
@@ -153,7 +150,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 }
 
 /**
- * @brief Send to modules TX message queue.
+ * @brief Send audio data item to the module's TX FIFO.
  *
  * @param handle[in/out]  The handle for this modules instance.
  * @param audio_data[in]  A pointer to the audio data.
@@ -200,7 +197,7 @@ static int tx_fifo_put(struct audio_module_handle *handle,
 }
 
 /**
- * @brief Send output audio data to next module(s).
+ * @brief Send the audio data item to all connected modules.
  *
  * @param handle[in/out]  The handle for this modules instance.
  * @param audio_data[in]  A pointer to the audio data.
@@ -236,6 +233,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 		return ret;
 	}
 
+	/* Send to all internally connected modules. */
 	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_to, node) {
 		ret = data_tx(handle, handle_to, audio_data, &audio_data_release_cb);
 		if (ret) {
@@ -251,6 +249,9 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 		return ret;
 	}
 
+	/* Send to this module's TX FIFO for extraction by an external
+	 * process with audio_module_rx().
+	 */
 	if (handle->use_tx_queue && handle->thread.msg_tx) {
 		ret = tx_fifo_put(handle, audio_data);
 		if (ret) {
@@ -294,10 +295,7 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
 		 * will control the data flow.
 		 */
 		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
-		if (ret) {
-			LOG_WRN("No free data for module %s, ret %d", handle->name, ret);
-			continue;
-		}
+		__ASSERT(ret, "No free data for module %s, ret %d", handle->name, ret);
 
 		/* Configure new audio data. */
 		audio_data.data = data;
@@ -352,6 +350,7 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
 		 */
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
+		__ASSERT(ret, "Module %s error in getting last filled", handle->name);
 
 		LOG_DBG("Module %s new audio data received", handle->name);
 
@@ -411,24 +410,14 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 		 */
 		ret = data_fifo_pointer_last_filled_get(handle->thread.msg_rx, (void **)&msg_rx,
 							&size, K_FOREVER);
+		__ASSERT(ret, "Module %s error in getting last filled", handle->name);
 
 		LOG_DBG("Module %s new audio data received", handle->name);
 
-		/* Get a new output buffer from outside the audio system. */
+		/* Get a new output buffer. */
 		ret = k_mem_slab_alloc(handle->thread.data_slab, (void **)&data, K_NO_WAIT);
-		if (ret) {
-			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb(
-					(struct audio_module_handle_private *)(msg_rx->tx_handle),
-					&msg_rx->audio_data);
-			}
-
-			data_fifo_block_free(handle->thread.msg_rx, (void **)(&msg_rx));
-
-			LOG_WRN("No free data buffer for module %s, dropping input, ret %d",
-				handle->name, ret);
-			continue;
-		}
+		__ASSERT(ret, "No free data buffer for module %s, dropping input, ret %d",
+			 handle->name, ret);
 
 		/* Configure new audio audio_data. */
 		audio_data.data = data;
@@ -699,28 +688,56 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
  *
  */
 int audio_module_connect(struct audio_module_handle *handle_from,
-			 struct audio_module_handle *handle_to)
+			 struct audio_module_handle *handle_to, bool connect_external)
 {
 	int ret;
 	struct audio_module_handle *handle;
 
-	if (handle_from == NULL || handle_to == NULL) {
+	if (handle_from == handle_to) {
+		LOG_WRN("Module handles identical");
+		return -EINVAL;
+	}
+
+	if (handle_from == NULL) {
 		LOG_ERR("Invalid parameter for the connection function");
 		return -EINVAL;
 	}
 
-	ret = handle_connection_type_test(handle_from, handle_to);
-	if (ret) {
-		LOG_ERR("Connections between these modules, %s to %s, is not supported",
-			handle_from->name, handle_to->name);
+	if (handle_from->description->type != AUDIO_MODULE_TYPE_INPUT &&
+	    handle_from->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+		LOG_ERR("Connections between these modules is not supported");
 		return -ENOTSUP;
 	}
 
-	if (handle_from->state == AUDIO_MODULE_STATE_UNDEFINED ||
-	    handle_to->state == AUDIO_MODULE_STATE_UNDEFINED) {
-		LOG_WRN("A module is in an invalid state for connecting modules %s to %s",
-			handle_from->name, handle_to->name);
+	ret = handle_valid_state_test(handle_from);
+	if (ret) {
+		LOG_WRN("A module is in an invalid state for connecting");
 		return -ENOTSUP;
+	}
+
+	if (connect_external) {
+		if (handle_to != NULL || handle_from->thread.msg_tx == NULL) {
+			LOG_ERR("Module %s has no TX FIFO or module handle to is not NULL",
+				handle_from->name);
+			return -EINVAL;
+		}
+	} else {
+		if (handle_to == NULL) {
+			LOG_ERR("Invalid parameter for the connection function");
+			return -EINVAL;
+		}
+
+		if (handle_to->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
+		    handle_to->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+			LOG_ERR("Connections between these modules is not supported");
+			return -ENOTSUP;
+		}
+
+		ret = handle_valid_state_test(handle_to);
+		if (ret) {
+			LOG_WRN("A module is in an invalid state for connecting");
+			return -ENOTSUP;
+		}
 	}
 
 	ret = k_mutex_lock(&handle_from->dest_mutex, LOCK_TIMEOUT_US);
@@ -728,14 +745,14 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 		return ret;
 	}
 
-	/* If the handles point to the same module then this module will queue it's output data to
-	 * it's own transmit queue. Thus allowing an external system to receive the data with a call
+	/* If the connect_external is true the handle_from module will queue it's output data to
+	 * it's own TX FIFO. Thus allowing an external system to receive the data with a call
 	 * to audio_module_data_rx() with the same handle.
 	 */
-	if (handle_from == handle_to) {
+	if (connect_external) {
 		handle_from->use_tx_queue = true;
-		handle_from->dest_count += 1;
-		LOG_DBG("Return the output of %s on it's TX message queue", handle_from->name);
+
+		LOG_DBG("Return the output of %s on it's TX FIFO", handle_from->name);
 	} else {
 		SYS_SLIST_FOR_EACH_CONTAINER(&handle_from->hdl_dest_list, handle, node) {
 			if (handle_to == handle) {
@@ -746,11 +763,12 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 		}
 
 		sys_slist_append(&handle_from->hdl_dest_list, &handle_to->node);
-		handle_from->dest_count += 1;
 
 		LOG_DBG("Connected the output of %s to the input of %s", handle_from->name,
 			handle_to->name);
 	}
+
+	handle_from->dest_count += 1;
 
 	ret = k_mutex_unlock(&handle_from->dest_mutex);
 	if (ret) {
@@ -765,26 +783,55 @@ int audio_module_connect(struct audio_module_handle *handle_from,
  *
  */
 int audio_module_disconnect(struct audio_module_handle *handle,
-			    struct audio_module_handle *handle_disconnect)
+			    struct audio_module_handle *handle_disconnect, bool disconnect_external)
 {
 	int ret;
 
-	if (handle == NULL || handle_disconnect == NULL) {
-		LOG_DBG("Module handle is NULL");
+	if (handle == handle_disconnect) {
+		LOG_WRN("Module handles identical");
 		return -EINVAL;
 	}
 
-	ret = handle_connection_type_test(handle, handle_disconnect);
-	if (ret) {
+	if (handle == NULL) {
+		LOG_WRN("Module handle is NULL");
+		return -EINVAL;
+	}
+
+	if (handle->description->type != AUDIO_MODULE_TYPE_INPUT &&
+	    handle->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
 		LOG_WRN("Disconnection of modules %s from %s, is not supported",
 			handle_disconnect->name, handle->name);
 		return -ENOTSUP;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
-	    handle_disconnect->state == AUDIO_MODULE_STATE_UNDEFINED) {
-		LOG_WRN("A module is an invalid state or type for disconnection");
+	ret = handle_valid_state_test(handle);
+	if (ret) {
+		LOG_WRN("A module is in an invalid state for connecting");
 		return -ENOTSUP;
+	}
+
+	if (disconnect_external) {
+		if (handle_disconnect != NULL) {
+			LOG_ERR("Module disconnect handle is not NULL");
+			return -EINVAL;
+		}
+	} else {
+		if (handle_disconnect == NULL) {
+			LOG_ERR("Invalid parameter for the connection function");
+			return -EINVAL;
+		}
+
+		if (handle_disconnect->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
+		    handle_disconnect->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+			LOG_ERR("Connections between these modules is not supported");
+			return -ENOTSUP;
+		}
+
+		ret = handle_valid_state_test(handle_disconnect);
+		if (ret) {
+			LOG_WRN("A module is in an invalid state for connecting");
+			return -ENOTSUP;
+		}
 	}
 
 	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
@@ -792,8 +839,13 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 		return ret;
 	}
 
-	if (handle == handle_disconnect) {
+	/* If the handle module is queuing it's output audio data to it's own TX FIFO and the
+	 * disconnect_external flag is true, then stop sending the audio data items to it.
+	 */
+	if (disconnect_external) {
 		handle->use_tx_queue = false;
+
+		LOG_DBG("Stop returning the output of %s on it's TX FIFO", handle->name);
 	} else {
 		if (!sys_slist_find_and_remove(&handle->hdl_dest_list, &handle_disconnect->node)) {
 			LOG_ERR("Connection to module %s has not been found for module %s",

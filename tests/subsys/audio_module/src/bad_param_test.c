@@ -19,7 +19,7 @@ const struct audio_module_functions mod_1_functions = {.open = NULL,
 						       .stop = NULL,
 						       .data_process = NULL};
 
-ZTEST(suite_a_mod_bad_param, test_number_channels_calculate_null)
+ZTEST(suite_audio_module_bad_param, test_number_channels_calculate_null)
 {
 	int ret;
 
@@ -29,7 +29,7 @@ ZTEST(suite_a_mod_bad_param, test_number_channels_calculate_null)
 		      -EINVAL, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_state_get_state)
+ZTEST(suite_audio_module_bad_param, test_state_get_state)
 {
 	int ret;
 	struct audio_module_handle handle = {0};
@@ -52,7 +52,7 @@ ZTEST(suite_a_mod_bad_param, test_state_get_state)
 		      "Get state function has changed the state returned: %d", state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_state_get_null)
+ZTEST(suite_audio_module_bad_param, test_state_get_null)
 {
 	int ret;
 	struct audio_module_handle handle = {0};
@@ -67,7 +67,7 @@ ZTEST(suite_a_mod_bad_param, test_state_get_null)
 		      -EINVAL, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_names_get_null)
+ZTEST(suite_audio_module_bad_param, test_names_get_null)
 {
 	int ret;
 	struct audio_module_handle handle = {0};
@@ -94,7 +94,7 @@ ZTEST(suite_a_mod_bad_param, test_names_get_null)
 		      "Get names returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
+ZTEST(suite_audio_module_bad_param, test_data_tx_bad_state)
 {
 	int ret;
 	struct data_fifo mod_fifo_rx;
@@ -139,7 +139,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_bad_state)
 		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_tx_null)
+ZTEST(suite_audio_module_bad_param, test_data_tx_null)
 {
 	int ret;
 	struct data_fifo mod_fifo_rx;
@@ -186,7 +186,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_null)
 		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
+ZTEST(suite_audio_module_bad_param, test_data_rx_bad_state)
 {
 	int ret;
 	struct data_fifo mod_fifo_tx;
@@ -232,7 +232,7 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_bad_state)
 		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_rx_null)
+ZTEST(suite_audio_module_bad_param, test_data_rx_null)
 {
 	int ret;
 	struct data_fifo mod_fifo_tx;
@@ -279,7 +279,7 @@ ZTEST(suite_a_mod_bad_param, test_data_rx_null)
 		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
+ZTEST(suite_audio_module_bad_param, test_data_tx_rx_bad_state)
 {
 	int ret;
 	struct data_fifo mod_fifo_tx;
@@ -379,7 +379,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_bad_state)
 		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
+ZTEST(suite_audio_module_bad_param, test_data_tx_rx_null)
 {
 	int ret;
 	struct data_fifo mod_fifo_tx;
@@ -474,7 +474,7 @@ ZTEST(suite_a_mod_bad_param, test_data_tx_rx_null)
 		      -ECONNREFUSED, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_stop_bad_state)
+ZTEST(suite_audio_module_bad_param, test_stop_bad_state)
 {
 	int ret;
 	struct audio_module_handle handle = {.name = "TEST stop"};
@@ -501,7 +501,7 @@ ZTEST(suite_a_mod_bad_param, test_stop_bad_state)
 		      "Stop returns with incorrect state: ret %d", ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_stop_null)
+ZTEST(suite_audio_module_bad_param, test_stop_null)
 {
 	int ret;
 	struct audio_module_handle handle = {0};
@@ -518,7 +518,7 @@ ZTEST(suite_a_mod_bad_param, test_stop_null)
 		      "Stop returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_start_bad_state)
+ZTEST(suite_audio_module_bad_param, test_start_bad_state)
 {
 	int ret;
 	struct audio_module_handle handle = {.name = "TEST start"};
@@ -538,7 +538,7 @@ ZTEST(suite_a_mod_bad_param, test_start_bad_state)
 		      "Start returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_start_null)
+ZTEST(suite_audio_module_bad_param, test_start_null)
 {
 	int ret;
 	struct audio_module_handle handle = {.name = "TEST start"};
@@ -555,10 +555,73 @@ ZTEST(suite_a_mod_bad_param, test_start_null)
 		      "Start returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_config_get_bad_state)
+ZTEST(suite_audio_module_bad_param, test_config_get_bad_state)
 {
 	int ret;
 	struct audio_module_handle handle = {.name = "TEST get config"};
+	struct mod_config configuration = {0};
+	struct audio_module_configuration *config =
+		(struct audio_module_configuration *)&configuration;
+
+	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
+	ret = audio_module_configuration_get(&handle, config);
+	zassert_equal(ret, -ENOTSUP,
+		      "Configuration get function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
+		      ret);
+}
+
+ZTEST(suite_audio_module_bad_param, test_config_get_null)
+{
+	int ret;
+	struct audio_module_handle handle = {.name = "TEST get config"};
+	struct mod_config configuration = {0};
+	struct audio_module_configuration *config =
+		(struct audio_module_configuration *)&configuration;
+
+	ret = audio_module_configuration_get(NULL, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = audio_module_configuration_get(NULL, config);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	ret = audio_module_configuration_get(&handle, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	ret = audio_module_configuration_get(NULL, config);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Configuration get returns with incorrect state: %d", handle.state);
+
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	ret = audio_module_configuration_get(&handle, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Configuration get returns with incorrect state: %d", handle.state);
+
+	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	ret = audio_module_configuration_get(NULL, NULL);
+	zassert_equal(ret, -EINVAL,
+		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
+		      "Configuration get returns with incorrect state: %d", handle.state);
+}
+
+ZTEST(suite_audio_module_bad_param, test_reconfig_bad_state)
+{
+	int ret;
+	struct audio_module_handle handle = {.name = "TEST reconfig"};
 	struct mod_config configuration = {0};
 	struct audio_module_configuration *config =
 		(struct audio_module_configuration *)&configuration;
@@ -566,59 +629,53 @@ ZTEST(suite_a_mod_bad_param, test_config_get_bad_state)
 	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_reconfigure(&handle, config);
 	zassert_equal(ret, -ENOTSUP,
-		      "Configuration get function did not return -ENOTSUP (129): ret %d", ret);
-	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
+		      "Reconfiguration function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
+		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_config_get_null)
+ZTEST(suite_audio_module_bad_param, test_reconfig_null)
 {
 	int ret;
-	struct audio_module_handle handle = {.name = "TEST get config"};
+	struct audio_module_handle handle = {.name = "TEST reconfig"};
 	struct mod_config configuration = {0};
 	struct audio_module_configuration *config =
 		(struct audio_module_configuration *)&configuration;
 
 	ret = audio_module_reconfigure(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
 	ret = audio_module_reconfigure(NULL, config);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
 	ret = audio_module_reconfigure(&handle, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_reconfigure(NULL, config);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration get returns with incorrect state: %d", handle.state);
+		      "Reconfiguration returns with incorrect state: %d", handle.state);
 
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_reconfigure(&handle, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration get returns with incorrect state: %d", handle.state);
+		      "Reconfiguration returns with incorrect state: %d", handle.state);
 
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_reconfigure(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration get function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	zassert_equal(ret, -EINVAL, "Reconfiguration function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration get returns with incorrect state: %d", handle.state);
+		      "Reconfiguration returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_disconnect_bad_type)
+ZTEST(suite_audio_module_bad_param, test_disconnect_bad_type)
 {
 	int ret;
 	struct audio_module_description test_description_1 = {
@@ -634,48 +691,42 @@ ZTEST(suite_a_mod_bad_param, test_disconnect_bad_type)
 						.state = AUDIO_MODULE_TYPE_UNDEFINED,
 						.description = &test_description_2};
 
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	test_description_1.type = AUDIO_MODULE_TYPE_IN_OUT;
 	test_description_1.type = AUDIO_MODULE_TYPE_UNDEFINED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_UNDEFINED;
 	handle_rx.state = AUDIO_MODULE_TYPE_IN_OUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
 	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_OUTPUT;
 	handle_rx.state = AUDIO_MODULE_TYPE_INPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_IN_OUT;
 	handle_rx.state = AUDIO_MODULE_TYPE_OUTPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_disconnect_bad_state)
+ZTEST(suite_audio_module_bad_param, test_disconnect_bad_state)
 {
 	int ret;
 	struct audio_module_description test_description = {
@@ -688,27 +739,24 @@ ZTEST(suite_a_mod_bad_param, test_disconnect_bad_state)
 						.state = AUDIO_MODULE_STATE_UNDEFINED,
 						.description = &test_description};
 
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_CONFIGURED;
 	handle_rx.state = AUDIO_MODULE_STATE_UNDEFINED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_UNDEFINED;
 	handle_rx.state = AUDIO_MODULE_STATE_CONFIGURED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Disconnect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_disconnect_null)
+ZTEST(suite_audio_module_bad_param, test_disconnect_null)
 {
 	int ret;
 	struct audio_module_description test_description = {
@@ -721,23 +769,28 @@ ZTEST(suite_a_mod_bad_param, test_disconnect_null)
 						.state = AUDIO_MODULE_STATE_CONFIGURED,
 						.description = &test_description};
 
-	ret = audio_module_connect(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	ret = audio_module_disconnect(NULL, NULL, false);
+	zassert_equal(ret, -EINVAL, "Disconnect set function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
-	ret = audio_module_connect(NULL, &handle_rx);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	ret = audio_module_disconnect(NULL, &handle_rx, false);
+	zassert_equal(ret, -EINVAL, "Disconnect set function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 
-	ret = audio_module_connect(&handle_tx, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
+	ret = audio_module_disconnect(&handle_tx, NULL, false);
+	zassert_equal(ret, -EINVAL, "Disconnect set function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
+
+	ret = audio_module_disconnect(&handle_tx, &handle_tx, false);
+	zassert_equal(ret, -EINVAL, "Disconnect set function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
+
+	ret = audio_module_disconnect(&handle_tx, &handle_rx, true);
+	zassert_equal(ret, -EINVAL, "Disconnect set function did not return -EINVAL (%d): ret %d",
+		      -EINVAL, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_connect_bad_type)
+ZTEST(suite_audio_module_bad_param, test_connect_bad_type)
 {
 	int ret;
 	struct audio_module_description test_description_1 = {
@@ -753,48 +806,42 @@ ZTEST(suite_a_mod_bad_param, test_connect_bad_type)
 						.state = AUDIO_MODULE_TYPE_UNDEFINED,
 						.description = &test_description_2};
 
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	test_description_1.type = AUDIO_MODULE_TYPE_IN_OUT;
 	test_description_1.type = AUDIO_MODULE_TYPE_UNDEFINED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_UNDEFINED;
 	handle_rx.state = AUDIO_MODULE_TYPE_IN_OUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
 	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_OUTPUT;
 	handle_rx.state = AUDIO_MODULE_TYPE_INPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 
 	handle_tx.state = AUDIO_MODULE_TYPE_IN_OUT;
 	handle_rx.state = AUDIO_MODULE_TYPE_OUTPUT;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -ENOTSUP (%d): ret %d",
+		      -ENOTSUP, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_connect_bad_state)
+ZTEST(suite_audio_module_bad_param, test_connect_bad_state)
 {
 	int ret;
 	struct audio_module_description test_description = {
@@ -807,24 +854,21 @@ ZTEST(suite_a_mod_bad_param, test_connect_bad_state)
 						.state = AUDIO_MODULE_STATE_UNDEFINED,
 						.description = &test_description};
 
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -EINVAL (-129): ret %d", ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -EINVAL (-129): ret %d", ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_CONFIGURED;
 	handle_rx.state = AUDIO_MODULE_STATE_UNDEFINED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -EINVAL (-129): ret %d", ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -EINVAL (-129): ret %d", ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_UNDEFINED;
 	handle_rx.state = AUDIO_MODULE_STATE_CONFIGURED;
-	ret = audio_module_connect(&handle_tx, &handle_rx);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -EINVAL (-129): ret %d", ret);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
+	zassert_equal(ret, -ENOTSUP, "Connect function did not return -EINVAL (-129): ret %d", ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_connect_null)
+ZTEST(suite_audio_module_bad_param, test_connect_null)
 {
 	int ret;
 	char *test_inst_name_1 = "TEST instance 1";
@@ -842,104 +886,31 @@ ZTEST(suite_a_mod_bad_param, test_connect_null)
 	handle_rx.state = AUDIO_MODULE_STATE_CONFIGURED;
 	handle_rx.description = &test_description;
 
-	ret = audio_module_connect(NULL, NULL);
+	ret = audio_module_connect(NULL, NULL, false);
 	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
 
-	ret = audio_module_connect(NULL, &handle_rx);
+	ret = audio_module_connect(NULL, &handle_rx, false);
 	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
 
-	ret = audio_module_connect(&handle_tx, NULL);
+	ret = audio_module_connect(&handle_tx, NULL, false);
 	zassert_equal(ret, -EINVAL, "Connect function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
 
-	ret = audio_module_connect(&handle_tx, &handle_rx);
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, 0, "Connect function did not return 0L (0): ret %d", ret);
-	ret = audio_module_connect(&handle_tx, &handle_rx);
+
+	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -EALREADY, "Connect function did not return -EALREADY (%d): ret %d",
 		      -EALREADY, ret);
+
+	ret = audio_module_connect(&handle_tx, NULL, true);
+	zassert_equal(ret, -EINVAL, "Connect function did not return -EALREADY (%d): ret %d",
+		      -EINVAL, ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_reconfig_bad_state)
-{
-	int ret;
-	struct audio_module_handle handle = {.name = "TEST set config"};
-	struct mod_config configuration = {0};
-	struct audio_module_configuration *config =
-		(struct audio_module_configuration *)&configuration;
-
-	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
-	ret = audio_module_reconfigure(&handle, config);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_UNDEFINED,
-		      "Configuration set returns with incorrect state: %d", handle.state);
-
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-	ret = audio_module_reconfigure(&handle, config);
-	zassert_equal(ret, -ENOTSUP,
-		      "Configuration set function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Configuration set returns with incorrect state: %d", handle.state);
-}
-
-ZTEST(suite_a_mod_bad_param, test_reconfig_null)
-{
-	int ret;
-	struct audio_module_handle handle = {.name = "TEST set config"};
-	struct mod_config configuration = {0};
-	struct audio_module_configuration *config =
-		(struct audio_module_configuration *)&configuration;
-
-	ret = audio_module_reconfigure(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	ret = audio_module_reconfigure(NULL, config);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	ret = audio_module_reconfigure(&handle, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	ret = audio_module_reconfigure(&handle, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-	ret = audio_module_reconfigure(NULL, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration set returns with incorrect state: %d", handle.state);
-
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-	ret = audio_module_reconfigure(NULL, config);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration set returns with incorrect state: %d", handle.state);
-
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-	ret = audio_module_reconfigure(&handle, NULL);
-	zassert_equal(ret, -EINVAL,
-		      "Configuration set function did not return -EINVAL (%d): ret %d", -EINVAL,
-		      ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Configuration set returns with incorrect state: %d", handle.state);
-}
-
-ZTEST(suite_a_mod_bad_param, test_close_bad_state)
+ZTEST(suite_audio_module_bad_param, test_close_bad_state)
 {
 	int ret;
 	char *inst_name = "TEST close";
@@ -968,7 +939,7 @@ ZTEST(suite_a_mod_bad_param, test_close_bad_state)
 		      "Close returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_close_null)
+ZTEST(suite_audio_module_bad_param, test_close_null)
 {
 	int ret;
 
@@ -977,7 +948,7 @@ ZTEST(suite_a_mod_bad_param, test_close_null)
 		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
+ZTEST(suite_audio_module_bad_param, test_open_bad_thread)
 {
 	int ret;
 	char *inst_name = "TEST open";
@@ -1009,7 +980,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_thread)
 		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_open_bad_description)
+ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 {
 	int ret;
 	char *inst_name = "TEST open";
@@ -1077,7 +1048,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_description)
 		      ret);
 }
 
-ZTEST(suite_a_mod_bad_param, test_open_bad_state)
+ZTEST(suite_audio_module_bad_param, test_open_bad_state)
 {
 	int ret;
 	char *inst_name = "TEST open";
@@ -1116,7 +1087,7 @@ ZTEST(suite_a_mod_bad_param, test_open_bad_state)
 		      "Open returns with incorrect state: %d", handle.state);
 }
 
-ZTEST(suite_a_mod_bad_param, test_open_null)
+ZTEST(suite_audio_module_bad_param, test_open_null)
 {
 	int ret;
 	char *inst_name = "TEST open";
