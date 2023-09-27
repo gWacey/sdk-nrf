@@ -21,6 +21,88 @@ LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
 #define LOCK_TIMEOUT_US (K_USEC(100))
 
 /**
+ * @brief Helper function to validate the module state.
+ *
+ * @param state[in]  The module's state, one of enum audio_module_state.
+ *
+ * @return 0 if successful, error value.
+ */
+static int valid_state(enum audio_module_state state)
+{
+	if (state == AUDIO_MODULE_STATE_CONFIGURED || state == AUDIO_MODULE_STATE_RUNNING ||
+	    state == AUDIO_MODULE_STATE_STOPPED) {
+		return 0;
+	}
+
+	return -ENOTSUP;
+}
+
+/**
+ * @brief Helper function to validate the module is running, does not check if a valid state.
+ *
+ * @param state[in]  The module's state, one of enum audio_module_state.
+ *
+ * @return 0 if successful, error value.
+ */
+static int state_running(enum audio_module_state state)
+{
+	if (state == AUDIO_MODULE_STATE_RUNNING) {
+		return 0;
+	}
+
+	return -ENOTSUP;
+}
+
+/**
+ * @brief Helper function to validate the module type.
+ *
+ * @param type[in]  The module's type, one of enum audio_module_type.
+ *
+ * @return 0 if successful, error value.
+ */
+static int valid_type(enum audio_module_type type)
+{
+	if (type == AUDIO_MODULE_TYPE_INPUT || type == AUDIO_MODULE_TYPE_OUTPUT ||
+	    type == AUDIO_MODULE_TYPE_IN_OUT) {
+		return 0;
+	}
+
+	return -ENOTSUP;
+}
+
+/**
+ * @brief Helper function to validate that the module is one of the possible input types.
+ *
+ * @param type[in]  The module's type, one of enum audio_module_type.
+ *
+ * @return 0 if successful, error value.
+ */
+static int valid_input_type(enum audio_module_type type)
+{
+	if (type == AUDIO_MODULE_TYPE_INPUT || type == AUDIO_MODULE_TYPE_IN_OUT) {
+		return 0;
+	}
+
+	return -ENOTSUP;
+}
+
+/**
+ * @brief Helper function to validate that the module is one of the possible output types.
+ *
+ * @param type[in]  The module's type, one of enum audio_module_type.
+ *
+ * @return 0 if successful, error value.
+ */
+static int valid_output_type(enum audio_module_type type)
+{
+	if (type == AUDIO_MODULE_TYPE_OUTPUT || type == AUDIO_MODULE_TYPE_IN_OUT) {
+		return 0;
+	}
+
+	return -ENOTSUP;
+}
+
+/**
  * @brief Helper function to validate the module description.
  *
  * @param parameters[in]  The module parameters.
@@ -34,10 +116,7 @@ static int validate_parameters(struct audio_module_parameters const *const param
 		return -EINVAL;
 	}
 
-	if (parameters->description == NULL ||
-	    (parameters->description->type != AUDIO_MODULE_TYPE_INPUT &&
-	     parameters->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
-	     parameters->description->type != AUDIO_MODULE_TYPE_IN_OUT) ||
+	if (parameters->description == NULL || valid_type(parameters->description->type) ||
 	    parameters->description->name == NULL || parameters->description->functions == NULL) {
 		return -EINVAL;
 	}
@@ -49,24 +128,6 @@ static int validate_parameters(struct audio_module_parameters const *const param
 
 	if (parameters->thread.stack == NULL || parameters->thread.stack_size == 0) {
 		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * @brief Helper function to validate the module states are valid.
- *
- * @param handle[in]  The module's handle to test the state of.
- *
- * @return 0 if successful, error value.
- */
-static int handle_valid_state_test(struct audio_module_handle const *const handle)
-{
-	if (handle->state != AUDIO_MODULE_STATE_CONFIGURED &&
-	    handle->state != AUDIO_MODULE_STATE_RUNNING &&
-	    handle->state != AUDIO_MODULE_STATE_STOPPED) {
-		return -ENOTSUP;
 	}
 
 	return 0;
@@ -473,7 +534,8 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		return -EINVAL;
 	}
 
-	if (handle->state != AUDIO_MODULE_STATE_UNDEFINED) {
+	ret = valid_state(handle->state);
+	if (!ret) {
 		LOG_ERR("The module is already open");
 		return -EALREADY;
 	}
@@ -572,8 +634,7 @@ int audio_module_close(struct audio_module_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
-	    handle->state == AUDIO_MODULE_STATE_RUNNING) {
+	if (valid_state(handle->state) || !state_running(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for close", handle->name,
 			handle->state);
 		return -ENOTSUP;
@@ -629,8 +690,7 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 		return -ENOTSUP;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED ||
-	    handle->state == AUDIO_MODULE_STATE_RUNNING) {
+	if (valid_state(handle->state) || !state_running(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for setting the configuration",
 			handle->name, handle->state);
 		return -ENOTSUP;
@@ -661,7 +721,8 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 		return -EINVAL;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+	ret = valid_state(handle->state);
+	if (ret) {
 		LOG_ERR("Module %s in an invalid state, %d, for getting the configuration",
 			handle->name, handle->state);
 		return -ENOTSUP;
@@ -694,7 +755,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 	struct audio_module_handle *handle;
 
 	if (handle_from == handle_to) {
-		LOG_WRN("Module handles identical");
+		LOG_ERR("Module handles identical");
 		return -EINVAL;
 	}
 
@@ -703,13 +764,13 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 		return -EINVAL;
 	}
 
-	if (handle_from->description->type != AUDIO_MODULE_TYPE_INPUT &&
-	    handle_from->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+	ret = valid_input_type(handle_from->description->type);
+	if (ret) {
 		LOG_ERR("Connections between these modules is not supported");
 		return -ENOTSUP;
 	}
 
-	ret = handle_valid_state_test(handle_from);
+	ret = valid_state(handle_from->state);
 	if (ret) {
 		LOG_WRN("A module is in an invalid state for connecting");
 		return -ENOTSUP;
@@ -727,13 +788,13 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			return -EINVAL;
 		}
 
-		if (handle_to->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
-		    handle_to->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+		ret = valid_output_type(handle_to->description->type);
+		if (ret) {
 			LOG_ERR("Connections between these modules is not supported");
 			return -ENOTSUP;
 		}
 
-		ret = handle_valid_state_test(handle_to);
+		ret = valid_state(handle_to->state);
 		if (ret) {
 			LOG_WRN("A module is in an invalid state for connecting");
 			return -ENOTSUP;
@@ -788,7 +849,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 	int ret;
 
 	if (handle == handle_disconnect) {
-		LOG_WRN("Module handles identical");
+		LOG_ERR("Module handles identical");
 		return -EINVAL;
 	}
 
@@ -797,14 +858,14 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 		return -EINVAL;
 	}
 
-	if (handle->description->type != AUDIO_MODULE_TYPE_INPUT &&
-	    handle->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
+	ret = valid_input_type(handle->description->type);
+	if (ret) {
 		LOG_WRN("Disconnection of modules %s from %s, is not supported",
 			handle_disconnect->name, handle->name);
 		return -ENOTSUP;
 	}
 
-	ret = handle_valid_state_test(handle);
+	ret = valid_state(handle->state);
 	if (ret) {
 		LOG_WRN("A module is in an invalid state for connecting");
 		return -ENOTSUP;
@@ -821,13 +882,14 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 			return -EINVAL;
 		}
 
-		if (handle_disconnect->description->type != AUDIO_MODULE_TYPE_OUTPUT &&
-		    handle_disconnect->description->type != AUDIO_MODULE_TYPE_IN_OUT) {
-			LOG_ERR("Connections between these modules is not supported");
+		ret = valid_output_type(handle_disconnect->description->type);
+		if (ret) {
+			LOG_WRN("Disconnection of modules %s from %s, is not supported",
+				handle_disconnect->name, handle->name);
 			return -ENOTSUP;
 		}
 
-		ret = handle_valid_state_test(handle_disconnect);
+		ret = valid_state(handle_disconnect->state);
 		if (ret) {
 			LOG_WRN("A module is in an invalid state for connecting");
 			return -ENOTSUP;
@@ -879,7 +941,7 @@ int audio_module_start(struct audio_module_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+	if (valid_state(handle->state)) {
 		LOG_WRN("Module %s in an invalid state, %d, for start", handle->name,
 			handle->state);
 		return -ENOTSUP;
@@ -916,14 +978,14 @@ int audio_module_stop(struct audio_module_handle *handle)
 		return -EINVAL;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_STOPPED) {
-		LOG_DBG("Module %s already stopped", handle->name);
-		return -EALREADY;
-	}
-
-	if (handle->state != AUDIO_MODULE_STATE_RUNNING) {
+	if (valid_state(handle->state)) {
 		LOG_WRN("Module %s in an invalid state, %d, for stop", handle->name, handle->state);
 		return -ENOTSUP;
+	}
+
+	if (state_running(handle->state)) {
+		LOG_WRN("Module %s is not running already stopped", handle->name);
+		return -EALREADY;
 	}
 
 	if (handle->description->functions->stop != NULL) {
@@ -952,16 +1014,19 @@ int audio_module_data_tx(struct audio_module_handle *handle,
 		return -EINVAL;
 	}
 
-	if (handle->state != AUDIO_MODULE_STATE_RUNNING ||
-	    handle->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle->description->type == AUDIO_MODULE_TYPE_INPUT) {
-		LOG_WRN("Module %s in an invalid state (%d) or type (%d) to transmit data",
+	if (valid_state(handle->state) || valid_output_type(handle->description->type)) {
+		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to transmit data",
 			handle->name, handle->state, handle->description->type);
 		return -ENOTSUP;
 	}
 
+	if (state_running(handle->state)) {
+		LOG_WRN("Module %s is not running", handle->name);
+		return -ENOTSUP;
+	}
+
 	if (handle->thread.msg_rx == NULL) {
-		LOG_ERR("Module has message queue set to NULL");
+		LOG_ERR("Module %s has message queue set to NULL", handle->name);
 		return -ENOTSUP;
 	}
 
@@ -990,11 +1055,14 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return -EINVAL;
 	}
 
-	if (handle->state != AUDIO_MODULE_STATE_RUNNING ||
-	    handle->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle->description->type == AUDIO_MODULE_TYPE_OUTPUT) {
-		LOG_WRN("Module %s in an invalid state (%d) or type (%d) to receive data",
+	if (valid_state(handle->state) || valid_input_type(handle->description->type)) {
+		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to receive data",
 			handle->name, handle->state, handle->description->type);
+		return -ENOTSUP;
+	}
+
+	if (state_running(handle->state)) {
+		LOG_WRN("Module %s is not running", handle->name);
 		return -ENOTSUP;
 	}
 
@@ -1054,28 +1122,30 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 		return -EINVAL;
 	}
 
-	if (handle_tx->state != AUDIO_MODULE_STATE_RUNNING ||
-	    handle_rx->state != AUDIO_MODULE_STATE_RUNNING) {
-		LOG_WRN("Module is in an invalid state or type to send-receive audio data");
+	if (valid_state(handle_tx->state) || valid_state(handle_rx->state)) {
+		LOG_WRN("One or both of the modules are in an invalid state");
 		return -ENOTSUP;
 	}
 
-	if (handle_tx->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle_tx->description->type == AUDIO_MODULE_TYPE_INPUT ||
-	    handle_rx->description->type == AUDIO_MODULE_TYPE_UNDEFINED ||
-	    handle_rx->description->type == AUDIO_MODULE_TYPE_OUTPUT) {
-		LOG_ERR("Module not of the right type for operation");
+	if (state_running(handle_tx->state) || state_running(handle_rx->state)) {
+		LOG_WRN("One or both of the modules are not running");
+		return -ENOTSUP;
+	}
+
+	if (valid_output_type(handle_tx->description->type) ||
+	    valid_input_type(handle_rx->description->type)) {
+		LOG_ERR("Modules are not of the right type for operation");
 		return -ENOTSUP;
 	}
 
 	if (audio_data_tx == NULL || audio_data_rx == NULL) {
-		LOG_ERR("Audio data pointer for module is NULL");
+		LOG_ERR("One or both of the audio data pointers are NULL");
 		return -ECONNREFUSED;
 	}
 
 	if (audio_data_tx->data == NULL || audio_data_tx->data_size == 0 ||
 	    audio_data_rx->data == NULL || audio_data_rx->data_size == 0) {
-		LOG_ERR("Invalid output audio data");
+		LOG_ERR("One or both of the have invalid output audio data");
 		return -ECONNREFUSED;
 	}
 
@@ -1134,7 +1204,7 @@ int audio_module_names_get(struct audio_module_handle const *const handle, char 
 		return -EINVAL;
 	}
 
-	if (handle->state == AUDIO_MODULE_STATE_UNDEFINED) {
+	if (valid_state(handle->state)) {
 		LOG_WRN("Module %s is in an invalid state, %d, for get names", handle->name,
 			handle->state);
 		return -ENOTSUP;
@@ -1158,7 +1228,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 		return -EINVAL;
 	}
 
-	if (handle->state > AUDIO_MODULE_STATE_STOPPED) {
+	if (valid_state(handle->state)) {
 		LOG_WRN("Module state is invalid");
 		return -EINVAL;
 	}

@@ -354,13 +354,6 @@ ZTEST(suite_audio_module_functional, test_state_get_fnct)
 	struct audio_module_handle handle = {0};
 	enum audio_module_state state;
 
-	ret = audio_module_state_get(&handle, &state);
-	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);
-	zassert_equal(
-		state, AUDIO_MODULE_STATE_UNDEFINED,
-		"Get state function did not return AUDIO_MODULE_STATE_UNDEFINED (%d) rather %d",
-		AUDIO_MODULE_STATE_UNDEFINED, state);
-
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_state_get(&handle, &state);
 	zassert_equal(ret, 0, "Get state function did not return successfully (0): ret %d", ret);

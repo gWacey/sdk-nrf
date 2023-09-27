@@ -488,8 +488,8 @@ ZTEST(suite_audio_module_bad_param, test_stop_bad_state)
 
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_stop(&handle);
-	zassert_equal(ret, -ENOTSUP, "Stop function did not return -ENOTSUP (%d): ret %d", -ENOTSUP,
-		      ret);
+	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
+		      -EALREADY, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
 		      "Stop returns with incorrect state: %d", handle.state);
 
