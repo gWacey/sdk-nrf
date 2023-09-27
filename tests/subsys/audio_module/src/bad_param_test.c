@@ -1065,24 +1065,24 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_state)
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_open(&test_params, config, inst_name,
 				(struct audio_module_context *)&context, &handle);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
+	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
 		      "Open returns with incorrect state: %d", handle.state);
 
 	handle.state = AUDIO_MODULE_STATE_RUNNING;
 	ret = audio_module_open(&test_params, config, inst_name,
 				(struct audio_module_context *)&context, &handle);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
+	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
 		      "Open returns with incorrect state: %d", handle.state);
 
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 	ret = audio_module_open(&test_params, config, inst_name,
 				(struct audio_module_context *)&context, &handle);
-	zassert_equal(ret, -EALREADY, "Open function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
+	zassert_equal(ret, -EINVAL, "Open function did not return -EINVAL (%d): ret %d", -EINVAL,
+		      ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
 		      "Open returns with incorrect state: %d", handle.state);
 }
