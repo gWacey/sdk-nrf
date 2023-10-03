@@ -39,6 +39,9 @@ static struct test_slab_queue test_fifo_slab[FAKE_FIFO_NUM];
 /* FIFO "message" queue */
 static struct test_msg_fifo_queue test_fifo_msg_queue[FAKE_FIFO_NUM];
 
+/**
+ * Deinitialize data FIFO structure.
+ */
 void data_fifo_deinit(struct data_fifo *data_fifo)
 {
 	data_fifo->msgq_buffer = (char *)NULL;

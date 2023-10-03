@@ -10,8 +10,17 @@
 #include <zephyr/ztest.h>
 #include <zephyr/fff.h>
 #include "data_fifo.h"
+#include "common.h"
 
-/* Fake functions declaration */
+/**
+ * @brief Deinitialize data FIFO structure.
+ *
+ * @param data_fifo[in/out]  The data FIFO instance.
+
+ */
+void data_fifo_deinit(struct data_fifo *data_fifo);
+
+/* Fake functions declaration. */
 DECLARE_FAKE_VALUE_FUNC(int, data_fifo_pointer_first_vacant_get, struct data_fifo *, void **,
 			k_timeout_t);
 DECLARE_FAKE_VALUE_FUNC(int, data_fifo_block_lock, struct data_fifo *, void **, size_t);

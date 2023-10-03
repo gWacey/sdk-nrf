@@ -34,4 +34,82 @@ struct mod_context {
 	struct mod_config config;
 };
 
+extern const char *test_instance_name;
+extern const char *test_string;
+extern const uint32_t test_uint32;
+
+/**
+ * @brief Test function to set a module's context.
+ *
+ * @param ctx[out]    The module context to set
+ * @param config[in]  Pointer to the module's configuration
+ *
+ * @return 0 if successful, error otherwise
+ */
+void test_context_set(struct mod_context *ctx, struct mod_config const *const config);
+
+/**
+ * @brief Test function to open a module.
+ *
+ * @param handle[in/out]     The handle to the module instance.
+ * @param configuration[in]  Pointer to the module's configuration.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_open_function(struct audio_module_handle_private *handle,
+		       struct audio_module_configuration const *const configuration);
+
+/**
+ * @brief Test function to close a module.
+ *
+ * @param handle[in/out]  The handle to the module instance.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_close_function(struct audio_module_handle_private *handle);
+
+/**
+ * @brief Test function to configure a module.
+ *
+ * @param handle[in/out]     The handle to the module instance.
+ * @param configuration[in]  Pointer to the module's configuration to set.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_config_set_function(struct audio_module_handle_private *handle,
+			     struct audio_module_configuration const *const configuration);
+
+/**
+ * @brief Test function to get the configuration of a module.
+ *
+ * @param handle[in]          The handle to the module instance.
+ * @param configuration[out]  Pointer to the module's current configuration.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_config_get_function(struct audio_module_handle_private const *const handle,
+			     struct audio_module_configuration *configuration);
+
+/**
+ * @brief Test stop/start function of a module.
+ *
+ * @param handle[in/out]  The handle for the module to be stopped or started.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_stop_start_function(struct audio_module_handle_private *handle);
+
+/**
+ * @brief Test process data function of a module.
+ *
+ * @param handle[in/out]      The handle to the module instance.
+ * @param audio_data_rx[in]   Pointer to the input audio data or NULL for an input module.
+ * @param audio_data_tx[out]  Pointer to the output audio data or NULL for an output module.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_data_process_function(struct audio_module_handle_private *handle,
+			       struct audio_data const *const audio_data_rx,
+			       struct audio_data *audio_data_tx);
+
 #endif /* _COMMON_AUDIO_MODULE_TEST_H_ */

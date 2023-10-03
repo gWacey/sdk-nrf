@@ -23,9 +23,9 @@ LOG_MODULE_REGISTER(audio_module, CONFIG_AUDIO_MODULE_LOG_LEVEL);
 /**
  * @brief Helper function to validate the module state.
  *
- * @param state[in]  The module's state, one of enum audio_module_state.
+ * @param state[in]  The module's state.
  *
- * @return true if successful, false if fails.
+ * @return true if state is not undefined, false otherwise.
  */
 static bool valid_state(enum audio_module_state state)
 {
@@ -40,9 +40,9 @@ static bool valid_state(enum audio_module_state state)
 /**
  * @brief Helper function to validate the module is running, does not check if a valid state.
  *
- * @param state[in]  The module's state, one of enum audio_module_state.
+ * @param state[in]  The module's state.
  *
- * @return true if successful, false if fails.
+ * @return true if in running state, false otherwise.
  */
 static bool state_running(enum audio_module_state state)
 {
@@ -56,9 +56,9 @@ static bool state_running(enum audio_module_state state)
 /**
  * @brief Helper function to validate the module type.
  *
- * @param type[in]  The module's type, one of enum audio_module_type.
+ * @param type[in]  The module's type.
  *
- * @return true if successful, false if fails.
+ * @return true if not type undefined, false otherwise.
  */
 static bool valid_type(enum audio_module_type type)
 {
@@ -73,9 +73,9 @@ static bool valid_type(enum audio_module_type type)
 /**
  * @brief Helper function to validate that the module is one of the possible input types.
  *
- * @param type[in]  The module's type, one of enum audio_module_type.
+ * @param type[in]  The module's type.
  *
- * @return true if successful, false if fails.
+ * @return true if possible input type, false otherwise.
  */
 static bool valid_input_type(enum audio_module_type type)
 {
@@ -89,9 +89,9 @@ static bool valid_input_type(enum audio_module_type type)
 /**
  * @brief Helper function to validate that the module is one of the possible output types.
  *
- * @param type[in]  The module's type, one of enum audio_module_type.
+ * @param type[in]  The module's type.
  *
- * @return true if successful, false if fails.
+ * @return true if possible output type, false otherwise.
  */
 static bool valid_output_type(enum audio_module_type type)
 {
@@ -103,11 +103,11 @@ static bool valid_output_type(enum audio_module_type type)
 }
 
 /**
- * @brief Helper function to validate the module description.
+ * @brief Helper function to validate the module parameters.
  *
  * @param parameters[in]  The module parameters.
  *
- * @return true if successful, false if fails.
+ * @return true if valid parameters, false otherwise.
  */
 static bool validate_parameters(struct audio_module_parameters const *const parameters)
 {
@@ -122,6 +122,7 @@ static bool validate_parameters(struct audio_module_parameters const *const para
 	}
 
 	if (parameters->description->functions->configuration_set == NULL ||
+	    parameters->description->functions->configuration_get == NULL ||
 	    parameters->description->functions->data_process == NULL) {
 		return false;
 	}
@@ -167,7 +168,7 @@ static void audio_data_release_cb(struct audio_module_handle_private *handle,
  * @param data_in_response_cb[in]  A pointer to a callback to run when the buffer is
  *                                 fully consumed.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_handle *rx_handle,
 		   struct audio_data const *const audio_data,
@@ -204,7 +205,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
 	} else {
 		LOG_WRN("Receiving module %s is in an invalid state %d", rx_handle->name,
 			rx_handle->state);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	return 0;
@@ -216,7 +217,7 @@ static int data_tx(struct audio_module_handle *tx_handle, struct audio_module_ha
  * @param handle[in/out]  The handle for this modules instance.
  * @param audio_data[in]  A pointer to the audio data.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static int tx_fifo_put(struct audio_module_handle *handle,
 		       struct audio_data const *const audio_data)
@@ -263,7 +264,7 @@ static int tx_fifo_put(struct audio_module_handle *handle,
  * @param handle[in/out]  The handle for this modules instance.
  * @param audio_data[in]  A pointer to the audio data.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static int send_to_connected_modules(struct audio_module_handle *handle,
 				     struct audio_data const *const audio_data)
@@ -286,11 +287,13 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 	 */
 	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
 	if (ret) {
+		LOG_ERR("Failed to take MUTEX lock in time");
 		return ret;
 	}
 
 	ret = k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
 	if (ret) {
+		LOG_ERR("Failed to initiate semaphore");
 		return ret;
 	}
 
@@ -307,6 +310,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 
 	ret = k_mutex_unlock(&handle->dest_mutex);
 	if (ret) {
+		LOG_ERR("Failed to release MUTEX");
 		return ret;
 	}
 
@@ -324,6 +328,8 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 				LOG_ERR("Failed to take semaphore for data release callback "
 					"function");
 			}
+
+			return ret;
 		}
 	}
 
@@ -335,7 +341,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
  *
  * @param handle[in/out]  The handle for this modules instance.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static void module_thread_input(struct audio_module_handle *handle, void *p2, void *p3)
 {
@@ -386,7 +392,7 @@ static void module_thread_input(struct audio_module_handle *handle, void *p2, vo
  *
  * @param handle[in/out]  The handle for this modules instance.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static void module_thread_output(struct audio_module_handle *handle, void *p2, void *p3)
 {
@@ -445,7 +451,7 @@ static void module_thread_output(struct audio_module_handle *handle, void *p2, v
  *
  * @param handle[in/out]  The handle for this modules instance.
  *
- * @return 0 if successful, error value.
+ * @return 0 if successful, error otherwise.
  */
 static void module_thread_in_out(struct audio_module_handle *handle, void *p2, void *p3)
 {
@@ -518,7 +524,7 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 }
 
 /**
- * @brief  Function for opening a module.
+ * Open an audio module.
  */
 int audio_module_open(struct audio_module_parameters const *const parameters,
 		      struct audio_module_configuration const *const configuration,
@@ -536,24 +542,25 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 
 	if (valid_state(handle->state)) {
 		LOG_ERR("The module is already open");
-		return -EINVAL;
+		return -ECANCELED;
 	}
 
 	if (!validate_parameters(parameters)) {
 		LOG_ERR("Invalid parameters for module");
-		return -EINVAL;
+		return -ECANCELED;
 	}
 
+	/* Clear handle to known state. */
 	memset(handle, 0, sizeof(struct audio_module_handle));
 
 	/* Allocate the context memory. */
 	handle->context = context;
 
-	memcpy(handle->name, name, CONFIG_AUDIO_MODULE_NAME_SIZE - 1);
-	if (strlen(name) > CONFIG_AUDIO_MODULE_NAME_SIZE - 1) {
+	memcpy(handle->name, name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	if (strlen(name) > CONFIG_AUDIO_MODULE_NAME_SIZE) {
+		handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE] = '\0';
 		LOG_WRN("Module's instance name truncated to %s", handle->name);
 	}
-	handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE - 1] = '\0';
 
 	handle->description = parameters->description;
 	memcpy(&handle->thread, &parameters->thread,
@@ -571,7 +578,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 	ret = handle->description->functions->configuration_set(
 		(struct audio_module_handle_private *)handle, configuration);
 	if (ret) {
-		LOG_ERR("Set configuration for module %s send failed, ret %d", handle->name, ret);
+		LOG_ERR("Set configuration for module %s failed, ret %d", handle->name, ret);
 		return ret;
 	}
 
@@ -598,9 +605,8 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 	k_mutex_init(&handle->dest_mutex);
 
 	handle->thread_id = k_thread_create(
-		&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
-		(k_thread_entry_t)module_thread_in_out, (void *)handle, NULL, NULL,
-		K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+		&handle->thread_data, handle->thread.stack, handle->thread.stack_size, thread_entry,
+		(void *)handle, NULL, NULL, K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
 
 	ret = k_thread_name_set(handle->thread_id, &handle->name[0]);
 	if (ret) {
@@ -621,7 +627,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 }
 
 /**
- * @brief  Function to close an open module.
+ *  Close an open audio module.
  */
 int audio_module_close(struct audio_module_handle *handle)
 {
@@ -635,7 +641,7 @@ int audio_module_close(struct audio_module_handle *handle)
 	if (!valid_state(handle->state) || state_running(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for close", handle->name,
 			handle->state);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (handle->description->functions->close != NULL) {
@@ -664,14 +670,11 @@ int audio_module_close(struct audio_module_handle *handle)
 
 	LOG_DBG("Closed module %s", handle->name);
 
-	/* Clean up the handle. */
-	memset(handle, 0, sizeof(struct audio_module_handle));
-
 	return 0;
 };
 
 /**
- * @brief  Function to reconfigure a module.
+ * Reconfigure an audio module.
  */
 int audio_module_reconfigure(struct audio_module_handle *handle,
 			     struct audio_module_configuration const *const configuration)
@@ -683,22 +686,22 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 		return -EINVAL;
 	}
 
-	if (handle->description->functions->configuration_set == NULL) {
-		LOG_ERR("Module %s has no reconfigure function", handle->name);
-		return -ENOTSUP;
-	}
-
 	if (!valid_state(handle->state) || state_running(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for setting the configuration",
 			handle->name, handle->state);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
-	ret = handle->description->functions->configuration_set(
-		(struct audio_module_handle_private *)handle, configuration);
-	if (ret) {
-		LOG_ERR("Set configuration for module %s send failed, ret %d", handle->name, ret);
-		return ret;
+	if (handle->description->functions->configuration_set != NULL) {
+		ret = handle->description->functions->configuration_set(
+			(struct audio_module_handle_private *)handle, configuration);
+		if (ret) {
+			LOG_ERR("Reconfiguration for module %s failed, ret %d", handle->name, ret);
+			return ret;
+		}
+	} else {
+		LOG_ERR("No mandatory reconfiguration function for module %s", handle->name);
+		return -ECANCELED;
 	}
 
 	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
@@ -707,7 +710,7 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 };
 
 /**
- * @brief  Function to get the configuration of a module.
+ * Get the configuration of an audio module.
  */
 int audio_module_configuration_get(struct audio_module_handle const *const handle,
 				   struct audio_module_configuration *configuration)
@@ -722,27 +725,27 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 	if (!valid_state(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for getting the configuration",
 			handle->name, handle->state);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (handle->description->functions->configuration_get != NULL) {
 		ret = handle->description->functions->configuration_get(
 			(struct audio_module_handle_private *)handle, configuration);
 		if (ret) {
-			LOG_DBG("Get configuration for module %s failed, ret %d", handle->name,
+			LOG_WRN("Get configuration for module %s failed, ret %d", handle->name,
 				ret);
 			return ret;
 		}
 	} else {
-		LOG_WRN("Get configuration for module %s has no get configuration function",
-			handle->name);
+		LOG_ERR("No mandatory get configuration function for module %s", handle->name);
+		return -ECANCELED;
 	}
 
 	return 0;
 };
 
 /**
- * @brief Function to connect two modules together.
+ *  Connect two audio modules together.
  *
  */
 int audio_module_connect(struct audio_module_handle *handle_from,
@@ -763,12 +766,12 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 
 	if (!valid_input_type(handle_from->description->type)) {
 		LOG_ERR("Connections between these modules is not supported");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!valid_state(handle_from->state)) {
 		LOG_WRN("A module is in an invalid state for connecting");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (connect_external) {
@@ -785,23 +788,24 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 
 		if (!valid_output_type(handle_to->description->type)) {
 			LOG_ERR("Connections between these modules is not supported");
-			return -ENOTSUP;
+			return -ECANCELED;
 		}
 
 		if (!valid_state(handle_to->state)) {
 			LOG_WRN("A module is in an invalid state for connecting");
-			return -ENOTSUP;
+			return -ECANCELED;
 		}
 	}
 
 	ret = k_mutex_lock(&handle_from->dest_mutex, LOCK_TIMEOUT_US);
 	if (ret) {
+		LOG_ERR("Failed to take MUTEX lock in time");
 		return ret;
 	}
 
-	/* If the connect_external is true the handle_from module will queue it's output data to
-	 * it's own TX FIFO. Thus allowing an external system to receive the data with a call
-	 * to audio_module_data_rx() with the same handle.
+	/* If the connect_external is true the handle_from module will queue it's output
+	 * data to it's own TX FIFO. Thus allowing an external system to receive the data
+	 * with a call to audio_module_data_rx() with the same handle.
 	 */
 	if (connect_external) {
 		handle_from->use_tx_queue = true;
@@ -822,10 +826,11 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			handle_to->name);
 	}
 
-	handle_from->dest_count += 1;
+	handle_from->dest_count++;
 
 	ret = k_mutex_unlock(&handle_from->dest_mutex);
 	if (ret) {
+		LOG_ERR("Failed to release MUTEX lock");
 		return ret;
 	}
 
@@ -833,7 +838,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 }
 
 /**
- * @brief Function to disconnect modules from each other.
+ * Disconnect audio modules from each other.
  *
  */
 int audio_module_disconnect(struct audio_module_handle *handle,
@@ -854,12 +859,12 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 	if (!valid_input_type(handle->description->type)) {
 		LOG_WRN("Disconnection of modules %s from %s, is not supported",
 			handle_disconnect->name, handle->name);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!valid_state(handle->state)) {
 		LOG_WRN("A module is in an invalid state for connecting");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (disconnect_external) {
@@ -876,22 +881,24 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 		if (!valid_output_type(handle_disconnect->description->type)) {
 			LOG_WRN("Disconnection of modules %s from %s, is not supported",
 				handle_disconnect->name, handle->name);
-			return -ENOTSUP;
+			return -ECANCELED;
 		}
 
 		if (!valid_state(handle_disconnect->state)) {
 			LOG_WRN("A module is in an invalid state for connecting");
-			return -ENOTSUP;
+			return -ECANCELED;
 		}
 	}
 
 	ret = k_mutex_lock(&handle->dest_mutex, LOCK_TIMEOUT_US);
 	if (ret) {
+		LOG_ERR("Failed to take MUTEX lock in time");
 		return ret;
 	}
 
-	/* If the handle module is queuing it's output audio data to it's own TX FIFO and the
-	 * disconnect_external flag is true, then stop sending the audio data items to it.
+	/* If the handle module is queuing it's output audio data to it's own TX FIFO and
+	 * the disconnect_external flag is true, then stop sending the audio data items to
+	 * it.
 	 */
 	if (disconnect_external) {
 		handle->use_tx_queue = false;
@@ -908,10 +915,11 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 			handle->name);
 	}
 
-	handle->dest_count -= 1;
+	handle->dest_count--;
 
 	ret = k_mutex_unlock(&handle->dest_mutex);
 	if (ret) {
+		LOG_ERR("Failed to release MUTEX lock");
 		return ret;
 	}
 
@@ -919,21 +927,21 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 }
 
 /**
- * @brief Start processing data in the module given by handle.
+ * Start processing data in the audio module given by handle.
  */
 int audio_module_start(struct audio_module_handle *handle)
 {
 	int ret;
 
 	if (handle == NULL) {
-		LOG_DBG("Module handle is NULL");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
-	if (!valid_state(handle->state)) {
-		LOG_WRN("Module %s in an invalid state, %d, for start", handle->name,
-			handle->state);
-		return -ENOTSUP;
+	if (!valid_state(handle->state) || !valid_type(handle->description->type)) {
+		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to start", handle->name,
+			handle->state, handle->description->type);
+		return -ECANCELED;
 	}
 
 	if (state_running(handle->state)) {
@@ -944,7 +952,7 @@ int audio_module_start(struct audio_module_handle *handle)
 	if (handle->description->functions->start != NULL) {
 		ret = handle->description->functions->start(
 			(struct audio_module_handle_private *)handle);
-		if (ret < 0) {
+		if (ret) {
 			LOG_ERR("Failed user start for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
@@ -956,7 +964,7 @@ int audio_module_start(struct audio_module_handle *handle)
 }
 
 /**
- * @brief Stop processing audio data in the module given by handle.
+ * Stop processing audio data in the audio module given by handle.
  */
 int audio_module_stop(struct audio_module_handle *handle)
 {
@@ -967,9 +975,10 @@ int audio_module_stop(struct audio_module_handle *handle)
 		return -EINVAL;
 	}
 
-	if (!valid_state(handle->state)) {
-		LOG_WRN("Module %s in an invalid state, %d, for stop", handle->name, handle->state);
-		return -ENOTSUP;
+	if (!valid_state(handle->state) || !valid_type(handle->description->type)) {
+		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to stop", handle->name,
+			handle->state, handle->description->type);
+		return -ECANCELED;
 	}
 
 	if (!state_running(handle->state)) {
@@ -980,7 +989,7 @@ int audio_module_stop(struct audio_module_handle *handle)
 	if (handle->description->functions->stop != NULL) {
 		ret = handle->description->functions->stop(
 			(struct audio_module_handle_private *)handle);
-		if (ret < 0) {
+		if (ret) {
 			LOG_ERR("Failed user pause for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
@@ -992,7 +1001,7 @@ int audio_module_stop(struct audio_module_handle *handle)
 }
 
 /**
- * @brief Send an audio data item to a module, all data is consumed by the module.
+ * Send an audio data item to an audio module, all data is consumed by the module.
  */
 int audio_module_data_tx(struct audio_module_handle *handle,
 			 struct audio_data const *const audio_data,
@@ -1006,29 +1015,29 @@ int audio_module_data_tx(struct audio_module_handle *handle,
 	if (!valid_state(handle->state) || !valid_output_type(handle->description->type)) {
 		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to transmit data",
 			handle->name, handle->state, handle->description->type);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!state_running(handle->state)) {
 		LOG_WRN("Module %s is not running", handle->name);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (handle->thread.msg_rx == NULL) {
 		LOG_ERR("Module %s has message queue set to NULL", handle->name);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
-		LOG_ERR("Module , %s, data parameter error", handle->name);
-		return -ECONNREFUSED;
+		LOG_ERR("Data parameter error for module %s", handle->name);
+		return -EINVAL;
 	}
 
 	return data_tx((void *)NULL, handle, audio_data, response_cb);
 }
 
 /**
- * @brief Retrieve an audio data item from the module.
+ * Retrieve a audio data item from an audio module.
  *
  */
 int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *audio_data,
@@ -1040,30 +1049,31 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 	size_t msg_tx_size;
 
 	if (handle == NULL) {
-		LOG_ERR("Module handle error");
+		LOG_ERR("Module handle is NULL");
 		return -EINVAL;
 	}
 
 	if (!valid_state(handle->state) || !valid_input_type(handle->description->type)) {
 		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to receive data",
 			handle->name, handle->state, handle->description->type);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!state_running(handle->state)) {
 		LOG_WRN("Module %s is not running", handle->name);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (handle->thread.msg_tx == NULL) {
 		LOG_ERR("Module has message queue set to NULL");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (audio_data == NULL || audio_data->data == NULL || audio_data->data_size == 0) {
-		LOG_ERR("Input audio data for module %s has NULL pointer or a zero size buffer",
+		LOG_ERR("Input audio data for module %s has NULL pointer or a zero size "
+			"buffer",
 			handle->name);
-		return -ECONNREFUSED;
+		return -EINVAL;
 	}
 
 	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_tx,
@@ -1075,7 +1085,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 
 	if (msg_tx->audio_data.data == NULL ||
 	    msg_tx->audio_data.data_size > audio_data->data_size) {
-		LOG_ERR("Data output buffer NULL or too small for received buffer from module %s",
+		LOG_ERR("Data output buffer NULL or too small for received buffer from "
+			"module %s",
 			handle->name);
 		ret = -EINVAL;
 	} else {
@@ -1090,11 +1101,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 }
 
 /**
- * @brief Send an audio data item to a module and retrieve an audio data item from a module.
- *
- * @note The audio data is processed within the module or sequence of modules. The result is
- * returned via the module or final module's output FIFO. All the input data is consumed within the
- * call and thus the input data buffer maybe released once the function returns.
+ * Send an audio data item to an audio module and retrieve an audio data item from an audio
+ * module.
  *
  */
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
@@ -1113,34 +1121,34 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 
 	if (!valid_state(handle_tx->state) || !valid_state(handle_rx->state)) {
 		LOG_WRN("One or both of the modules are in an invalid state");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!state_running(handle_tx->state) || !state_running(handle_rx->state)) {
 		LOG_WRN("One or both of the modules are not running");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (!valid_output_type(handle_tx->description->type) ||
 	    !valid_input_type(handle_rx->description->type)) {
 		LOG_ERR("Modules are not of the right type for operation");
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	if (audio_data_tx == NULL || audio_data_rx == NULL) {
 		LOG_ERR("One or both of the audio data pointers are NULL");
-		return -ECONNREFUSED;
+		return -EINVAL;
+	}
+
+	if (handle_tx->thread.msg_rx == NULL || handle_rx->thread.msg_tx == NULL) {
+		LOG_ERR("Modules have message queue set to NULL");
+		return -EINVAL;
 	}
 
 	if (audio_data_tx->data == NULL || audio_data_tx->data_size == 0 ||
 	    audio_data_rx->data == NULL || audio_data_rx->data_size == 0) {
 		LOG_ERR("One or both of the have invalid output audio data");
-		return -ECONNREFUSED;
-	}
-
-	if (handle_tx->thread.msg_rx == NULL || handle_rx->thread.msg_tx == NULL) {
-		LOG_ERR("Modules have message queue set to NULL");
-		return -ENOTSUP;
+		return -EINVAL;
 	}
 
 	ret = data_tx(NULL, handle_tx, audio_data_tx, NULL);
@@ -1160,7 +1168,8 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 	}
 
 	if (msg_rx->audio_data.data == NULL || msg_rx->audio_data.data_size == 0) {
-		LOG_ERR("Data output buffer too small for received buffer from module %s (%d)",
+		LOG_ERR("Data output buffer too small for received buffer from module %s "
+			"(%d)",
 			handle_rx->name, msg_rx->audio_data.data_size);
 		ret = -EINVAL;
 	} else {
@@ -1181,8 +1190,8 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 };
 
 /**
- * @brief Helper function to return the base and instance names for a given
- *        module handle.
+ * Helper function to return the base and instance names for a given
+ *        audio module handle.
  *
  */
 int audio_module_names_get(struct audio_module_handle const *const handle, char **base_name,
@@ -1196,17 +1205,17 @@ int audio_module_names_get(struct audio_module_handle const *const handle, char 
 	if (!valid_state(handle->state)) {
 		LOG_WRN("Module %s is in an invalid state, %d, for get names", handle->name,
 			handle->state);
-		return -ENOTSUP;
+		return -ECANCELED;
 	}
 
 	*base_name = handle->description->name;
-	memcpy(instance_name, &handle->name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	strcpy(instance_name, &handle->name[0]);
 
 	return 0;
 }
 
 /**
- * @brief Helper function to get the state of a given module handle.
+ * Helper function to get the state of a given audio module handle.
  *
  */
 int audio_module_state_get(struct audio_module_handle const *const handle,
@@ -1219,7 +1228,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 
 	if (!valid_state(handle->state)) {
 		LOG_WRN("Module state is invalid");
-		return -EINVAL;
+		return -ECANCELED;
 	}
 
 	*state = handle->state;
@@ -1228,7 +1237,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 };
 
 /**
- * @brief Calculate the number of channels from the channel map for the given module handle.
+ * Calculate the number of channels from the given channel locations.
  *
  */
 int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels)

@@ -96,8 +96,11 @@ typedef void (*audio_module_response_cb)(struct audio_module_handle_private *han
  */
 struct audio_module_functions {
 	/**
-	 * @brief Function for opening a module with the specified initial configuration.
+	 * @brief Open an audio module with the specified initial configuration.
 	 *
+	 * @note This is an optional function for an audio module.
+	 *
+	 * @note This is a mandatory function for all audio modules.
 	 * @param handle[in/out]     The handle to the module instance.
 	 * @param configuration[in]  Pointer to the desired initial configuration to set.
 	 *
@@ -107,7 +110,9 @@ struct audio_module_functions {
 		    struct audio_module_configuration const *const configuration);
 
 	/**
-	 * @brief Function to close an open module.
+	 * @brief Close an open audio module.
+	 *
+	 * @note This is an optional function for an audio module.
 	 *
 	 * @param handle[in/out]  The handle to the module instance.
 	 *
@@ -116,8 +121,10 @@ struct audio_module_functions {
 	int (*close)(struct audio_module_handle_private *handle);
 
 	/**
-	 * @brief Function to reconfigure a module after it has been opened with its initial
+	 * @brief Reconfigure an audio module after it has been opened with its initial
 	 *        configuration.
+	 *
+	 * @note This is a mandatory function for an audio module.
 	 *
 	 * @param handle[in/out]     The handle to the module instance.
 	 * @param configuration[in]  Pointer to the desired configuration to set.
@@ -128,7 +135,9 @@ struct audio_module_functions {
 				 struct audio_module_configuration const *const configuration);
 
 	/**
-	 * @brief Function to get the configuration of a module.
+	 * @brief Get the configuration of an audio module.
+	 *
+	 * @note This is a mandatory function for an audio module.
 	 *
 	 * @param handle[in]          The handle to the module instance.
 	 * @param configuration[out]  Pointer to the module's current configuration.
@@ -139,8 +148,11 @@ struct audio_module_functions {
 				 struct audio_module_configuration *configuration);
 
 	/**
-	 * @brief Start a module.
+	 * @brief Start an audio module.
 	 *
+	 * @note This is an optional function for an audio module.
+	 *
+	 * @note This is an optional function for an audio module.
 	 * @param handle[in/out]  The handle for the module to start.
 	 *
 	 * @return 0 if successful, error otherwise.
@@ -148,7 +160,9 @@ struct audio_module_functions {
 	int (*start)(struct audio_module_handle_private *handle);
 
 	/**
-	 * @brief Stop a module.
+	 * @brief Stop an audio module.
+	 *
+	 * @note This is an optional function for an audio module.
 	 *
 	 * @param handle[in/out]  The handle for the module to stop.
 	 *
@@ -157,13 +171,15 @@ struct audio_module_functions {
 	int (*stop)(struct audio_module_handle_private *handle);
 
 	/**
-	 * @brief The core data processing function for the module. Can be either an
+	 * @brief The core data processing for an audio module. Can be either an
 	 *		  input, output or input/output module type.
+	 *
+	 * @note This is a mandatory function for an audio module.
 	 *
 	 * @param handle[in/out]      The handle to the module instance.
 	 * @param audio_data_rx[in]   Pointer to the input audio data or NULL for an input module.
 	 * @param audio_data_tx[out]  Pointer to the output audio data or NULL for an output
-	 *module.
+	 *                            module.
 	 *
 	 * @return 0 if successful, error otherwise.
 	 */
@@ -229,8 +245,8 @@ struct audio_module_parameters {
  * @brief Private module handle.
  */
 struct audio_module_handle {
-	/* The unique name of this module instance. */
-	char name[CONFIG_AUDIO_MODULE_NAME_SIZE];
+	/* A NULL terminated string giving a unique name of this module's instance. */
+	char name[CONFIG_AUDIO_MODULE_NAME_SIZE + 1];
 
 	/* The module's description. */
 	const struct audio_module_description *description;
@@ -284,11 +300,11 @@ struct audio_module_message {
 };
 
 /**
- * @brief Function for opening a module.
+ * @brief Open an audio module.
  *
  * @param parameters[in]     Pointer to the module set-up parameters.
  * @param configuration[in]  Pointer to the module's configuration.
- * @param name[in]           A unique name for this instance of the module.
+ * @param name[in]           A NULL terminated string giving a unique name for this module instance.
  * @param context[in/out]    Pointer to the private context for the module.
  * @param handle[out]        Pointer to the module's private handle.
  *
@@ -300,7 +316,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		      struct audio_module_handle *handle);
 
 /**
- * @brief Function to close an open module.
+ * @brief Close an audio open module.
  *
  * @param handle[in/out]  The handle to the module instance.
  *
@@ -309,7 +325,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 int audio_module_close(struct audio_module_handle *handle);
 
 /**
- * @brief Function to reconfigure a module.
+ * @brief Reconfigure an audio module.
  *
  * @param handle[in/out]     The handle to the module instance.
  * @param configuration[in]  Pointer to the module's configuration to set.
@@ -320,7 +336,7 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 			     struct audio_module_configuration const *const configuration);
 
 /**
- * @brief Function to get the configuration of a module.
+ * @brief Get the configuration of an audio module.
  *
  * @param handle[in]          The handle to the module instance.
  * @param configuration[out]  Pointer to the module's current configuration.
@@ -331,7 +347,7 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 				   struct audio_module_configuration *configuration);
 
 /**
- * @brief Function to connect two modules together.
+ * @brief Connect two audio modules together.
  *
  * @param handle_from[in/out]   The handle for the module for output.
  * @param handle_to[in/out]     The handle of the module for input, should be NULL if
@@ -345,7 +361,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			 struct audio_module_handle *handle_to, bool connect_external);
 
 /**
- * @brief Function to disconnect modules from each other.
+ * @brief Disconnect audio modules from each other.
  *
  * @param handle[in/out]             The handle for the module.
  * @param handle_disconnect[in/out]  The handle of the module to disconnect, should be NULL if
@@ -360,7 +376,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 			    bool disconnect_external);
 
 /**
- * @brief Start processing audio data in the module given by handle.
+ * @brief Start processing audio data in the audio module given by handle.
  *
  * @param handle[in/out]  The handle for the module to start.
  *
@@ -369,7 +385,7 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 int audio_module_start(struct audio_module_handle *handle);
 
 /**
- * @brief Stop processing audio data in the module given by handle.
+ * @brief Stop processing audio data in the audio module given by handle.
  *
  * @param handle[in/out]  The handle for the module to be stopped.
  *
@@ -378,7 +394,7 @@ int audio_module_start(struct audio_module_handle *handle);
 int audio_module_stop(struct audio_module_handle *handle);
 
 /**
- * @brief Send an audio data item to a module, all data is consumed by the module.
+ * @brief Send an audio data item to an audio module, all data is consumed by the module.
  *
  * @param handle[in/out]   The handle for the receiving module instance.
  * @param audio_data[in]   Pointer to the audio data to send to the module.
@@ -392,7 +408,7 @@ int audio_module_data_tx(struct audio_module_handle *handle,
 			 audio_module_response_cb response_cb);
 
 /**
- * @brief Retrieve an audio data item from the module.
+ * @brief Retrieve an audio data item from an audio module.
  *
  * @param handle[in/out]   The handle to the module instance.
  * @param audio_data[out]  Pointer to the audio data from the module.
@@ -406,7 +422,7 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 			 k_timeout_t timeout);
 
 /**
- * @brief Send an audio data to a module and retrieve an audio data from a module.
+ * @brief Send an audio data to an audio module and retrieve an audio data from an audio module.
  *
  * @note The audio data is processed within the module or sequence of modules. The result is
  *       returned via the module or final module's output FIFO. All the input data is consumed
@@ -428,7 +444,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 			    struct audio_data *audio_data_rx, k_timeout_t timeout);
 
 /**
- * @brief Helper function to get the base and instance names for a given
+ * @brief Helper to get the base and instance names for a given audio
  *        module handle.
  *
  * @param handle[in]          The handle to the module instance.
@@ -441,7 +457,7 @@ int audio_module_names_get(struct audio_module_handle const *const handle, char 
 			   char *instance_name);
 
 /**
- * @brief Helper function to get the state of a given module handle.
+ * @brief Helper to get the state of a given audio module handle.
  *
  * @param handle[in]  The handle to the module instance.
  * @param state[out]  Pointer to the current module's state.
@@ -452,7 +468,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 			   enum audio_module_state *state);
 
 /**
- * @brief Helper function to calculate the number of channels from the channel map for the given
+ * @brief Helper to calculate the number of channels from the channel map for the given
  *        audio data.
  *
  * @param locations[in]         Channel locations to calculate the number of channels from.
