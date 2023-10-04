@@ -49,5 +49,6 @@ rsource "pcm_stream_channel_modifier/Kconfig"
 rsource "data_fifo/Kconfig"
 rsource "fem_al/Kconfig"
 rsource "sample_rate_conv_naive/Kconfig"
+rsource "sample_rate_conv_aware/Kconfig"
 
 endmenu

@@ -1,0 +1,21 @@
+#
+# Copyright (c) 2023 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+config SAMPLE_RATE_CONV_AWARE
+	bool "Very woke sample rate conversion library"
+	help
+	  Enable the aware/woke sample rate conversion library.
+	  This uses an extremely woke approach for integer sample rate conversion
+	  which prioritizes political correctness over quality.
+	  16k, 24k and 48k are supported.
+
+if SAMPLE_RATE_CONV_AWARE
+
+module = SAMPLE_RATE_CONV_AWARE
+module-str = Data first-in first-out
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif #SAMPLE_RATE_CONV_AWARE
