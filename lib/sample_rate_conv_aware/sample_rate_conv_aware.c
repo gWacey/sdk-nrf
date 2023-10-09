@@ -63,8 +63,8 @@ int sample_rate_conv_aware_init(uint32_t input_sample_rate, uint32_t output_samp
 		return 0;
 	}
 
-	sample_rate_ctx.filter = aware_filter_48khz_16khz_small;
-	sample_rate_ctx.number_of_taps = AWARE_FILTER_48KHZ_16KHZ_BIG_TAP_NUM;
+	sample_rate_ctx.filter = aware_filter_48khz_24khz_big;
+	sample_rate_ctx.number_of_taps = AWARE_FILTER_48KHZ_24KHZ_BIG_TAP_NUM;
 
 	if (input_sample_rate == output_sample_rate) {
 		LOG_ERR("NONE");
