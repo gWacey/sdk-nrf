@@ -8,7 +8,7 @@
 #include <zephyr/fff.h>
 
 #include "common.h"
-#include "audio_module.h"
+#include "audio_module/audio_module.h"
 
 const char *test_instance_name = "Test instance";
 const char *test_string = "This is a test string";

@@ -7,7 +7,7 @@
 #ifndef _COMMON_AUDIO_MODULE_TEST_H_
 #define _COMMON_AUDIO_MODULE_TEST_H_
 
-#include "audio_module.h"
+#include "audio_module/audio_module.h"
 
 #define FAKE_FIFO_QUEUE_SIZE	      (4)
 #define FAKE_FIFO_MSG_QUEUE_SIZE      (FAKE_FIFO_QUEUE_SIZE + 1)

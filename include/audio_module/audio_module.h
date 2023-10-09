@@ -29,15 +29,15 @@ enum audio_module_type {
 	/* This is an input processing module.
 	 *
 	 * @note An input module obtains data internally within the
-	 *       module (e.g. I2S) and hence has no RX FIFO.
+	 *       module (e.g. I2S in) and hence has no RX FIFO.
 	 */
 	AUDIO_MODULE_TYPE_INPUT,
 
 	/* This is an output processing module.
 	 *
 	 * @note An output module takes audio data from an input or in/out module.
-	 *       It then outputs data internally within the module (e.g. I2S) and hence has no TX
-	 *       FIFO.
+	 *       It then outputs data internally within the module (e.g. I2S out) and hence has no
+	 *       TX FIFO.
 	 */
 	AUDIO_MODULE_TYPE_OUTPUT,
 

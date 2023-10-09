@@ -8,7 +8,7 @@
 #include "fakes.h"
 #include <errno.h>
 
-#include "audio_module.h"
+#include "audio_module/audio_module.h"
 #include "common.h"
 
 static struct audio_module_functions mod_1_functions = {.open = NULL,

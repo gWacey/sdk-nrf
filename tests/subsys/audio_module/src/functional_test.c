@@ -9,7 +9,7 @@
 #include <errno.h>
 
 #include "fakes.h"
-#include "audio_module.h"
+#include "audio_module/audio_module.h"
 #include "common.h"
 
 K_THREAD_STACK_DEFINE(mod_stack, TEST_MOD_THREAD_STACK_SIZE);
