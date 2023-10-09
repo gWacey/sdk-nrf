@@ -7,6 +7,17 @@
 #ifndef _AUDIO_MODULE_H_
 #define _AUDIO_MODULE_H_
 
+/**
+ * @file
+ * @defgroup audio_module Audio module
+ * @{
+ * @brief Audio module for LE Audio applications.
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <zephyr/kernel.h>
 
 #include "data_fifo.h"
@@ -477,5 +488,13 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
  * @return 0 if successful, error otherwise.
  */
 int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels);
+
+#ifdef __cplusplus
+}
+#endif
+
+/**
+ * @}
+ */
 
 #endif /*_AUDIO_MODULE_H_ */
