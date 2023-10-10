@@ -7,104 +7,101 @@ Audio module
    :local:
    :depth: 2
 
-.. note::
-   Use this template to create pages that describe the libraries included in the |NCS|, following these instructions:
-
-   * Use this first section to give a short description (1 or 2 sentences) of the library, indicating what it does and why it should be used.
-
-   * Give the library a concise name that also corresponds to the folder name.
-
-     If the library targets a specific protocol or device, add it in the title before the library name (for example, "NFC:").
-     Do not include the word "library" in the title.
-     Use the provided stock phrases and includes when possible.
-
-   * Sections with ``*`` are optional and can be left out.
-     All the other sections are required for all libraries.
-
-     Do not add new sections or remove a mandatory section without consulting a tech writer.
-     If any new section is needed, try first to fit it as a subsection of one of the sections listed below.
-
-     When you keep an optional section, remove the asterisk from the title, and format the length of the related RST heading accordingly.
-
-
-The audio module library coordinates audio states and the exchange of audio-related data of an LE Audio application, such as :ref:`nrf5340_audio`.
+The audio module library is an interface to audio processing functions that coordinate audio states and the exchange of audio-related data of an LE Audio application, such as :ref:`nrf5340_audio`.
 
 Overview
 ********
+The audio module is an interface for construction of audio processing modules (e.g. decoder, encoder, I2S output, etc.).
+This gives a common interface to audio processing algorithms. The interface allows the module to be opened, configured, connected to, started/stopped and data sent to/from the application.
 
-.. note::
-   Use this section to give a general overview of the library.
+The operation of the module is determined by the designer with a set of functions that perform the processing.
+Connecting these modules allows an audio system or stream to be formed as illustrated below:
 
-Implementation*
-===============
+.. figure:: images/audio_module_stream.svg
+   :alt: Audio stream example
 
-.. note::
-   Use this section to describe the library architecture and implementation.
+Implementation
+==============
+The audio module is implemented as a set of functions. These functions call out to the users implementation of these functions written to a predetermined API for the desired audio algorithm.
+The functions are illustrated below:
 
-Supported features*
-===================
+.. figure:: images/audio_module_functions.svg
+   :alt: Audio module functions
 
-.. note::
-   Use this section to describe the features supported by the library.
+The functions required to be supplied by the user are outlined in the following table:
 
-Supported backends*
-===================
+.. list-table::
+    :header-rows: 1
 
-.. note::
-   Use this section to describe the backends supported by the library, if applicable.
+    * - Function
+      - Mandatory/Optional
+      - Comment
+    * - open
+      - optional
+      - Perform any algorithm operations to open
+    * - close
+      - optional
+      - Tidy up the algorithm on a close
+    * - configure_set
+      - mandatory
+      - Configure the algorithm to perform a particular operation
+    * - configure_get
+      - mandatory
+      - Return the internal configuration of the algorithm
+    * - start
+      - optional
+      - Set the algorithm running
+    * - stop
+      - optional
+      - Stop the algorithms
+    * - data_process
+      - mandatory
+      - Process the data for the algorithm
 
-Requirements*
-*************
+Once these are combined with the audio module then an audio algorithm maybe performed. On it's own the audio module can not perform a task, it merely supplies a consistent way to interface to an audio algorithm.
 
-.. note::
-   Use this section to list the requirements needed to use the library.
-   It is a mandatory section if there are specific requirements that must be met to use the library.
+The flow and internal states of the audio module are given in the following:
 
-This library can only be used with an LE Audio application, for example :ref:`nrf5340_audio`.
+.. figure:: images/audio_module_flow.svg
+   :alt: Audio module flow
+
+.. figure:: images/audio_module_states.svg
+   :alt: Audio module internal states
 
 Configuration
 *************
 
-To use the audio module library, enable the :kconfig:option:`AUDIO_MODULE` Kconfig option.
-
+To use the audio module library, enable the :kconfig:option:`AUDIO_MODULE` Kconfig option  to ``y`` in the project configuration file :file:`prj.conf`.
 
 Usage
 *****
 
-.. note::
-   Use this section to explain how to use the library.
-   This is optional if the library is so small that the initial short description also provides information about how to use the library.
+The steps to creating an audio module ar as follows:
+
+#. Write the mandatory functions required by the function table API.
+#. Write any optional functions listed in the function table that are also required.
+#. Assign the function table to an instance of an audio module.
+#. Build with the audio module API and link together with the application.
+
+The audio application should then open the module, configure it and connect it to other module(s) or the application.
+It may then be started and data sent to it and the data retrieved from the it and/or a later module or output via an audio peripheral module.
+
+The following figure illustrate a simple decoding stream where the decoded audio is sent to an I2S output and returned to the application.
+
+.. figure::images/audio_module_example.svg
+   :alt: Audio module stream example
 
 Samples using the library
 *************************
 
-The following |NCS| applications use this library:
+The following |NCS| test application uses this library:
 
-* :ref:`nrf5340_audio`
-
-Application integration*
-************************
-
-.. note::
-   Use this section to explain how to integrate the library in a custom application.
-
-Additional information*
-***********************
-
-.. note::
-   Use this section to provide any additional information relevant to the user.
-
-Limitations*
-************
-
-.. note::
-   Use this section to describe any limitations to the library, if present.
+:ref:`tests/subsys/audio_module`
 
 Dependencies
 ************
 
-.. note::
-   Use this section to list all dependencies of this library, if applicable.
+The audio module depends upon the data_fifo. To enable the library, set the :kconfig:option:`CONFIG_DATA_FIFO` Kconfig option to ``y`` in the project configuration file :file:`prj.conf`.
 
 API documentation
 *****************
@@ -115,4 +112,3 @@ API documentation
 .. doxygengroup:: audio_module
    :project: nrf
    :members:
-
