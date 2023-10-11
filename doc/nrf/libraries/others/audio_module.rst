@@ -88,7 +88,7 @@ It may then be started and data sent to it and the data retrieved from the it an
 
 The following figure illustrate a simple decoding stream where the decoded audio is sent to an I2S output and returned to the application.
 
-.. figure::images/audio_module_example.svg
+.. figure:: images/audio_module_example.svg
    :alt: Audio module stream example
 
 Samples using the library
