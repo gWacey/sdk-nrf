@@ -10,7 +10,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/fff.h>
 #include "data_fifo.h"
-#include "common.h"
+#include "audio_module_test_common.h"
 
 /**
  * @brief Deinitialize data FIFO structure.

@@ -9,7 +9,7 @@
 #include <errno.h>
 
 #include "audio_module/audio_module.h"
-#include "common.h"
+#include "audio_module_test_common.h"
 
 static struct audio_module_functions mod_1_functions = {.open = NULL,
 							.close = NULL,
@@ -932,7 +932,7 @@ ZTEST(suite_audio_module_bad_param, test_connect_null)
 		      ret);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
-	zassert_equal(ret, 0, "Connect function did not return 0 (0): ret %d", ret);
+	zassert_equal(ret, 0, "Connect function did not return successfully: ret %d", ret);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -EALREADY, "Connect function did not return -EALREADY (%d): ret %d",

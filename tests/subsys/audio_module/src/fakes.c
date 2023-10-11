@@ -7,7 +7,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/fff.h>
 
-#include "common.h"
+#include "audio_module_test_common.h"
 #include "data_fifo.h"
 #include "fakes.h"
 

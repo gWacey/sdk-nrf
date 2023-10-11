@@ -90,13 +90,22 @@ int test_config_get_function(struct audio_module_handle_private const *const han
 			     struct audio_module_configuration *configuration);
 
 /**
- * @brief Test stop/start function of a module.
+ * @brief Test start function of a module.
  *
- * @param handle[in/out]  The handle for the module to be stopped or started.
+ * @param handle[in/out]  The handle for the module to be started.
  *
  * @return 0 if successful, error otherwise.
  */
-int test_stop_start_function(struct audio_module_handle_private *handle);
+int test_start_function(struct audio_module_handle_private *handle);
+
+/**
+ * @brief Test stop function of a module.
+ *
+ * @param handle[in/out]  The handle for the module to be stopped.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int test_stop_function(struct audio_module_handle_private *handle);
 
 /**
  * @brief Test process data function of a module.
