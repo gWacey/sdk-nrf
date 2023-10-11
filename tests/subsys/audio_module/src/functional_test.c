@@ -374,42 +374,6 @@ ZTEST(suite_audio_module_functional, test_reconfigure_fnct)
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-
-	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
-	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 
 	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration *)&mod_config);
@@ -442,41 +406,6 @@ ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_configuration_get(&handle,
-					     (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_configuration_get(&handle,
-					     (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-
-	ret = audio_module_configuration_get(&handle,
-					     (struct audio_module_configuration *)&mod_config);
-	zassert_equal(ret, 0, "Reconfigure function did not return successfully (0): ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Reconfigure state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
-	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
-			  "Failed reconfigure");
 
 	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
