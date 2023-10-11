@@ -321,7 +321,7 @@ int fake_data_fifo_init__succeeds(struct data_fifo *data_fifo)
 	test_fifo_slab_data->tail = 0;
 	test_fifo_slab_data->size = FAKE_FIFO_MSG_QUEUE_SIZE;
 
-	for (int i = 0; i < FAKE_FIFO_MSG_QUEUE_SIZE - 1; i++) {
+	for (int i = 0; i < FAKE_FIFO_MSG_QUEUE_SIZE; i++) {
 		if (((test_fifo_slab_data->head + 1) % test_fifo_slab_data->size) ==
 		    test_fifo_slab_data->tail) {
 			return -ENOMSG;

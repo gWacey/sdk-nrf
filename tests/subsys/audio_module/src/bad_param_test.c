@@ -19,7 +19,8 @@ static struct audio_module_functions mod_1_functions = {.open = NULL,
 							.stop = NULL,
 							.data_process = NULL};
 
-static struct audio_module_description test_description, test_description_tx, test_description_rx;
+static struct audio_module_description test_description, test_description_1, test_description_2,
+	test_description_tx, test_description_rx;
 static struct mod_config configuration;
 static struct audio_module_configuration *config =
 	(struct audio_module_configuration *)&configuration;
@@ -301,9 +302,9 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_rx_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1",
+	test_initialise_description(&test_description_tx, "Module Test TX",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2",
+	test_initialise_description(&test_description_rx, "Module Test RX",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
 	test_initialise_handle(&handle_tx, "TEST TX", &test_description_tx,
@@ -394,10 +395,10 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_rx_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
-				    NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
-				    NULL);
+	test_initialise_description(&test_description_tx, "Module Test TX",
+				    AUDIO_MODULE_TYPE_IN_OUT, NULL);
+	test_initialise_description(&test_description_rx, "Module Test RX",
+				    AUDIO_MODULE_TYPE_IN_OUT, NULL);
 
 	test_initialise_handle(&handle_tx, "TEST TX", &test_description_tx,
 			       AUDIO_MODULE_STATE_RUNNING, NULL, NULL);
@@ -713,22 +714,22 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_bad_type)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1",
+	test_initialise_description(&test_description_1, "Module Test 1",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2",
+	test_initialise_description(&test_description_2, "Module Test 2",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Disconnect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_description_tx.type = AUDIO_MODULE_TYPE_IN_OUT;
-	test_description_rx.type = AUDIO_MODULE_TYPE_UNDEFINED;
+	test_description_1.type = AUDIO_MODULE_TYPE_IN_OUT;
+	test_description_2.type = AUDIO_MODULE_TYPE_UNDEFINED;
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Disconnect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
@@ -739,8 +740,8 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_bad_type)
 	zassert_equal(ret, -ECANCELED, "Disconnect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_description_tx.type = AUDIO_MODULE_TYPE_INPUT;
-	test_description_rx.type = AUDIO_MODULE_TYPE_INPUT;
+	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
+	test_description_2.type = AUDIO_MODULE_TYPE_INPUT;
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Disconnect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
@@ -762,14 +763,14 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
@@ -793,14 +794,14 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_disconnect(NULL, NULL, false);
@@ -828,22 +829,22 @@ ZTEST(suite_audio_module_bad_param, test_connect_bad_type)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1",
+	test_initialise_description(&test_description_1, "Module Test 1",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2",
+	test_initialise_description(&test_description_2, "Module Test 2",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_description_tx.type = AUDIO_MODULE_TYPE_IN_OUT;
-	test_description_rx.type = AUDIO_MODULE_TYPE_UNDEFINED;
+	test_description_1.type = AUDIO_MODULE_TYPE_IN_OUT;
+	test_description_2.type = AUDIO_MODULE_TYPE_UNDEFINED;
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
@@ -854,8 +855,8 @@ ZTEST(suite_audio_module_bad_param, test_connect_bad_type)
 	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_description_tx.type = AUDIO_MODULE_TYPE_INPUT;
-	test_description_rx.type = AUDIO_MODULE_TYPE_INPUT;
+	test_description_1.type = AUDIO_MODULE_TYPE_INPUT;
+	test_description_2.type = AUDIO_MODULE_TYPE_INPUT;
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
@@ -877,45 +878,45 @@ ZTEST(suite_audio_module_bad_param, test_connect_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
-	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (-129): ret %d",
-		      ret);
+	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_CONFIGURED;
 	handle_rx.state = AUDIO_MODULE_STATE_UNDEFINED;
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
-	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (-129): ret %d",
-		      ret);
+	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
 
 	handle_tx.state = AUDIO_MODULE_STATE_UNDEFINED;
 	handle_rx.state = AUDIO_MODULE_STATE_CONFIGURED;
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
-	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (-129): ret %d",
-		      ret);
+	zassert_equal(ret, -ECANCELED, "Connect function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
 }
 
 ZTEST(suite_audio_module_bad_param, test_connect_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_rx, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_tx,
+	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_rx,
+	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_connect(NULL, NULL, false);
@@ -931,7 +932,7 @@ ZTEST(suite_audio_module_bad_param, test_connect_null)
 		      ret);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
-	zassert_equal(ret, 0, "Connect function did not return 0L (0): ret %d", ret);
+	zassert_equal(ret, 0, "Connect function did not return 0 (0): ret %d", ret);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
 	zassert_equal(ret, -EALREADY, "Connect function did not return -EALREADY (%d): ret %d",
