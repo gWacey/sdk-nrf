@@ -126,7 +126,7 @@ static void test_initialise_handle(struct audio_module_handle *handle,
 				   struct mod_config const *const configuration)
 {
 	memset(handle, 0, sizeof(struct audio_module_handle));
-	memcpy(&handle->name[0], test_instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	memcpy(&handle->name[0], TEST_INSTANCE_NAME, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle->description = description;
 	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
 	handle->dest_count = 0;

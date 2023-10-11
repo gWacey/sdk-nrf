@@ -10,17 +10,17 @@
 #include "common.h"
 #include "audio_module/audio_module.h"
 
-const char *test_instance_name = "Test instance";
-const char *test_string = "This is a test string";
-const uint32_t test_uint32 = 0XDEADBEEF;
+const char *TEST_INSTANCE_NAME = "Test instance";
+const char *TEST_STRING = "This is a test string";
+const uint32_t TEST_UINT32 = 0XDEADBEEF;
 
 /**
  * Test function to set a module's context.
  */
 void test_context_set(struct mod_context *ctx, struct mod_config const *const config)
 {
-	memcpy(&ctx->test_string, test_string, sizeof(test_string));
-	ctx->test_uint32 = test_uint32;
+	memcpy(&ctx->test_string, TEST_STRING, sizeof(TEST_STRING));
+	ctx->test_uint32 = TEST_UINT32;
 	memcpy(&ctx->config, config, sizeof(struct mod_config));
 }
 
@@ -35,8 +35,8 @@ int test_open_function(struct audio_module_handle_private *handle,
 	struct mod_config *config = (struct mod_config *)configuration;
 
 	test_context_set(ctx, config);
-	memcpy(&ctx->test_string, test_string, sizeof(test_string));
-	ctx->test_uint32 = test_uint32;
+	memcpy(&ctx->test_string, TEST_STRING, sizeof(TEST_STRING));
+	ctx->test_uint32 = TEST_UINT32;
 	memcpy(&ctx->config, config, sizeof(struct mod_config));
 
 	return 0;
@@ -90,8 +90,8 @@ int test_stop_start_function(struct audio_module_handle_private *handle)
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct mod_context *ctx = (struct mod_context *)hdl->context;
 
-	ctx->test_string = test_string;
-	ctx->test_uint32 = test_uint32;
+	ctx->test_string = TEST_STRING;
+	ctx->test_uint32 = TEST_UINT32;
 
 	return 0;
 }

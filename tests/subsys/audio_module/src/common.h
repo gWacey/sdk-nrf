@@ -33,9 +33,9 @@ struct mod_context {
 	struct mod_config config;
 };
 
-extern const char *test_instance_name;
-extern const char *test_string;
-extern const uint32_t test_uint32;
+extern const char *TEST_INSTANCE_NAME;
+extern const char *TEST_STRING;
+extern const uint32_t TEST_UINT32;
 
 /**
  * @brief Test function to set a module's context.
