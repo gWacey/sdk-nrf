@@ -913,16 +913,16 @@ ZTEST(suite_audio_module_functional, test_data_tx_fnct)
 	audio_data.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = audio_module_data_tx(&handle, &audio_data, NULL);
-	zassert_equal(ret, 0, "Data TX function did not return successfully:: ret %d", ret);
+	zassert_equal(ret, 0, "Data TX function did not return successfully: ret %d", ret);
 
 	ret = data_fifo_pointer_last_filled_get(&mod_fifo_rx, (void **)&msg_rx, &size, K_NO_WAIT);
 	zassert_equal(ret, 0, "Data TX function did not return 0: ret %d", 0, ret);
 	zassert_mem_equal(msg_rx->audio_data.data, &test_data[0], TEST_MOD_DATA_SIZE,
 			  "Failed open, module contexts differ");
 	zassert_equal(msg_rx->audio_data.data_size, TEST_MOD_DATA_SIZE,
-		      "Failed Data TX-RX function, data sizes differs");
+		      "Failed Data TX function, data sizes differs");
 	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 1,
-		      "Data TX-RX failed to get item, data FIFO get called %d times",
+		      "Data TX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
 	zassert_equal(data_fifo_block_lock_fake.call_count, 1,
 		      "Failed to send item, data FIFO send called %d times",
@@ -984,16 +984,16 @@ ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 	audio_data_out.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = audio_module_data_rx(&handle, &audio_data_out, K_NO_WAIT);
-	zassert_equal(ret, 0, "Data RX function did not return successfully:: ret %d", ret);
+	zassert_equal(ret, 0, "Data RX function did not return successfully: ret %d", ret);
 	zassert_mem_equal(&test_data[0], audio_data_out.data, TEST_MOD_DATA_SIZE,
 			  "Failed Data RX function, data differs");
 	zassert_equal(audio_data_in.data_size, audio_data_out.data_size,
-		      "Failed Data TX-RX function, data sizes differs");
+		      "Failed Data RX function, data sizes differs");
 	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 1,
-		      "Data TX-RX function failed to get item, data FIFO get called %d times",
+		      "Data RX function failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_last_filled_get_fake.call_count);
 	zassert_equal(data_fifo_block_free_fake.call_count, 1,
-		      "Data TX-RX function failed to free item, data FIFO free called %d times",
+		      "Data RX function failed to free item, data FIFO free called %d times",
 		      data_fifo_block_free_fake.call_count);
 }
 
@@ -1045,7 +1045,7 @@ ZTEST(suite_audio_module_functional, test_data_tx_rx_fnct)
 	audio_data_out.data_size = TEST_MOD_DATA_SIZE;
 
 	ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_in, &audio_data_out, K_NO_WAIT);
-	zassert_equal(ret, 0, "Data TX-RX function did not return successfully:: ret %d", ret);
+	zassert_equal(ret, 0, "Data TX-RX function did not return successfully: ret %d", ret);
 	zassert_mem_equal(audio_data_in.data, audio_data_out.data, TEST_MOD_DATA_SIZE,
 			  "Failed Data TX-RX function, data returned differs");
 	zassert_equal(audio_data_in.data_size, audio_data_out.data_size,

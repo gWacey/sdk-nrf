@@ -25,13 +25,11 @@ extern "C" {
 
 /**
  * @brief Number of valid location bits.
- *
  */
 #define AUDIO_MODULE_LOCATIONS_NUM (32)
 
 /**
  * @brief Module type.
- *
  */
 enum audio_module_type {
 	/* The module type is undefined. */
@@ -46,7 +44,7 @@ enum audio_module_type {
 
 	/* This is an output processing module.
 	 *
-	 * @note An output module takes audio data from an input or in/out module.
+	 * @note An output module takes audio data from an input or an in/out module.
 	 *       It then outputs data internally within the module (e.g. I2S out) and hence has no
 	 *       TX FIFO.
 	 */
@@ -54,7 +52,7 @@ enum audio_module_type {
 
 	/* This is a processing module.
 	 *
-	 * @note An processing module takes input and outputs from/to another
+	 * @note A processing module takes input from and outputs to another
 	 *       module, thus having RX and TX FIFOs.
 	 */
 	AUDIO_MODULE_TYPE_IN_OUT
