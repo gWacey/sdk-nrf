@@ -11,24 +11,30 @@ The audio module library is an interface to audio processing functions that coor
 
 Overview
 ********
-The audio module is an interface for construction of audio processing modules (e.g. decoder, encoder, I2S output, etc.).
-This gives a common interface to audio processing algorithms. The interface allows the module to be opened, configured, connected to, started/stopped and data sent to/from the application.
 
-The operation of the module is determined by the designer with a set of functions that perform the processing.
-Connecting these modules allows an audio system or stream to be formed as illustrated below:
+The audio module is an interface for constructing custom audio processing modules, such as decoder, encoder, and I2S output.
+It provides a common interface to audio processing algorithms.
+
+Using this interface, you can open and configure the custom modules, connect to them, and start and stop them.
+You can also send audio data to and from the application.
+
+The operation of the module is determined by a set of functions that perform the processing.
+Connecting these modules lets you create the following audio system or stream:
 
 .. figure:: images/audio_module_stream.svg
    :alt: Audio stream example
 
 Implementation
 ==============
-The audio module is implemented as a set of functions. These functions call out to the users implementation of these functions written to a predetermined API for the desired audio algorithm.
-The functions are illustrated below:
+
+The audio module is implemented as a set of functions, listed in the following figure:
 
 .. figure:: images/audio_module_functions.svg
    :alt: Audio module functions
 
-The functions required to be supplied by the user are outlined in the following table:
+These functions call out to the user's implementation of these functions written to a predetermined API for the desired audio algorithm.
+
+The following table outlines the available functions and whether they are mandatory or not:
 
 .. list-table::
     :header-rows: 1
@@ -36,31 +42,32 @@ The functions required to be supplied by the user are outlined in the following 
     * - Function
       - Mandatory/Optional
       - Comment
-    * - open
-      - optional
-      - Perform any algorithm operations to open
-    * - close
-      - optional
-      - Tidy up the algorithm on a close
+    * - :c:func:`audio_module_open`
+      - Optional
+      - Perform any algorithm operations to open.
+    * - :c:func:`audio_module_close`
+      - Optional
+      - Tidy up the algorithm on a close.
     * - configure_set
-      - mandatory
-      - Configure the algorithm to perform a particular operation
-    * - configure_get
-      - mandatory
-      - Return the internal configuration of the algorithm
-    * - start
-      - optional
-      - Set the algorithm running
-    * - stop
-      - optional
-      - Stop the algorithms
-    * - data_process
-      - mandatory
-      - Process the data for the algorithm
+      - Mandatory
+      - Configure the algorithm to perform a particular operation.
+    * - :c:func:`audio_module_configuration_get`
+      - Mandatory
+      - Return the internal configuration of the algorithm.
+    * - :c:func:`audio_module_start`
+      - Optional
+      - Set the algorithm running.
+    * - :c:func:`audio_module_stop`
+      - Optional
+      - Stop the algorithms.
+    * - :c:func:`audio_module_data_tx` and :c:func:`audio_module_data_rx`
+      - Mandatory
+      - Process the data for the algorithm.
 
-Once these are combined with the audio module then an audio algorithm maybe performed. On it's own the audio module can not perform a task, it merely supplies a consistent way to interface to an audio algorithm.
+The audio algorithm can run only if these functions are combined with the audio module.
+The audio module cannot perform a task on its own, as it merely supplies a consistent way to interface to an audio algorithm.
 
-The flow and internal states of the audio module are given in the following:
+The following figures show the flow and the internal states of the audio module:
 
 .. figure:: images/audio_module_flow.svg
    :alt: Audio module flow
@@ -71,37 +78,36 @@ The flow and internal states of the audio module are given in the following:
 Configuration
 *************
 
-To use the audio module library, enable the :kconfig:option:`AUDIO_MODULE` Kconfig option  to ``y`` in the project configuration file :file:`prj.conf`.
+To use the audio module library, set the following Kconfig options to ``y`` in the project configuration file :file:`prj.conf`:
 
-Usage
-*****
+* :kconfig:option:`CONFIG_AUDIO_MODULE`
+* :kconfig:option:`CONFIG_DATA_FIFO`
 
-The steps to creating an audio module ar as follows:
+Application integration
+***********************
 
-#. Write the mandatory functions required by the function table API.
-#. Write any optional functions listed in the function table that are also required.
+To create your own audio module for an LE Audio application, complete the following steps:
+
+#. Write the mandatory functions required by the function table API in `Implementation`_.
+#. Write any optional functions.
 #. Assign the function table to an instance of an audio module.
 #. Build with the audio module API and link together with the application.
 
-The audio application should then open the module, configure it and connect it to other module(s) or the application.
-It may then be started and data sent to it and the data retrieved from the it and/or a later module or output via an audio peripheral module.
+The audio application opens the module, configures it and connects it to other modules or the application.
+The module can then be started and you can send data to it and get the data from it.
+You can also integrate a different module or output using an audio peripheral module.
 
-The following figure illustrate a simple decoding stream where the decoded audio is sent to an I2S output and returned to the application.
+The following figure demonstrates a simple decoding stream where the decoded audio is sent to an I2S output and returned to the application:
 
 .. figure:: images/audio_module_example.svg
    :alt: Audio module stream example
 
-Samples using the library
-*************************
-
-The following |NCS| test application uses this library:
-
-:ref:`tests/subsys/audio_module`
-
 Dependencies
 ************
 
-The audio module depends upon the data_fifo. To enable the library, set the :kconfig:option:`CONFIG_DATA_FIFO` Kconfig option to ``y`` in the project configuration file :file:`prj.conf`.
+This library uses the following |NCS| library:
+
+* :ref:`lib_data_fifo`
 
 API documentation
 *****************
