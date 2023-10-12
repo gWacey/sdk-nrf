@@ -42,7 +42,7 @@ The following table outlines the available functions that are defined in :c:stru
     * - Function
       - Mandatory/Optional
       - Comment
-    * - :c:member:struct audio_module_functions: `(*open)`
+    * - :c:member:audio_module_functions: `(*open)`
       - Optional
       - Perform any algorithm operations to open.
     * - :c:member:struct audio_module_functions: `(*close)`
