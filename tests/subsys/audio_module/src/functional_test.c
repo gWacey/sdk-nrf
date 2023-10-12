@@ -414,158 +414,67 @@ ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 			  "Failed reconfigure");
 }
 
-ZTEST(suite_audio_module_functional, test_stop_null_fnct)
+static void test_start_stop(bool start, const struct audio_module_functions *test_fnct,
+			    enum audio_module_state test_state,
+			    enum audio_module_state return_state, int ret_expected)
 {
 	int ret;
 
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
+	mod_description.functions = test_fnct;
+	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
+	handle.state = test_state;
 
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	if (start) {
+		ret = audio_module_start(&handle);
+	} else {
+		ret = audio_module_stop(&handle);
+	}
 
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Stop state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, 0, "Stop function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
+	zassert_equal(ret, ret_expected, "%s function did not return as expected (%d): ret %d",
+		      (start ? "Start" : "Stop"), ret_expected, ret);
+	zassert_equal(handle.state, return_state, "%s state failed %d rather %d",
+		      (start ? "Start" : "Stop"), return_state, handle.state);
 }
 
-ZTEST(suite_audio_module_functional, test_start_null_fnct)
+ZTEST(suite_audio_module_functional, test_stop_fnct_null)
 {
-	int ret;
-
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, -EALREADY, "Start function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
-
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
-
-	test_initialise_handle(&handle, &mod_description, NULL, NULL);
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
+	test_start_stop(false, &ft_null, AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED,
+			-EALREADY);
+	test_start_stop(false, &ft_null, AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED, 0);
+	test_start_stop(false, &ft_null, AUDIO_MODULE_STATE_CONFIGURED,
+			AUDIO_MODULE_STATE_CONFIGURED, -EALREADY);
 }
 
 ZTEST(suite_audio_module_functional, test_stop_fnct)
 {
-	int ret;
+	test_start_stop(false, &ft_pop, AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED,
+			-EALREADY);
+	test_start_stop(false, &ft_pop, AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED, 0);
+	test_start_stop(false, &ft_pop, AUDIO_MODULE_STATE_CONFIGURED,
+			AUDIO_MODULE_STATE_CONFIGURED, -EALREADY);
+}
 
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, -EALREADY, "Stop function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, 0, "Stop function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
-	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed stop");
-
-	mod_context.test_string = NULL;
-	mod_context.test_uint32 = 0;
-	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-
-	ret = audio_module_stop(&handle);
-	zassert_equal(ret, 0, "Stop function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
-		      "Stop state not AUDIO_MODULE_STATE_STOPPED (%d) rather %d",
-		      AUDIO_MODULE_STATE_STOPPED, handle.state);
-	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed stop");
+ZTEST(suite_audio_module_functional, test_start_fnct_null)
+{
+	test_start_stop(true, &ft_null, AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING,
+			-EALREADY);
+	test_start_stop(true, &ft_null, AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING, 0);
+	test_start_stop(true, &ft_null, AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING,
+			0);
 }
 
 ZTEST(suite_audio_module_functional, test_start_fnct)
 {
-	int ret;
-
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, -EALREADY, "Start function did not return -EALREADY (%d): ret %d",
-		      -EALREADY, ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
-
-	mod_context.test_string = NULL;
-	mod_context.test_uint32 = 0;
-	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
-	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed start");
-
-	mod_context.test_string = NULL;
-	mod_context.test_uint32 = 0;
-	memset(&mod_context.config, 0, sizeof(struct mod_config));
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle_context = (struct mod_context *)handle.context;
-	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
-
-	ret = audio_module_start(&handle);
-	zassert_equal(ret, 0, "Start function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
-		      "Start state not AUDIO_MODULE_STATE_RUNNING (%d) rather %d",
-		      AUDIO_MODULE_STATE_RUNNING, handle.state);
-	zassert_mem_equal(&mod_context, handle_context, sizeof(struct mod_context), "Failed start");
+	test_start_stop(true, &ft_pop, AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING,
+			-EALREADY);
+	test_start_stop(true, &ft_pop, AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING, 0);
+	test_start_stop(true, &ft_pop, AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING,
+			0);
 }
 
-ZTEST(suite_audio_module_functional, test_disconnect_fnct)
+static void test_connections(bool connect, enum audio_module_type from_type,
+			     enum audio_module_type to_type, enum audio_module_state from_state,
+			     enum audio_module_state to_state)
 {
 	int ret;
 	int num_destinations;
@@ -574,292 +483,154 @@ ZTEST(suite_audio_module_functional, test_disconnect_fnct)
 	struct audio_module_handle handle_from;
 	struct audio_module_handle handles_to[TEST_CONNECTIONS_NUM];
 
+	test_from_description.type = from_type;
+	test_to_description.type = to_type;
+
 	for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
 		test_initialise_handle(&handles_to[k], &test_to_description, NULL, NULL);
+		handles_to[k].state = to_state;
 		snprintf(handles_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
 			 test_inst_to_name, k);
 	}
 
-	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-			num_destinations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
+	test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
+	memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	handle_from.state = from_state;
+	sys_slist_init(&handle_from.hdl_dest_list);
+	k_mutex_init(&handle_from.dest_mutex);
 
-			for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
+	if (connect) {
+		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
+			ret = audio_module_connect(&handle_from, &handles_to[k], false);
 
-				zassert_equal(ret, 0,
-					      "Disconnect function did not return successfully: "
-					      "ret %d (%d)",
-					      ret, k);
-
-				num_destinations -= 1;
-
-				zassert_equal(handle_from.dest_count, num_destinations,
-					      "Destination count should be %d, but is %d",
-					      num_destinations, handle_from.dest_count);
-
-				test_list(&handle_from, &handles_to[k + 1], num_destinations,
-					  false);
-			}
-		}
-	}
-
-	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-			num_destinations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
-
-			for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
-
-				zassert_equal(ret, 0,
-					      "Disconnect function did not return successfully: "
-					      "ret %d (%d)",
-					      ret, k);
-
-				num_destinations -= 1;
-
-				zassert_equal(handle_from.dest_count, num_destinations,
-					      "Destination count should be %d, but is %d",
-					      num_destinations, handle_from.dest_count);
-
-				test_list(&handle_from, &handles_to[k + 1], num_destinations,
-					  false);
-			}
-		}
-	}
-
-	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-			num_destinations = test_initialise_connection_list(
-				&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, true);
-
-			for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
-
-				zassert_equal(ret, 0,
-					      "Disconnect function did not return successfully: "
-					      "ret %d (%d)",
-					      ret, k);
-
-				num_destinations -= 1;
-
-				zassert_equal(handle_from.dest_count, num_destinations,
-					      "Destination count should be %d, but is %d",
-					      num_destinations, handle_from.dest_count);
-
-				test_list(&handle_from, &handles_to[k + 1], num_destinations, true);
-			}
-		}
-
-		ret = audio_module_disconnect(&handle_from, NULL, true);
-		zassert_equal(ret, 0, "Disconnect function did not return successfully: ret %d",
-			      ret);
-
-		num_destinations -= 1;
-
-		zassert_equal(handle_from.dest_count, 0, "Destination count is not %d, %d", 0,
-			      handle_from.dest_count);
-		zassert_equal(handle_from.use_tx_queue, false,
-			      "Flag for retuning data from module not false, %d",
-			      handle_from.use_tx_queue);
-	}
-
-	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
-		handle_from.state = i;
-		sys_slist_init(&handle_from.hdl_dest_list);
-		k_mutex_init(&handle_from.dest_mutex);
-		num_destinations = test_initialise_connection_list(&handle_from, NULL, 0, true);
-
-		ret = audio_module_disconnect(&handle_from, NULL, true);
-
-		zassert_equal(ret, 0,
-			      "Disconnect function did not return successfully: "
-			      "ret %d",
-			      ret);
-		zassert_equal(handle_from.dest_count, 0,
-			      "Destination count should be %d, but is %d", 0,
-			      handle_from.dest_count);
-		zassert_equal(handle_from.use_tx_queue, false,
-			      "Flag for retuning data from module not false, %d",
-			      handle_from.use_tx_queue);
-	}
-}
-
-ZTEST(suite_audio_module_functional, test_connect_fnct)
-{
-	int ret;
-	char *test_inst_from_name = "TEST instance from";
-	char *test_inst_to_name = "TEST instance to";
-	struct audio_module_handle handle_from;
-	struct audio_module_handle handle_to[TEST_CONNECTIONS_NUM];
-
-	/* Fake internal empty data FIFO success */
-	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
-
-	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
-
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-
-			for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
-						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
-					 test_inst_to_name, k);
-				handle_to[k].state = j;
-
-				ret = audio_module_connect(&handle_from, &handle_to[k], false);
-
-				zassert_equal(ret, 0,
-					      "Connect function did not return successfully: "
-					      "ret %d (%d)",
-					      ret, k);
-				zassert_equal(handle_from.dest_count, k + 1,
-					      "Destination count is not %d, %d", k + 1,
-					      handle_from.dest_count);
-			}
-
-			test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, false);
-		}
-	}
-
-	test_from_description.type = AUDIO_MODULE_TYPE_INPUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-
-			for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
-						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
-					 test_inst_to_name, k);
-				handle_to[k].state = j;
-
-				ret = audio_module_connect(&handle_from, &handle_to[k], false);
-
-				zassert_equal(ret, 0,
-					      "Connect function did not return "
-					      "successfully: ret %d",
-					      ret);
-				zassert_equal(handle_from.dest_count, k + 1,
-					      "Destination count is not %d, %d", k + 1,
-					      handle_from.dest_count);
-			}
-
-			test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, false);
-		}
-	}
-
-	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	test_to_description.type = AUDIO_MODULE_TYPE_OUTPUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		for (int j = AUDIO_MODULE_STATE_CONFIGURED; j <= AUDIO_MODULE_STATE_STOPPED; j++) {
-			test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-			memcpy(&handle_from.name, test_inst_from_name,
-			       CONFIG_AUDIO_MODULE_NAME_SIZE);
-			handle_from.state = i;
-
-			sys_slist_init(&handle_from.hdl_dest_list);
-			k_mutex_init(&handle_from.dest_mutex);
-
-			for (int k = 0; k < TEST_CONNECTIONS_NUM - 1; k++) {
-				test_initialise_handle(&handle_to[k], &test_to_description, NULL,
-						       NULL);
-				snprintf(handle_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
-					 test_inst_to_name, k);
-				handle_to[k].state = j;
-
-				ret = audio_module_connect(&handle_from, &handle_to[k], false);
-
-				zassert_equal(ret, 0,
-					      "Connect function did not return "
-					      "successfully: ret %d",
-					      ret);
-				zassert_equal(handle_from.dest_count, k + 1,
-					      "Destination count is not %d, %d", k + 1,
-					      handle_from.dest_count);
-			}
-
-			data_fifo_deinit(&mod_fifo_tx);
-			data_fifo_init(&mod_fifo_tx);
-			handle_from.thread.msg_tx = &mod_fifo_tx;
-
-			ret = audio_module_connect(&handle_from, NULL, true);
 			zassert_equal(ret, 0,
-				      "Connect function did not return successfully: ret %d", ret);
-			zassert_equal(handle_from.dest_count, TEST_CONNECTIONS_NUM,
-				      "Destination count is not %d, %d", TEST_CONNECTIONS_NUM,
+				      "Connect function did not return successfully: "
+				      "ret %d (%d)",
+				      ret, k);
+			zassert_equal(handle_from.dest_count, k + 1,
+				      "Destination count is not %d, %d", k + 1,
 				      handle_from.dest_count);
 		}
 
-		test_list(&handle_from, &handle_to[0], TEST_CONNECTIONS_NUM, true);
+		test_list(&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
+	} else {
+		num_destinations = test_initialise_connection_list(&handle_from, &handles_to[0],
+								   TEST_CONNECTIONS_NUM, false);
+
+		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
+			ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
+
+			zassert_equal(ret, 0,
+				      "Disconnect function did not return successfully: "
+				      "ret %d (%d)",
+				      ret, k);
+
+			num_destinations--;
+
+			zassert_equal(handle_from.dest_count, num_destinations,
+				      "Destination count should be %d, but is %d", num_destinations,
+				      handle_from.dest_count);
+
+			test_list(&handle_from, &handles_to[k + 1], num_destinations, false);
+		}
 	}
+}
 
-	test_from_description.type = AUDIO_MODULE_TYPE_IN_OUT;
-	for (int i = AUDIO_MODULE_STATE_CONFIGURED; i <= AUDIO_MODULE_STATE_STOPPED; i++) {
-		test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-		memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
-		handle_from.state = i;
+ZTEST(suite_audio_module_functional, test_connect_disconnect_fnct)
+{
+	bool connect = false;
 
-		data_fifo_deinit(&mod_fifo_tx);
-		data_fifo_init(&mod_fifo_tx);
-		handle_from.thread.msg_tx = &mod_fifo_tx;
+	do {
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_STOPPED);
 
-		sys_slist_init(&handle_from.hdl_dest_list);
-		k_mutex_init(&handle_from.dest_mutex);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED);
 
-		ret = audio_module_connect(&handle_from, NULL, true);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED);
 
-		zassert_equal(ret, 0, "Connect function did not return successfully: ret %d", ret);
-		zassert_equal(handle_from.use_tx_queue, true,
-			      "Flag for retuning data from module not true, %d",
-			      handle_from.use_tx_queue);
-		zassert_equal(handle_from.dest_count, 1, "Destination count is not 1, %d",
-			      handle_from.dest_count);
-	}
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_INPUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_OUTPUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_RUNNING, AUDIO_MODULE_STATE_STOPPED);
+
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_CONFIGURED);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING);
+		test_connections(connect, AUDIO_MODULE_TYPE_IN_OUT, AUDIO_MODULE_TYPE_IN_OUT,
+				 AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_STOPPED);
+
+		if (connect) {
+			break;
+		}
+
+		connect = true;
+	} while (1);
 }
 
 static void test_close(const struct audio_module_functions *test_fnct,
