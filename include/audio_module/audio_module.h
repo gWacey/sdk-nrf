@@ -111,7 +111,6 @@ struct audio_module_functions {
 	 *
 	 * @note This is an optional function for an audio module.
 	 *
-	 * @note This is a mandatory function for all audio modules.
 	 * @param handle[in/out]     The handle to the module instance.
 	 * @param configuration[in]  Pointer to the desired initial configuration to set.
 	 *
@@ -163,7 +162,6 @@ struct audio_module_functions {
 	 *
 	 * @note This is an optional function for an audio module.
 	 *
-	 * @note This is an optional function for an audio module.
 	 * @param handle[in/out]  The handle for the module to start.
 	 *
 	 * @return 0 if successful, error otherwise.
@@ -183,7 +181,7 @@ struct audio_module_functions {
 
 	/**
 	 * @brief The core data processing for an audio module. Can be either an
-	 *		  input, output or input/output module type.
+	 *        input, output or input/output module type.
 	 *
 	 * @note This is a mandatory function for an audio module.
 	 *
@@ -236,7 +234,7 @@ struct audio_module_thread_configuration {
 	struct k_mem_slab *data_slab;
 
 	/* Size of each memory data buffer in bytes that will be
-	 * taken from the audio data buffer slab or 0.
+	 * taken from the audio data buffer slab. The size can be 0.
 	 */
 	size_t data_size;
 };
@@ -277,8 +275,8 @@ struct audio_module_handle {
 	/* List node (pointer to next audio module). */
 	sys_snode_t node;
 
-	/* A single linked-list of the handles the module is connected to. */
-	sys_slist_t hdl_dest_list;
+	/* A single linked-list of the destination handles the module is connected to. */
+	sys_slist_t handle_dest_list;
 
 	/* Number of destination modules. */
 	uint8_t dest_count;
@@ -327,7 +325,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		      struct audio_module_handle *handle);
 
 /**
- * @brief Close an audio open module.
+ * @brief Close an audio an opened audio module.
  *
  * @param handle[in/out]  The handle to the module instance.
  *
@@ -336,7 +334,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 int audio_module_close(struct audio_module_handle *handle);
 
 /**
- * @brief Reconfigure an audio module.
+ * @brief Reconfigure an opened audio module.
  *
  * @param handle[in/out]     The handle to the module instance.
  * @param configuration[in]  Pointer to the module's configuration to set.
@@ -424,8 +422,8 @@ int audio_module_data_tx(struct audio_module_handle *handle,
  * @param handle[in/out]   The handle to the module instance.
  * @param audio_data[out]  Pointer to the audio data from the module.
  * @param timeout[in]      Non-negative waiting period to wait for operation to complete
- *	                       (in milliseconds). Use K_NO_WAIT to return without waiting,
- *	                       or K_FOREVER to wait as long as necessary.
+ *                         (in milliseconds). Use K_NO_WAIT to return without waiting,
+ *                         or K_FOREVER to wait as long as necessary.
  *
  * @return 0 if successful, error otherwise.
  */
@@ -444,8 +442,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
  * @param audio_data_tx[in]   Pointer to the audio data to send.
  * @param audio_data_rx[out]  Pointer to the audio data received.
  * @param timeout[in]         Non-negative waiting period to wait for operation to complete
- *	                          (in milliseconds). Use K_NO_WAIT to return without waiting,
- *	                          or K_FOREVER to wait as long as necessary.
+ *                            (in milliseconds). Use K_NO_WAIT to return without waiting,
+ *                            or K_FOREVER to wait as long as necessary.
  *
  * @return 0 if successful, error otherwise.
  */

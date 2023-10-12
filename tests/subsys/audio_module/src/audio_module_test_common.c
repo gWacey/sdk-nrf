@@ -12,7 +12,7 @@
 
 const char *TEST_INSTANCE_NAME = "Test instance";
 const char *TEST_STRING = "This is a test string";
-const uint32_t TEST_UINT32 = 0XDEADBEEF;
+const uint32_t TEST_UINT32 = 0xDEADBEEF;
 
 /**
  * Test function to set a module's context.

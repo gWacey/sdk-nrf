@@ -154,7 +154,7 @@ static int test_initialise_connection_list(struct audio_module_handle *handle_fr
 					   bool use_tx_queue)
 {
 	for (int i = 0; i < list_size; i++) {
-		sys_slist_append(&handle_from->hdl_dest_list, &handles_to->node);
+		sys_slist_append(&handle_from->handle_dest_list, &handles_to->node);
 		handle_from->dest_count += 1;
 		handles_to += 1;
 	}
@@ -194,7 +194,7 @@ static int test_list(struct audio_module_handle *handle, struct audio_module_han
 		      "List is the incorrect, use_tx_queue flag is %d but should be %d",
 		      handle->use_tx_queue, use_tx_queue);
 
-	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_get, node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&handle->handle_dest_list, handle_get, node) {
 		zassert_equal_ptr(&handles_to[i], handle_get, "List is incorrect for item %d", i);
 		i += 1;
 	}
@@ -496,7 +496,7 @@ static void test_connections(bool connect, enum audio_module_type from_type,
 	test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
 	memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
 	handle_from.state = from_state;
-	sys_slist_init(&handle_from.hdl_dest_list);
+	sys_slist_init(&handle_from.handle_dest_list);
 	k_mutex_init(&handle_from.dest_mutex);
 
 	if (connect) {

@@ -298,7 +298,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 	}
 
 	/* Send to all internally connected modules. */
-	SYS_SLIST_FOR_EACH_CONTAINER(&handle->hdl_dest_list, handle_to, node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&handle->handle_dest_list, handle_to, node) {
 		ret = data_tx(handle, handle_to, audio_data, &audio_data_release_cb);
 		if (ret) {
 			LOG_ERR("Failed to send audio data to module %s from %s, ret %d",
@@ -612,7 +612,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		return -EINVAL;
 	}
 
-	sys_slist_init(&handle->hdl_dest_list);
+	sys_slist_init(&handle->handle_dest_list);
 	k_mutex_init(&handle->dest_mutex);
 
 	handle->thread_id = k_thread_create(
@@ -823,7 +823,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 
 		LOG_DBG("Return the output of %s on it's TX FIFO", handle_from->name);
 	} else {
-		SYS_SLIST_FOR_EACH_CONTAINER(&handle_from->hdl_dest_list, handle, node) {
+		SYS_SLIST_FOR_EACH_CONTAINER(&handle_from->handle_dest_list, handle, node) {
 			if (handle_to == handle) {
 				LOG_WRN("Already attached %s to %s", handle_to->name,
 					handle_from->name);
@@ -831,7 +831,7 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			}
 		}
 
-		sys_slist_append(&handle_from->hdl_dest_list, &handle_to->node);
+		sys_slist_append(&handle_from->handle_dest_list, &handle_to->node);
 
 		LOG_DBG("Connected the output of %s to the input of %s", handle_from->name,
 			handle_to->name);
@@ -916,7 +916,8 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 
 		LOG_DBG("Stop returning the output of %s on it's TX FIFO", handle->name);
 	} else {
-		if (!sys_slist_find_and_remove(&handle->hdl_dest_list, &handle_disconnect->node)) {
+		if (!sys_slist_find_and_remove(&handle->handle_dest_list,
+					       &handle_disconnect->node)) {
 			LOG_ERR("Connection to module %s has not been found for module %s",
 				handle_disconnect->name, handle->name);
 			return -EALREADY;
