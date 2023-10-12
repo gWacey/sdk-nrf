@@ -42,25 +42,25 @@ The following table outlines the available functions that are defined in :c:stru
     * - Function
       - Mandatory/Optional
       - Comment
-    * - :c:member:struct audio_module_functions:`(*open)`
+    * - :c:member:struct audio_module_functions: `(*open)`
       - Optional
       - Perform any algorithm operations to open.
-    * - :c:member:struct audio_module_functions:`(*close)`
+    * - :c:member:struct audio_module_functions: `(*close)`
       - Optional
       - Tidy up the algorithm on a close.
-    * - :c:member:struct audio_module_functions:`(*configure_set)`
+    * - :c:member:struct audio_module_functions: `(*configure_set)`
       - Mandatory
       - Configure the algorithm to perform a particular operation.
-    * - :c:member:struct audio_module_functions:`(*configuration_get)`
+    * - :c:member:struct audio_module_functions: `(*configuration_get)`
       - Mandatory
       - Return the internal configuration of the algorithm.
-    * - :c:member:struct audio_module_functions:`(*start)`
+    * - :c:member:struct audio_module_functions: `(*start)`
       - Optional
       - Set the algorithm running.
-    * - :c:member:struct audio_module_functions:`(*stop)`
+    * - :c:member:struct audio_module_functions: `(*stop)`
       - Optional
       - Stop the algorithms.
-    * - :c:member:struct audio_module_functions:`(*data_process)`
+    * - :c:member:struct audio_module_functions: `(*data_process)`
       - Mandatory
       - Process the data for the algorithm.
 
