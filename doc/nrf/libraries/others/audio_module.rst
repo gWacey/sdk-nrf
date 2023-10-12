@@ -34,7 +34,7 @@ The audio module is implemented as a set of functions, listed in the following f
 
 These functions call out to the user's implementation of these functions written to a predetermined API for the desired audio algorithm.
 
-The following table outlines the available functions and whether they are mandatory or not:
+The following table outlines the available functions that are defined in struct audio_module_functions and whether they are mandatory or not:
 
 .. list-table::
     :header-rows: 1
@@ -42,25 +42,25 @@ The following table outlines the available functions and whether they are mandat
     * - Function
       - Mandatory/Optional
       - Comment
-    * - :c:func:`audio_module_open`
+    * - open
       - Optional
       - Perform any algorithm operations to open.
-    * - :c:func:`audio_module_close`
+    * - close
       - Optional
       - Tidy up the algorithm on a close.
     * - configure_set
       - Mandatory
       - Configure the algorithm to perform a particular operation.
-    * - :c:func:`audio_module_configuration_get`
+    * - configuration_get
       - Mandatory
       - Return the internal configuration of the algorithm.
-    * - :c:func:`audio_module_start`
+    * - start
       - Optional
       - Set the algorithm running.
-    * - :c:func:`audio_module_stop`
+    * - audio_module_stop
       - Optional
       - Stop the algorithms.
-    * - :c:func:`audio_module_data_tx` and :c:func:`audio_module_data_rx`
+    * - data_process
       - Mandatory
       - Process the data for the algorithm.
 
