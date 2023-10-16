@@ -279,7 +279,7 @@ struct audio_module_handle {
 	/* Number of destination modules. */
 	uint8_t dest_count;
 
-	/* Semaphore to count messages between modules. */
+	/* Semaphore to count messages between modules and on a module's TX FIFO. */
 	struct k_sem sem;
 
 	/* Mutex to make the above destinations list thread safe. */
@@ -323,7 +323,7 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		      struct audio_module_handle *handle);
 
 /**
- * @brief Close an audio an opened audio module.
+ * @brief Close an opened audio module.
  *
  * @param handle[in/out]  The handle to the module instance.
  *
@@ -354,7 +354,8 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 				   struct audio_module_configuration *configuration);
 
 /**
- * @brief Connect two audio modules together.
+ * @brief Connect two audio modules together or connect to the module's TX FIFO. The function should
+ *        be called for all individual connections.
  *
  * @param handle_from[in/out]   The handle for the module for output.
  * @param handle_to[in/out]     The handle of the module for input, should be NULL if
@@ -368,7 +369,8 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 			 struct audio_module_handle *handle_to, bool connect_external);
 
 /**
- * @brief Disconnect audio modules from each other.
+ * @brief Disconnect audio modules from each other or disconnect the module's TX FIFO. The function
+ * should be called for all individual disconnections.
  *
  * @param handle[in/out]             The handle for the module.
  * @param handle_disconnect[in/out]  The handle of the module to disconnect, should be NULL if

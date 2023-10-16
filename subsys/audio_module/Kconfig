@@ -4,23 +4,24 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-menu "Audio"
+config AUDIO_MODULE_TEST
+	bool "Enable test mode"
+	default n
+	help
+	  Enable the test mode for the audio module.
 
-#----------------------------------------------------------------------------#
-menu "Modules"
+menu "Audio Module"
 
 config AUDIO_MODULE
-	bool "Enable the audio module"
+	tristate "Enable the audio module"
+	depends on DATA_FIFO || AUDIO_MODULE_TEST
 
 config AUDIO_MODULE_NAME_SIZE
 	int "Maximum size for module naming in characters"
 	default 20
 
-endmenu # Modules
-
-#----------------------------------------------------------------------------#
 module = AUDIO_MODULE
 module-str = audio_modules
 source "subsys/logging/Kconfig.template.log_config"
 
-endmenu # Audio
+endmenu # Audio Module

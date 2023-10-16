@@ -273,7 +273,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 	struct audio_module_handle *handle_to;
 
 	if (handle->dest_count == 0) {
-		LOG_DBG("Nowhere to send the audio data from module %s so releasing it",
+		LOG_WRN("Nowhere to send the audio data from module %s so releasing it",
 			handle->name);
 
 		k_mem_slab_free(handle->thread.data_slab, (void **)audio_data->data);
@@ -291,6 +291,9 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 		return ret;
 	}
 
+	/* Here the semaphore is used as a count of the number of audio data items out in the
+	 * connected modules.
+	 */
 	ret = k_sem_init(&handle->sem, handle->dest_count, handle->dest_count);
 	if (ret) {
 		LOG_ERR("Failed to initiate semaphore");
@@ -534,9 +537,6 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 	CODE_UNREACHABLE;
 }
 
-/**
- * Open an audio module.
- */
 int audio_module_open(struct audio_module_parameters const *const parameters,
 		      struct audio_module_configuration const *const configuration,
 		      char const *const name, struct audio_module_context *context,
@@ -637,9 +637,6 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 	return 0;
 }
 
-/**
- *  Close an open audio module.
- */
 int audio_module_close(struct audio_module_handle *handle)
 {
 	int ret;
@@ -684,9 +681,6 @@ int audio_module_close(struct audio_module_handle *handle)
 	return 0;
 };
 
-/**
- * Reconfigure an audio module.
- */
 int audio_module_reconfigure(struct audio_module_handle *handle,
 			     struct audio_module_configuration const *const configuration)
 {
@@ -697,22 +691,22 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 		return -EINVAL;
 	}
 
+	if (handle->description->functions->configuration_set == NULL) {
+		LOG_ERR("No mandatory reconfiguration function for module %s", handle->name);
+		return -ECANCELED;
+	}
+
 	if (!state_not_undefined(handle->state) || state_running(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for setting the configuration",
 			handle->name, handle->state);
 		return -ECANCELED;
 	}
 
-	if (handle->description->functions->configuration_set != NULL) {
-		ret = handle->description->functions->configuration_set(
-			(struct audio_module_handle_private *)handle, configuration);
-		if (ret) {
-			LOG_ERR("Reconfiguration for module %s failed, ret %d", handle->name, ret);
-			return ret;
-		}
-	} else {
-		LOG_ERR("No mandatory reconfiguration function for module %s", handle->name);
-		return -ECANCELED;
+	ret = handle->description->functions->configuration_set(
+		(struct audio_module_handle_private *)handle, configuration);
+	if (ret) {
+		LOG_ERR("Reconfiguration for module %s failed, ret %d", handle->name, ret);
+		return ret;
 	}
 
 	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
@@ -720,9 +714,6 @@ int audio_module_reconfigure(struct audio_module_handle *handle,
 	return 0;
 };
 
-/**
- * Get the configuration of an audio module.
- */
 int audio_module_configuration_get(struct audio_module_handle const *const handle,
 				   struct audio_module_configuration *configuration)
 {
@@ -733,32 +724,27 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 		return -EINVAL;
 	}
 
+	if (handle->description->functions->configuration_get == NULL) {
+		LOG_ERR("No mandatory get configuration function for module %s", handle->name);
+		return -ECANCELED;
+	}
+
 	if (!state_not_undefined(handle->state)) {
 		LOG_ERR("Module %s in an invalid state, %d, for getting the configuration",
 			handle->name, handle->state);
 		return -ECANCELED;
 	}
 
-	if (handle->description->functions->configuration_get != NULL) {
-		ret = handle->description->functions->configuration_get(
-			(struct audio_module_handle_private *)handle, configuration);
-		if (ret) {
-			LOG_WRN("Get configuration for module %s failed, ret %d", handle->name,
-				ret);
-			return ret;
-		}
-	} else {
-		LOG_ERR("No mandatory get configuration function for module %s", handle->name);
-		return -ECANCELED;
+	ret = handle->description->functions->configuration_get(
+		(struct audio_module_handle_private *)handle, configuration);
+	if (ret) {
+		LOG_WRN("Get configuration for module %s failed, ret %d", handle->name, ret);
+		return ret;
 	}
 
 	return 0;
 };
 
-/**
- *  Connect two audio modules together.
- *
- */
 int audio_module_connect(struct audio_module_handle *handle_from,
 			 struct audio_module_handle *handle_to, bool connect_external)
 {
@@ -848,10 +834,6 @@ int audio_module_connect(struct audio_module_handle *handle_from,
 	return 0;
 }
 
-/**
- * Disconnect audio modules from each other.
- *
- */
 int audio_module_disconnect(struct audio_module_handle *handle,
 			    struct audio_module_handle *handle_disconnect, bool disconnect_external)
 {
@@ -938,9 +920,6 @@ int audio_module_disconnect(struct audio_module_handle *handle,
 	return 0;
 }
 
-/**
- * Start processing data in the audio module given by handle.
- */
 int audio_module_start(struct audio_module_handle *handle)
 {
 	int ret;
@@ -957,7 +936,7 @@ int audio_module_start(struct audio_module_handle *handle)
 	}
 
 	if (state_running(handle->state)) {
-		LOG_DBG("Module %s already running", handle->name);
+		LOG_WRN("Module %s already running", handle->name);
 		return -EALREADY;
 	}
 
@@ -975,9 +954,6 @@ int audio_module_start(struct audio_module_handle *handle)
 	return 0;
 }
 
-/**
- * Stop processing audio data in the audio module given by handle.
- */
 int audio_module_stop(struct audio_module_handle *handle)
 {
 	int ret;
@@ -1012,9 +988,6 @@ int audio_module_stop(struct audio_module_handle *handle)
 	return 0;
 }
 
-/**
- * Send an audio data item to an audio module, all data is consumed by the module.
- */
 int audio_module_data_tx(struct audio_module_handle *handle,
 			 struct audio_data const *const audio_data,
 			 audio_module_response_cb response_cb)
@@ -1048,10 +1021,6 @@ int audio_module_data_tx(struct audio_module_handle *handle,
 	return data_tx((void *)NULL, handle, audio_data, response_cb);
 }
 
-/**
- * Retrieve a audio data item from an audio module.
- *
- */
 int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *audio_data,
 			 k_timeout_t timeout)
 {
@@ -1110,11 +1079,6 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 	return ret;
 }
 
-/**
- * Send an audio data item to an audio module and retrieve an audio data item from an audio
- * module.
- *
- */
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 			    struct audio_module_handle *handle_rx,
 			    struct audio_data const *const audio_data_tx,
@@ -1199,11 +1163,6 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 	return ret;
 };
 
-/**
- * Helper function to return the base and instance names for a given
- *        audio module handle.
- *
- */
 int audio_module_names_get(struct audio_module_handle const *const handle, char **base_name,
 			   char *instance_name)
 {
@@ -1224,10 +1183,6 @@ int audio_module_names_get(struct audio_module_handle const *const handle, char 
 	return 0;
 }
 
-/**
- * Helper function to get the state of a given audio module handle.
- *
- */
 int audio_module_state_get(struct audio_module_handle const *const handle,
 			   enum audio_module_state *state)
 {
@@ -1246,10 +1201,6 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 	return 0;
 };
 
-/**
- * Calculate the number of channels from the given channel locations.
- *
- */
 int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels)
 {
 	if (number_channels == NULL) {

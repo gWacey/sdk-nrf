@@ -31,7 +31,15 @@ static struct data_fifo mod_fifo_tx, mod_fifo_rx;
 static struct audio_data test_block, test_block_tx, test_block_rx;
 static char mod_thread_stack[TEST_MOD_THREAD_STACK_SIZE];
 
-static void test_initialise_description(struct audio_module_description *description, char *name,
+/**
+ * @brief Function to initialize a module's handle.
+ *
+ * @param description[in/out]  Pointer to the module's description.
+ * @param name[in]             Pointer to the module's base name.
+ * @param type[in]             The type of the module.
+ * @param functions[in]        Pointer to the module's function pointer structure.
+ */
+static void test_initialize_description(struct audio_module_description *description, char *name,
 					enum audio_module_type type,
 					struct audio_module_functions *functions)
 {
@@ -40,17 +48,27 @@ static void test_initialise_description(struct audio_module_description *descrip
 	description->functions = functions;
 }
 
-static void test_initialise_handle(struct audio_module_handle *hdl, char *instance_name,
+/**
+ * @brief Function to initialize a module's handle.
+ *
+ * @param test_handle[in/out]  The handle to the module instance.
+ * @param instance_name[in]    Pointer to the module's instance name.
+ * @param description[in]      Pointer to the module's description.
+ * @param state[in]            The state of the module.
+ * @param fifo_tx[in]          Pointer to the module's TX FIFO.
+ * @param fifo_rx[in]          Pointer to the module's RX FIFO.
+ */
+static void test_initialize_handle(struct audio_module_handle *test_handle, char *instance_name,
 				   struct audio_module_description *description,
 				   enum audio_module_state state, struct data_fifo *fifo_tx,
 				   struct data_fifo *fifo_rx)
 {
-	memcpy(&hdl->name[0], instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
-	hdl->name[CONFIG_AUDIO_MODULE_NAME_SIZE] = '\0';
-	hdl->description = description;
-	hdl->state = state;
-	hdl->thread.msg_tx = fifo_tx;
-	hdl->thread.msg_rx = fifo_rx;
+	memcpy(&test_handle->name[0], instance_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	test_handle->name[CONFIG_AUDIO_MODULE_NAME_SIZE] = '\0';
+	test_handle->description = description;
+	test_handle->state = state;
+	test_handle->thread.msg_tx = fifo_tx;
+	test_handle->thread.msg_rx = fifo_rx;
 }
 
 ZTEST(suite_audio_module_bad_param, test_number_channels_calculate_null)
@@ -130,10 +148,10 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST TX", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST TX", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       NULL, &mod_fifo_rx);
 
 	test_block.data = &test_data[0];
@@ -174,10 +192,10 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST TX", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST TX", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       NULL, NULL);
 
 	test_block.data = &test_data[0];
@@ -216,10 +234,10 @@ ZTEST(suite_audio_module_bad_param, test_data_rx_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST RX", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST RX", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       &mod_fifo_tx, NULL);
 
 	test_block.data = &test_data[0];
@@ -260,10 +278,10 @@ ZTEST(suite_audio_module_bad_param, test_data_rx_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST RX", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST RX", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       NULL, NULL);
 
 	test_block.data = &test_data[0];
@@ -302,14 +320,14 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_rx_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test TX",
+	test_initialize_description(&test_description_tx, "Module Test TX",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_rx, "Module Test RX",
+	test_initialize_description(&test_description_rx, "Module Test RX",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST TX", &test_description_tx,
+	test_initialize_handle(&handle_tx, "TEST TX", &test_description_tx,
 			       AUDIO_MODULE_STATE_RUNNING, &mod_fifo_tx, &mod_fifo_rx);
-	test_initialise_handle(&handle_rx, "TEST RX", &test_description_rx,
+	test_initialize_handle(&handle_rx, "TEST RX", &test_description_rx,
 			       AUDIO_MODULE_STATE_RUNNING, &mod_fifo_tx, &mod_fifo_rx);
 
 	test_block_tx.data = &test_data[0];
@@ -395,14 +413,14 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_rx_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_tx, "Module Test TX",
+	test_initialize_description(&test_description_tx, "Module Test TX",
 				    AUDIO_MODULE_TYPE_IN_OUT, NULL);
-	test_initialise_description(&test_description_rx, "Module Test RX",
+	test_initialize_description(&test_description_rx, "Module Test RX",
 				    AUDIO_MODULE_TYPE_IN_OUT, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST TX", &test_description_tx,
+	test_initialize_handle(&handle_tx, "TEST TX", &test_description_tx,
 			       AUDIO_MODULE_STATE_RUNNING, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST RX", &test_description_rx,
+	test_initialize_handle(&handle_rx, "TEST RX", &test_description_rx,
 			       AUDIO_MODULE_STATE_RUNNING, NULL, NULL);
 
 	test_block_tx.data = &test_data[0];
@@ -479,10 +497,10 @@ ZTEST(suite_audio_module_bad_param, test_stop_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Stop", &test_description,
+	test_initialize_handle(&handle, "TEST Stop", &test_description,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_stop(&handle);
@@ -510,10 +528,10 @@ ZTEST(suite_audio_module_bad_param, test_stop_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Stop", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST Stop", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       NULL, NULL);
 
 	ret = audio_module_stop(NULL);
@@ -532,10 +550,10 @@ ZTEST(suite_audio_module_bad_param, test_start_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST Start", &test_description,
+	test_initialize_handle(&handle, "TEST Start", &test_description,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_start(&handle);
@@ -566,10 +584,10 @@ ZTEST(suite_audio_module_bad_param, test_start_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Start", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST Start", &test_description, AUDIO_MODULE_STATE_RUNNING,
 			       NULL, NULL);
 
 	ret = audio_module_start(NULL);
@@ -588,10 +606,10 @@ ZTEST(suite_audio_module_bad_param, test_config_get_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Get Config", &test_description,
+	test_initialize_handle(&handle, "TEST Get Config", &test_description,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_configuration_get(&handle, config);
@@ -604,10 +622,10 @@ ZTEST(suite_audio_module_bad_param, test_config_get_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Get Config", &test_description,
+	test_initialize_handle(&handle, "TEST Get Config", &test_description,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_configuration_get(NULL, NULL);
@@ -654,10 +672,10 @@ ZTEST(suite_audio_module_bad_param, test_reconfig_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Reconfig", &test_description,
+	test_initialize_handle(&handle, "TEST Reconfig", &test_description,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_reconfigure(&handle, config);
@@ -670,10 +688,10 @@ ZTEST(suite_audio_module_bad_param, test_reconfig_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_rx, "Module Test",
+	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle, "TEST Reconfig", &test_description,
+	test_initialize_handle(&handle, "TEST Reconfig", &test_description,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_reconfigure(NULL, NULL);
@@ -714,14 +732,14 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_bad_type)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1",
+	test_initialize_description(&test_description_1, "Module Test 1",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_2, "Module Test 2",
+	test_initialize_description(&test_description_2, "Module Test 2",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
@@ -763,14 +781,14 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_disconnect(&handle_tx, &handle_rx, false);
@@ -794,14 +812,14 @@ ZTEST(suite_audio_module_bad_param, test_disconnect_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Disconnect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Disconnect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_disconnect(NULL, NULL, false);
@@ -829,14 +847,14 @@ ZTEST(suite_audio_module_bad_param, test_connect_bad_type)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1",
+	test_initialize_description(&test_description_1, "Module Test 1",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
-	test_initialise_description(&test_description_2, "Module Test 2",
+	test_initialize_description(&test_description_2, "Module Test 2",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
@@ -878,14 +896,14 @@ ZTEST(suite_audio_module_bad_param, test_connect_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
 
 	ret = audio_module_connect(&handle_tx, &handle_rx, false);
@@ -909,14 +927,14 @@ ZTEST(suite_audio_module_bad_param, test_connect_null)
 {
 	int ret;
 
-	test_initialise_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_1, "Module Test 1", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
-	test_initialise_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description_2, "Module Test 2", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle_tx, "TEST Connect 1", &test_description_1,
+	test_initialize_handle(&handle_tx, "TEST Connect 1", &test_description_1,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
-	test_initialise_handle(&handle_rx, "TEST Connect 2", &test_description_2,
+	test_initialize_handle(&handle_rx, "TEST Connect 2", &test_description_2,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_connect(NULL, NULL, false);
@@ -947,10 +965,10 @@ ZTEST(suite_audio_module_bad_param, test_close_bad_state)
 {
 	int ret;
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 
-	test_initialise_handle(&handle, "TEST Close", &test_description,
+	test_initialize_handle(&handle, "TEST Close", &test_description,
 			       AUDIO_MODULE_STATE_CONFIGURED, NULL, NULL);
 
 	ret = audio_module_close(NULL);
@@ -1020,7 +1038,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 	zassert_equal(ret, -ECANCELED, "Open function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_initialise_description(&test_description, "Module Test", -1, &mod_1_functions);
+	test_initialize_description(&test_description, "Module Test", -1, &mod_1_functions);
 	test_params_desc.description = &test_description;
 
 	ret = audio_module_open(&test_params_desc, (struct audio_module_configuration *)&config,
@@ -1028,7 +1046,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 	zassert_equal(ret, -ECANCELED, "Open function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_initialise_description(&test_description, NULL, AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description, NULL, AUDIO_MODULE_TYPE_IN_OUT,
 				    &mod_1_functions);
 	test_params_desc.description = &test_description;
 
@@ -1037,7 +1055,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 	zassert_equal(ret, -ECANCELED, "Open function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_IN_OUT,
 				    NULL);
 	test_params_desc.description = &test_description;
 
@@ -1046,7 +1064,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 	zassert_equal(ret, -ECANCELED, "Open function did not return -ECANCELED (%d): ret %d",
 		      -ECANCELED, ret);
 
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    &mod_1_functions);
 	test_params_desc.description = &test_description;
 
@@ -1056,7 +1074,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 		      -ECANCELED, ret);
 
 	mod_1_functions.configuration_set = &test_config_set_function;
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    &mod_1_functions);
 	test_params_desc.description = &test_description;
 
@@ -1066,7 +1084,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 		      -ECANCELED, ret);
 
 	mod_1_functions.configuration_get = &test_config_get_function;
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    &mod_1_functions);
 	test_params_desc.description = &test_description;
 
@@ -1076,7 +1094,7 @@ ZTEST(suite_audio_module_bad_param, test_open_bad_description)
 		      -ECANCELED, ret);
 
 	mod_1_functions.data_process = &test_data_process_function;
-	test_initialise_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
+	test_initialize_description(&test_description, "Module Test", AUDIO_MODULE_TYPE_UNDEFINED,
 				    &mod_1_functions);
 	test_params_desc.description = &test_description;
 

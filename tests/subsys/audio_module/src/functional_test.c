@@ -52,31 +52,31 @@ static struct data_fifo mod_fifo_tx, mod_fifo_rx;
 /**
  * @brief Set the minimum for a handle.
  *
- * @param handle[in/out]       The handle to the module instance
- * @param state[in]            Pointer to the module's state
- * @param name[in]             Pointer to the module's base name
- * @param description[in/out]  Pointer to the modules description
+ * @param test_handle[in/out]  The handle to the module instance.
+ * @param state[in]            Pointer to the module's state.
+ * @param name[in]             Pointer to the module's base name.
+ * @param description[in/out]  Pointer to the modules description.
  */
-static void test_handle_set(struct audio_module_handle *hdl, enum audio_module_state state,
+static void test_handle_set(struct audio_module_handle *test_handle, enum audio_module_state state,
 			    char *name, struct audio_module_description *description)
 {
-	hdl->state = state;
+	test_handle->state = state;
 	description->name = name;
-	hdl->description = description;
+	test_handle->description = description;
 }
 
 /**
  * @brief Simple test thread with handle NULL.
  *
- * @param handle[in]  The handle to the module instance
+ * @param test_handle[in]  The handle to the module instance.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int test_thread_handle(struct audio_module_handle const *const handle)
+static int test_thread_handle(struct audio_module_handle const *const test_handle)
 {
 	/* Execute thread */
 	while (1) {
-		zassert_not_null(handle, NULL, "handle is NULL!");
+		zassert_not_null(test_handle, NULL, "handle is NULL!");
 
 		k_sleep(K_MSEC(100));
 	}
@@ -87,69 +87,68 @@ static int test_thread_handle(struct audio_module_handle const *const handle)
 /**
  * @brief Simple function to start a test thread with handle.
  *
- * @param handle[in/out]  The handle to the module instance
+ * @param test_handle[in/out]  The handle to the module instance.
  *
- * @return 0 if successful, error value
+ * @return 0 if successful, error value.
  */
-static int thread_start(struct audio_module_handle *handle)
+static int thread_start(struct audio_module_handle *test_handle)
 {
 	int ret;
 
-	handle->thread_id = k_thread_create(
-		&handle->thread_data, handle->thread.stack, handle->thread.stack_size,
-		(k_thread_entry_t)test_thread_handle, handle, NULL, NULL,
-		K_PRIO_PREEMPT(handle->thread.priority), 0, K_FOREVER);
+	test_handle->thread_id = k_thread_create(
+		&test_handle->thread_data, test_handle->thread.stack,
+		test_handle->thread.stack_size, (k_thread_entry_t)test_thread_handle, test_handle,
+		NULL, NULL, K_PRIO_PREEMPT(test_handle->thread.priority), 0, K_FOREVER);
 
-	ret = k_thread_name_set(handle->thread_id, handle->name);
+	ret = k_thread_name_set(test_handle->thread_id, test_handle->name);
 	if (ret) {
 		return ret;
 	}
 
-	k_thread_start(handle->thread_id);
+	k_thread_start(test_handle->thread_id);
 
 	return 0;
 }
 
 /**
- * @brief Function to initialise a handle.
+ * @brief Function to initialize a handle.
  *
- * @param handle[in/out]     The handle to the module instance
- * @param description[in]    Pointer to the module's description
- * @param context[in/out]    Pointer to the module's context
- * @param configuration[in]  Pointer to the module's configuration
- *
+ * @param test_handle[in/out]  The handle to the module instance.
+ * @param description[in]      Pointer to the module's description.
+ * @param context[in/out]      Pointer to the module's context.
+ * @param configuration[in]    Pointer to the module's configuration.
  */
-static void test_initialise_handle(struct audio_module_handle *handle,
+static void test_initialize_handle(struct audio_module_handle *test_handle,
 				   struct audio_module_description const *const description,
 				   struct mod_context *context,
 				   struct mod_config const *const configuration)
 {
-	memset(handle, 0, sizeof(struct audio_module_handle));
-	memcpy(&handle->name[0], TEST_INSTANCE_NAME, CONFIG_AUDIO_MODULE_NAME_SIZE);
-	handle->description = description;
-	handle->state = AUDIO_MODULE_STATE_CONFIGURED;
-	handle->dest_count = 0;
+	memset(test_handle, 0, sizeof(struct audio_module_handle));
+	memcpy(&test_handle->name[0], TEST_INSTANCE_NAME, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	test_handle->description = description;
+	test_handle->state = AUDIO_MODULE_STATE_CONFIGURED;
+	test_handle->dest_count = 0;
 
 	if (configuration != NULL) {
 		memcpy(&context->config, configuration, sizeof(struct mod_config));
 	}
 
 	if (context != NULL) {
-		handle->context = (struct audio_module_context *)context;
+		test_handle->context = (struct audio_module_context *)context;
 	}
 }
 
 /**
- * @brief Initialise a list of connections.
+ * @brief Initialize a list of connections.
  *
- * @param handle_from[in/out]  The handle for the module to initialise the list
- * @param handles_to[in/out]   Pointer to an array of handles to initialise the list with
- * @param list_size[in]        The number of handles to initialise the list with
- * @param use_tx_queue[in]     The state to set for use_tx_queue in the handle
+ * @param handle_from[in/out]  The handle for the module to initialize the list.
+ * @param handles_to[in/out]   Pointer to an array of handles to initialize the list with.
+ * @param list_size[in]        The number of handles to initialize the list with.
+ * @param use_tx_queue[in]     The state to set for use_tx_queue in the handle.
  *
- * @return Number of destinations
+ * @return Number of destinations.
  */
-static int test_initialise_connection_list(struct audio_module_handle *handle_from,
+static int test_initialize_connection_list(struct audio_module_handle *handle_from,
 					   struct audio_module_handle *handles_to, size_t list_size,
 					   bool use_tx_queue)
 {
@@ -172,34 +171,307 @@ static int test_initialise_connection_list(struct audio_module_handle *handle_fr
  * @brief Test a list of connections, both that the handle is in the list and that the list is in
  *        the correct order.
  *
- * @param handle[in]        The handle for the module to test the list
+ * @param test_handle[in]   The handle for the module to test the list.
  * @param handles_to[in]    Pointer to an array of handles that should be in the list and are in the
- *                          order expected
- * @param list_size[in]     The number of handles expected in the list
- * @param use_tx_queue[in]  The expected state of use_tx_queue in the handle
+ *                          order expected.
+ * @param list_size[in]     The number of handles expected in the list.
+ * @param use_tx_queue[in]  The expected state of use_tx_queue in the handle.
  *
- * @return 0 if successful, assert otherwise
+ * @return 0 if successful, assert otherwise.
  */
-static int test_list(struct audio_module_handle *handle, struct audio_module_handle *handles_to,
-		     size_t list_size, bool use_tx_queue)
+static int test_list(struct audio_module_handle *test_handle,
+		     struct audio_module_handle *handles_to, size_t list_size, bool use_tx_queue)
 {
 	struct audio_module_handle *handle_get;
 	int i = 0;
 
-	zassert_equal(handle->dest_count, list_size,
-		      "List is the incorrect size, it is %d but should be %d", handle->dest_count,
-		      list_size);
+	zassert_equal(test_handle->dest_count, list_size,
+		      "List is the incorrect size, it is %d but should be %d",
+		      test_handle->dest_count, list_size);
 
-	zassert_equal(handle->use_tx_queue, use_tx_queue,
+	zassert_equal(test_handle->use_tx_queue, use_tx_queue,
 		      "List is the incorrect, use_tx_queue flag is %d but should be %d",
-		      handle->use_tx_queue, use_tx_queue);
+		      test_handle->use_tx_queue, use_tx_queue);
 
-	SYS_SLIST_FOR_EACH_CONTAINER(&handle->handle_dest_list, handle_get, node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&test_handle->handle_dest_list, handle_get, node) {
 		zassert_equal_ptr(&handles_to[i], handle_get, "List is incorrect for item %d", i);
 		i += 1;
 	}
 
 	return 0;
+}
+
+/**
+ * @brief Test the module's close.
+ *
+ * @param test_fnct[in]    Pointer to the audio module's function pointer structure.
+ * @param test_type[in]    The type of the audio module.
+ * @param fifo_rx_set[in]  Flag to indicate if the audio modules RX data FIFO is to be initialised.
+ * @param fifo_tx_set[in]  Flag to indicate if the audio modules TX data FIFO is to be initialised.
+ * @param test_state[in]   The module's state.
+ */
+static void test_close(const struct audio_module_functions *test_fnct,
+		       enum audio_module_type test_type, bool fifo_rx_set, bool fifo_tx_set,
+		       enum audio_module_state test_state)
+{
+	int ret;
+	int empty_call_count = 0;
+	char *test_inst_name = "TEST instance 1";
+	struct audio_module_description test_mod_description;
+	struct audio_module_functions test_mod_functions;
+
+	/* Register resets */
+	DO_FOREACH_FAKE(RESET_FAKE);
+
+	mod_description.functions = test_fnct;
+	memcpy(&test_mod_functions, test_fnct, sizeof(struct audio_module_functions));
+
+	test_context_set(&test_mod_context, &mod_config);
+	mod_context = test_mod_context;
+
+	mod_description.type = test_type;
+	test_mod_description = mod_description;
+	test_mod_parameters = mod_parameters;
+
+	memset(&handle, 0, sizeof(struct audio_module_handle));
+
+	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
+	handle.description = &mod_description;
+	handle.use_tx_queue = true;
+	handle.dest_count = 1;
+	handle.thread.stack = mod_stack;
+	handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
+	handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
+	handle.thread.data_slab = &data_slab;
+	handle.thread.data_size = TEST_MOD_DATA_SIZE;
+	handle.context = (struct audio_module_context *)&mod_context;
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
+
+	if (fifo_rx_set) {
+		data_fifo_deinit(&mod_fifo_rx);
+		data_fifo_init(&mod_fifo_rx);
+		handle.thread.msg_rx = &mod_fifo_rx;
+
+		empty_call_count++;
+	} else {
+		handle.thread.msg_rx = NULL;
+	}
+
+	if (fifo_tx_set) {
+		data_fifo_deinit(&mod_fifo_tx);
+		data_fifo_init(&mod_fifo_tx);
+		handle.thread.msg_tx = &mod_fifo_tx;
+
+		empty_call_count++;
+	} else {
+		handle.thread.msg_tx = NULL;
+	}
+
+	thread_start(&handle);
+
+	handle.state = test_state;
+
+	ret = audio_module_close(&handle);
+
+	zassert_equal(ret, 0, "Close function did not return successfully: ret %d", ret);
+	zassert_equal(data_fifo_empty_fake.call_count, empty_call_count,
+		      "Failed close, data FIFO empty called %d times",
+		      data_fifo_empty_fake.call_count);
+	zassert_mem_equal(&mod_description, &test_mod_description,
+			  sizeof(struct audio_module_description),
+			  "Failed close, modified the modules description");
+	zassert_mem_equal(&test_mod_functions, test_fnct, sizeof(struct audio_module_functions),
+			  "Failed close, modified the modules functions");
+	zassert_mem_equal(&mod_parameters, &test_mod_parameters,
+			  sizeof(struct audio_module_parameters),
+			  "Failed close, modified the modules parameter settings");
+	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
+			  "Failed close, modified the modules context");
+}
+
+/**
+ * @brief Test the module's open.
+ *
+ * @param test_type[in]       The type of the audio module.
+ * @param fifo_rx_set[in]     Flag to indicate if the audio modules RX data FIFO is to be
+ *                            initialised.
+ * @param fifo_tx_set[in]     Flag to indicate if the audio modules TX data FIFO is to be
+ *                            initialised.
+ * @param test_slab[in]       The module's data slab. This can be NULL.
+ * @param test_data_size[in]  The size of the data slab items. This can be 0..
+ */
+static void test_open(enum audio_module_type test_type, bool fifo_rx_set, bool fifo_tx_set,
+		      struct k_mem_slab *test_slab, size_t test_data_size)
+{
+	int ret;
+	char *test_inst_name = "TEST instance 1";
+
+	/* Fake internal empty data FIFO success */
+	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
+
+	mod_description.functions = &ft_pop;
+
+	test_context_set(&test_mod_context, &mod_config);
+
+	if (fifo_rx_set) {
+		data_fifo_deinit(&mod_fifo_rx);
+		data_fifo_init(&mod_fifo_rx);
+		mod_parameters.thread.msg_rx = &mod_fifo_rx;
+	} else {
+		mod_parameters.thread.msg_rx = NULL;
+	}
+
+	if (fifo_tx_set) {
+		data_fifo_deinit(&mod_fifo_tx);
+		data_fifo_init(&mod_fifo_tx);
+		mod_parameters.thread.msg_tx = &mod_fifo_tx;
+	} else {
+		mod_parameters.thread.msg_tx = NULL;
+	}
+
+	mod_parameters.thread.data_slab = test_slab;
+	mod_parameters.thread.data_size = test_data_size;
+
+	mod_description.type = test_type;
+
+	memset(&handle, 0, sizeof(struct audio_module_handle));
+
+	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
+
+	ret = audio_module_open(&mod_parameters, (struct audio_module_configuration *)&mod_config,
+				test_inst_name, (struct audio_module_context *)&mod_context,
+				&handle);
+
+	zassert_equal(ret, 0, "Open function did not return successfully: ret %d", ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
+		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
+	zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
+			  "Failed open, name should be %s, but is %s", test_inst_name, handle.name);
+	zassert_mem_equal(handle.description, &mod_description,
+			  sizeof(struct audio_module_description),
+			  "Failed open, module descriptions differ");
+	zassert_mem_equal(handle.description->functions, &ft_pop,
+			  sizeof(struct audio_module_functions),
+			  "Failed open, module function pointers differ");
+	zassert_mem_equal(&handle.thread, &mod_parameters.thread,
+			  sizeof(struct audio_module_thread_configuration),
+			  "Failed open, module thread settings differ");
+	zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
+			  "Failed open, module contexts differ");
+	zassert_equal(handle.use_tx_queue, false, "Open failed use_tx_queue is not false: %d",
+		      handle.use_tx_queue);
+	zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
+		      handle.dest_count);
+
+	k_thread_abort(handle.thread_id);
+}
+
+/**
+ * @brief Test the audio modules connect and disconnect.
+ *
+ * @param connect[in]     A flag to signal if this is for testing the connect or disconnect.
+ * @param from_type[in]   The from audio module type.
+ * @param to_type[in]     The to audio module type.
+ * @param from_state[in]  The state of the from audio module.
+ * @param to_state[in]    The state of the to audio module.
+ */
+static void test_connections(bool connect, enum audio_module_type from_type,
+			     enum audio_module_type to_type, enum audio_module_state from_state,
+			     enum audio_module_state to_state)
+{
+	int ret;
+	int num_destinations;
+	char *test_inst_from_name = "TEST instance from";
+	char *test_inst_to_name = "TEST instance to";
+	struct audio_module_handle handle_from;
+	struct audio_module_handle handles_to[TEST_CONNECTIONS_NUM];
+
+	test_from_description.type = from_type;
+	test_to_description.type = to_type;
+
+	for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
+		test_initialize_handle(&handles_to[k], &test_to_description, NULL, NULL);
+		handles_to[k].state = to_state;
+		snprintf(handles_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
+			 test_inst_to_name, k);
+	}
+
+	test_initialize_handle(&handle_from, &test_from_description, NULL, NULL);
+	memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
+	handle_from.state = from_state;
+	sys_slist_init(&handle_from.handle_dest_list);
+	k_mutex_init(&handle_from.dest_mutex);
+
+	if (connect) {
+		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
+			ret = audio_module_connect(&handle_from, &handles_to[k], false);
+
+			zassert_equal(ret, 0,
+				      "Connect function did not return successfully: "
+				      "ret %d (%d)",
+				      ret, k);
+			zassert_equal(handle_from.dest_count, k + 1,
+				      "Destination count is not %d, %d", k + 1,
+				      handle_from.dest_count);
+		}
+
+		test_list(&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
+	} else {
+		num_destinations = test_initialize_connection_list(&handle_from, &handles_to[0],
+								   TEST_CONNECTIONS_NUM, false);
+
+		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
+			ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
+
+			zassert_equal(ret, 0,
+				      "Disconnect function did not return successfully: "
+				      "ret %d (%d)",
+				      ret, k);
+
+			num_destinations--;
+
+			zassert_equal(handle_from.dest_count, num_destinations,
+				      "Destination count should be %d, but is %d", num_destinations,
+				      handle_from.dest_count);
+
+			test_list(&handle_from, &handles_to[k + 1], num_destinations, false);
+		}
+	}
+}
+
+/**
+ * @brief Test the audio module's start and stop.
+ *
+ * @param start[in]             A flag to signal if this is for testing ths start or stop.
+ * @param test_fnct[in]         Pointer to the module's function pointer structure.
+ * @param test_state[in]        The stat of the audio module.
+ * @param return_state[in]      The state of the audio module after a start or stop.
+ * @param ret_expected[in/out]  Expected return value from the start or stop.
+ */
+static void test_start_stop(bool start, const struct audio_module_functions *test_fnct,
+			    enum audio_module_state test_state,
+			    enum audio_module_state return_state, int ret_expected)
+{
+	int ret;
+
+	mod_description.functions = test_fnct;
+	test_initialize_handle(&handle, &mod_description, &mod_context, NULL);
+	handle.state = test_state;
+
+	if (start) {
+		ret = audio_module_start(&handle);
+	} else {
+		ret = audio_module_stop(&handle);
+	}
+
+	zassert_equal(ret, ret_expected, "%s function did not return as expected (%d): ret %d",
+		      (start ? "Start" : "Stop"), ret_expected, ret);
+	zassert_equal(handle.state, return_state, "%s state failed %d rather %d",
+		      (start ? "Start" : "Stop"), return_state, handle.state);
 }
 
 ZTEST(suite_audio_module_functional, test_number_channels_calculate_fnct)
@@ -357,7 +629,7 @@ ZTEST(suite_audio_module_functional, test_reconfigure_fnct)
 	int ret;
 
 	mod_description.functions = &ft_pop;
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
+	test_initialize_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
@@ -369,7 +641,7 @@ ZTEST(suite_audio_module_functional, test_reconfigure_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
+	test_initialize_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 
@@ -387,7 +659,7 @@ ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 	int ret;
 
 	mod_description.functions = &ft_pop;
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
+	test_initialize_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
 
@@ -400,7 +672,7 @@ ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
 
-	test_initialise_handle(&handle, &mod_description, &mod_context, &mod_config);
+	test_initialize_handle(&handle, &mod_description, &mod_context, &mod_config);
 	handle_context = (struct mod_context *)handle.context;
 	handle.state = AUDIO_MODULE_STATE_STOPPED;
 
@@ -412,28 +684,6 @@ ZTEST(suite_audio_module_functional, test_configuration_get_fnct)
 		      AUDIO_MODULE_STATE_STOPPED, handle.state);
 	zassert_mem_equal(&mod_config, &handle_context->config, sizeof(struct mod_config),
 			  "Failed reconfigure");
-}
-
-static void test_start_stop(bool start, const struct audio_module_functions *test_fnct,
-			    enum audio_module_state test_state,
-			    enum audio_module_state return_state, int ret_expected)
-{
-	int ret;
-
-	mod_description.functions = test_fnct;
-	test_initialise_handle(&handle, &mod_description, &mod_context, NULL);
-	handle.state = test_state;
-
-	if (start) {
-		ret = audio_module_start(&handle);
-	} else {
-		ret = audio_module_stop(&handle);
-	}
-
-	zassert_equal(ret, ret_expected, "%s function did not return as expected (%d): ret %d",
-		      (start ? "Start" : "Stop"), ret_expected, ret);
-	zassert_equal(handle.state, return_state, "%s state failed %d rather %d",
-		      (start ? "Start" : "Stop"), return_state, handle.state);
 }
 
 ZTEST(suite_audio_module_functional, test_stop_fnct_null)
@@ -470,70 +720,6 @@ ZTEST(suite_audio_module_functional, test_start_fnct)
 	test_start_stop(true, &ft_pop, AUDIO_MODULE_STATE_STOPPED, AUDIO_MODULE_STATE_RUNNING, 0);
 	test_start_stop(true, &ft_pop, AUDIO_MODULE_STATE_CONFIGURED, AUDIO_MODULE_STATE_RUNNING,
 			0);
-}
-
-static void test_connections(bool connect, enum audio_module_type from_type,
-			     enum audio_module_type to_type, enum audio_module_state from_state,
-			     enum audio_module_state to_state)
-{
-	int ret;
-	int num_destinations;
-	char *test_inst_from_name = "TEST instance from";
-	char *test_inst_to_name = "TEST instance to";
-	struct audio_module_handle handle_from;
-	struct audio_module_handle handles_to[TEST_CONNECTIONS_NUM];
-
-	test_from_description.type = from_type;
-	test_to_description.type = to_type;
-
-	for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-		test_initialise_handle(&handles_to[k], &test_to_description, NULL, NULL);
-		handles_to[k].state = to_state;
-		snprintf(handles_to[k].name, CONFIG_AUDIO_MODULE_NAME_SIZE, "%s %d",
-			 test_inst_to_name, k);
-	}
-
-	test_initialise_handle(&handle_from, &test_from_description, NULL, NULL);
-	memcpy(&handle_from.name, test_inst_from_name, CONFIG_AUDIO_MODULE_NAME_SIZE);
-	handle_from.state = from_state;
-	sys_slist_init(&handle_from.handle_dest_list);
-	k_mutex_init(&handle_from.dest_mutex);
-
-	if (connect) {
-		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-			ret = audio_module_connect(&handle_from, &handles_to[k], false);
-
-			zassert_equal(ret, 0,
-				      "Connect function did not return successfully: "
-				      "ret %d (%d)",
-				      ret, k);
-			zassert_equal(handle_from.dest_count, k + 1,
-				      "Destination count is not %d, %d", k + 1,
-				      handle_from.dest_count);
-		}
-
-		test_list(&handle_from, &handles_to[0], TEST_CONNECTIONS_NUM, false);
-	} else {
-		num_destinations = test_initialise_connection_list(&handle_from, &handles_to[0],
-								   TEST_CONNECTIONS_NUM, false);
-
-		for (int k = 0; k < TEST_CONNECTIONS_NUM; k++) {
-			ret = audio_module_disconnect(&handle_from, &handles_to[k], false);
-
-			zassert_equal(ret, 0,
-				      "Disconnect function did not return successfully: "
-				      "ret %d (%d)",
-				      ret, k);
-
-			num_destinations--;
-
-			zassert_equal(handle_from.dest_count, num_destinations,
-				      "Destination count should be %d, but is %d", num_destinations,
-				      handle_from.dest_count);
-
-			test_list(&handle_from, &handles_to[k + 1], num_destinations, false);
-		}
-	}
 }
 
 ZTEST(suite_audio_module_functional, test_connect_disconnect_fnct)
@@ -633,88 +819,6 @@ ZTEST(suite_audio_module_functional, test_connect_disconnect_fnct)
 	} while (1);
 }
 
-static void test_close(const struct audio_module_functions *test_fnct,
-		       enum audio_module_type test_type, bool fifo_rx_set, bool fifo_tx_set,
-		       enum audio_module_state test_state)
-{
-	int ret;
-	int empty_call_count = 0;
-	char *test_inst_name = "TEST instance 1";
-	struct audio_module_description test_mod_description;
-	struct audio_module_functions test_mod_functions;
-
-	/* Register resets */
-	DO_FOREACH_FAKE(RESET_FAKE);
-
-	mod_description.functions = test_fnct;
-	memcpy(&test_mod_functions, test_fnct, sizeof(struct audio_module_functions));
-
-	test_context_set(&test_mod_context, &mod_config);
-	mod_context = test_mod_context;
-
-	mod_description.type = test_type;
-	test_mod_description = mod_description;
-	test_mod_parameters = mod_parameters;
-
-	memset(&handle, 0, sizeof(struct audio_module_handle));
-
-	memcpy(&handle.name, test_inst_name, sizeof(test_inst_name));
-	handle.description = &mod_description;
-	handle.use_tx_queue = true;
-	handle.dest_count = 1;
-	handle.thread.stack = mod_stack;
-	handle.thread.stack_size = TEST_MOD_THREAD_STACK_SIZE;
-	handle.thread.priority = TEST_MOD_THREAD_PRIORITY;
-	handle.thread.data_slab = &data_slab;
-	handle.thread.data_size = TEST_MOD_DATA_SIZE;
-	handle.context = (struct audio_module_context *)&mod_context;
-
-	/* Fake internal empty data FIFO success */
-	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
-	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
-
-	if (fifo_rx_set) {
-		data_fifo_deinit(&mod_fifo_rx);
-		data_fifo_init(&mod_fifo_rx);
-		handle.thread.msg_rx = &mod_fifo_rx;
-
-		empty_call_count++;
-	} else {
-		handle.thread.msg_rx = NULL;
-	}
-
-	if (fifo_tx_set) {
-		data_fifo_deinit(&mod_fifo_tx);
-		data_fifo_init(&mod_fifo_tx);
-		handle.thread.msg_tx = &mod_fifo_tx;
-
-		empty_call_count++;
-	} else {
-		handle.thread.msg_tx = NULL;
-	}
-
-	thread_start(&handle);
-
-	handle.state = test_state;
-
-	ret = audio_module_close(&handle);
-
-	zassert_equal(ret, 0, "Close function did not return successfully: ret %d", ret);
-	zassert_equal(data_fifo_empty_fake.call_count, empty_call_count,
-		      "Failed close, data FIFO empty called %d times",
-		      data_fifo_empty_fake.call_count);
-	zassert_mem_equal(&mod_description, &test_mod_description,
-			  sizeof(struct audio_module_description),
-			  "Failed close, modified the modules description");
-	zassert_mem_equal(&test_mod_functions, test_fnct, sizeof(struct audio_module_functions),
-			  "Failed close, modified the modules functions");
-	zassert_mem_equal(&mod_parameters, &test_mod_parameters,
-			  sizeof(struct audio_module_parameters),
-			  "Failed close, modified the modules parameter settings");
-	zassert_mem_equal(&mod_context, &test_mod_context, sizeof(struct mod_context),
-			  "Failed close, modified the modules context");
-}
-
 ZTEST(suite_audio_module_functional, test_close_null_fnct)
 {
 	test_close(&ft_null, AUDIO_MODULE_TYPE_INPUT, true, true, AUDIO_MODULE_STATE_CONFIGURED);
@@ -779,73 +883,6 @@ ZTEST(suite_audio_module_functional, test_close_fnct)
 	test_close(&ft_pop, AUDIO_MODULE_TYPE_IN_OUT, false, true, AUDIO_MODULE_STATE_STOPPED);
 	test_close(&ft_pop, AUDIO_MODULE_TYPE_IN_OUT, true, false, AUDIO_MODULE_STATE_STOPPED);
 	test_close(&ft_pop, AUDIO_MODULE_TYPE_IN_OUT, false, false, AUDIO_MODULE_STATE_STOPPED);
-}
-
-static void test_open(enum audio_module_type test_type, bool fifo_rx_set, bool fifo_tx_set,
-		      struct k_mem_slab *test_slab, size_t test_data_size)
-{
-	int ret;
-	char *test_inst_name = "TEST instance 1";
-
-	/* Fake internal empty data FIFO success */
-	data_fifo_init_fake.custom_fake = fake_data_fifo_init__succeeds;
-
-	mod_description.functions = &ft_pop;
-
-	test_context_set(&test_mod_context, &mod_config);
-
-	if (fifo_rx_set) {
-		data_fifo_deinit(&mod_fifo_rx);
-		data_fifo_init(&mod_fifo_rx);
-		mod_parameters.thread.msg_rx = &mod_fifo_rx;
-	} else {
-		mod_parameters.thread.msg_rx = NULL;
-	}
-
-	if (fifo_tx_set) {
-		data_fifo_deinit(&mod_fifo_tx);
-		data_fifo_init(&mod_fifo_tx);
-		mod_parameters.thread.msg_tx = &mod_fifo_tx;
-	} else {
-		mod_parameters.thread.msg_tx = NULL;
-	}
-
-	mod_parameters.thread.data_slab = test_slab;
-	mod_parameters.thread.data_size = test_data_size;
-
-	mod_description.type = test_type;
-
-	memset(&handle, 0, sizeof(struct audio_module_handle));
-
-	handle.state = AUDIO_MODULE_STATE_UNDEFINED;
-
-	ret = audio_module_open(&mod_parameters, (struct audio_module_configuration *)&mod_config,
-				test_inst_name, (struct audio_module_context *)&mod_context,
-				&handle);
-
-	zassert_equal(ret, 0, "Open function did not return successfully: ret %d", ret);
-	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
-		      "Open state not AUDIO_MODULE_STATE_CONFIGURED (%d) rather %d",
-		      AUDIO_MODULE_STATE_CONFIGURED, handle.state);
-	zassert_mem_equal(&handle.name, test_inst_name, sizeof(test_inst_name),
-			  "Failed open, name should be %s, but is %s", test_inst_name, handle.name);
-	zassert_mem_equal(handle.description, &mod_description,
-			  sizeof(struct audio_module_description),
-			  "Failed open, module descriptions differ");
-	zassert_mem_equal(handle.description->functions, &ft_pop,
-			  sizeof(struct audio_module_functions),
-			  "Failed open, module function pointers differ");
-	zassert_mem_equal(&handle.thread, &mod_parameters.thread,
-			  sizeof(struct audio_module_thread_configuration),
-			  "Failed open, module thread settings differ");
-	zassert_mem_equal(handle.context, &test_mod_context, sizeof(struct mod_context),
-			  "Failed open, module contexts differ");
-	zassert_equal(handle.use_tx_queue, false, "Open failed use_tx_queue is not false: %d",
-		      handle.use_tx_queue);
-	zassert_equal(handle.dest_count, 0, "Open failed dest_count is not 0: %d",
-		      handle.dest_count);
-
-	k_thread_abort(handle.thread_id);
 }
 
 ZTEST(suite_audio_module_functional, test_open_fnct)

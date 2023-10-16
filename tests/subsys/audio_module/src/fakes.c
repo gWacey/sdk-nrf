@@ -33,15 +33,10 @@ struct test_msg_fifo_queue {
 	void **data[FAKE_FIFO_MSG_QUEUE_SIZE];
 };
 
-/* FIFO "slab" */
 static struct test_slab_queue test_fifo_slab[FAKE_FIFO_NUM];
 
-/* FIFO "message" queue */
 static struct test_msg_fifo_queue test_fifo_msg_queue[FAKE_FIFO_NUM];
 
-/**
- * Deinitialize data FIFO structure.
- */
 void data_fifo_deinit(struct data_fifo *data_fifo)
 {
 	data_fifo->msgq_buffer = (char *)NULL;
@@ -69,7 +64,6 @@ DEFINE_FAKE_VALUE_FUNC(int, data_fifo_num_used_get, struct data_fifo *, uint32_t
 DEFINE_FAKE_VALUE_FUNC(int, data_fifo_empty, struct data_fifo *);
 DEFINE_FAKE_VALUE_FUNC(int, data_fifo_init, struct data_fifo *);
 
-/* Custom fakes implementation */
 int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fifo, void **data,
 						      k_timeout_t timeout)
 {

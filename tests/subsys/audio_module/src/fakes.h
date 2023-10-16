@@ -9,6 +9,7 @@
 
 #include <zephyr/ztest.h>
 #include <zephyr/fff.h>
+
 #include "data_fifo.h"
 #include "audio_module_test_common.h"
 
@@ -16,7 +17,6 @@
  * @brief Deinitialize data FIFO structure.
  *
  * @param data_fifo[in/out]  The data FIFO instance.
-
  */
 void data_fifo_deinit(struct data_fifo *data_fifo);
 

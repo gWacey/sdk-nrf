@@ -14,9 +14,6 @@ const char *TEST_INSTANCE_NAME = "Test instance";
 const char *TEST_STRING = "This is a test string";
 const uint32_t TEST_UINT32 = 0xDEADBEEF;
 
-/**
- * Test function to set a module's context.
- */
 void test_context_set(struct mod_context *ctx, struct mod_config const *const config)
 {
 	memcpy(&ctx->test_string, TEST_STRING, sizeof(TEST_STRING));
@@ -24,9 +21,6 @@ void test_context_set(struct mod_context *ctx, struct mod_config const *const co
 	memcpy(&ctx->config, config, sizeof(struct mod_config));
 }
 
-/**
- * Test function to open a module.
- */
 int test_open_function(struct audio_module_handle_private *handle,
 		       struct audio_module_configuration const *const configuration)
 {
@@ -42,9 +36,6 @@ int test_open_function(struct audio_module_handle_private *handle,
 	return 0;
 }
 
-/**
- * Test function to close a module.
- */
 int test_close_function(struct audio_module_handle_private *handle)
 {
 	ARG_UNUSED(handle);
@@ -52,9 +43,6 @@ int test_close_function(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * Test function to configure a module.
- */
 int test_config_set_function(struct audio_module_handle_private *handle,
 			     struct audio_module_configuration const *const configuration)
 {
@@ -67,9 +55,6 @@ int test_config_set_function(struct audio_module_handle_private *handle,
 	return 0;
 }
 
-/**
- * Test function to get the configuration of a module.
- */
 int test_config_get_function(struct audio_module_handle_private const *const handle,
 			     struct audio_module_configuration *configuration)
 {
@@ -82,9 +67,6 @@ int test_config_get_function(struct audio_module_handle_private const *const han
 	return 0;
 }
 
-/**
- * Test start function of a module.
- */
 int test_start_function(struct audio_module_handle_private *handle)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
@@ -96,9 +78,6 @@ int test_start_function(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * Test stop function of a module.
- */
 int test_stop_function(struct audio_module_handle_private *handle)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
@@ -110,9 +89,6 @@ int test_stop_function(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * Test process data function of a module.
- */
 int test_data_process_function(struct audio_module_handle_private *handle,
 			       struct audio_data const *const audio_data_rx,
 			       struct audio_data *audio_data_tx)
