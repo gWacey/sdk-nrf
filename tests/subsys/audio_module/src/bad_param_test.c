@@ -5,9 +5,9 @@
  */
 
 #include <zephyr/ztest.h>
-#include "fakes.h"
 #include <errno.h>
 
+#include "fakes.h"
 #include "audio_module/audio_module.h"
 #include "audio_module_test_common.h"
 

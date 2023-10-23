@@ -354,8 +354,9 @@ int audio_module_configuration_get(struct audio_module_handle const *const handl
 				   struct audio_module_configuration *configuration);
 
 /**
- * @brief Connect two audio modules together or connect to the module's TX FIFO. The function should
- *        be called for all individual connections.
+ * @brief Connect two audio modules together or connect to the module's TX FIFO.
+ *
+ * @note The function should be called once for every individual connection.
  *
  * @param handle_from[in/out]   The handle for the module for output.
  * @param handle_to[in/out]     The handle of the module for input, should be NULL if

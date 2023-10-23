@@ -111,7 +111,7 @@ static int thread_start(struct audio_module_handle *test_handle)
 }
 
 /**
- * @brief Function to initialize a handle.
+ * @brief Initialize a handle.
  *
  * @param test_handle[in/out]  The handle to the module instance.
  * @param description[in]      Pointer to the module's description.
@@ -448,7 +448,7 @@ static void test_connections(bool connect, enum audio_module_type from_type,
  *
  * @param start[in]             A flag to signal if this is for testing ths start or stop.
  * @param test_fnct[in]         Pointer to the module's function pointer structure.
- * @param test_state[in]        The stat of the audio module.
+ * @param test_state[in]        The state of the audio module.
  * @param return_state[in]      The state of the audio module after a start or stop.
  * @param ret_expected[in/out]  Expected return value from the start or stop.
  */

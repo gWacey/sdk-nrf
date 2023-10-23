@@ -7,7 +7,7 @@ Audio module
    :local:
    :depth: 2
 
-The audio module library is an interface to audio processing functions that coordinate audio states and the exchange of audio-related data of an LE Audio application, such as :ref:`nrf5340_audio`.
+The audio module library is an interface to audio processing functions that coordinate audio states and the exchange of audio-related data of an LE Audio application, such as :ref:`nrf53_audio_app`.
 
 Overview
 ********
@@ -34,7 +34,7 @@ The audio module is implemented as a set of functions, listed in the following f
 
 These functions call out to the user's implementation of these functions written to a predetermined API for the desired audio algorithm.
 
-The following table outlines the available functions that are defined in :c:struct:`struct audio_module_functions` and whether they are mandatory or not:
+The following table outlines the available functions that are defined in :c:struct:`audio_module_functions` and whether they are mandatory or not:
 
 .. list-table::
     :header-rows: 1
@@ -51,7 +51,7 @@ The following table outlines the available functions that are defined in :c:stru
     * - ``audio_module_functions.*configure_set``
       - Mandatory
       - Configure the algorithm to perform a particular operation.
-    * -``audio_module_functions.*configuration_get``
+    * - ``audio_module_functions.*configuration_get``
       - Mandatory
       - Return the internal configuration of the algorithm.
     * - ``audio_module_functions.*start``

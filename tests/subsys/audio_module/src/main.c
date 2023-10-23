@@ -7,6 +7,7 @@
 #include <zephyr/fff.h>
 #include <zephyr/ztest.h>
 #include <errno.h>
+
 #include "fakes.h"
 
 /* This function runs before each test */
