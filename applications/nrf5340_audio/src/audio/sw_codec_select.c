@@ -62,7 +62,7 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 				pcm_block_size_mono_system_sample_rate, m_config.encoder.bitrate,
 				(void *)&pcm_data_mono[m_config.encoder.audio_ch],
 				&pcm_block_size_mono, m_config.encoder.sample_rate_hz,
-				CONFIG_AUDIO_BIT_DEPTH_BITS);
+				CONFIG_AUDIO_BIT_DEPTH_BITS, m_config.encoder.audio_ch);
 			if (ret) {
 				LOG_ERR("Sample rate conversion failed: %d", ret);
 			}
@@ -81,7 +81,8 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 				pcm_data_mono_system_sample_rate[AUDIO_CH_L],
 				pcm_block_size_mono_system_sample_rate, CONFIG_AUDIO_SAMPLE_RATE_HZ,
 				(void *)&pcm_data_mono[AUDIO_CH_L], &pcm_block_size_mono,
-				m_config.encoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS);
+				m_config.encoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS,
+				AUDIO_CH_L);
 			if (ret) {
 				LOG_ERR("Sample rate conversion failed: %d", ret);
 			}
@@ -90,7 +91,8 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 				pcm_data_mono_system_sample_rate[AUDIO_CH_R],
 				pcm_block_size_mono_system_sample_rate, CONFIG_AUDIO_SAMPLE_RATE_HZ,
 				(void *)&pcm_data_mono[AUDIO_CH_R], &pcm_block_size_mono,
-				m_config.encoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS);
+				m_config.encoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS,
+				AUDIO_CH_R);
 			if (ret) {
 				LOG_ERR("Sample rate conversion failed: %d", ret);
 			}
@@ -175,7 +177,8 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 							  (void *)&pcm_data_mono_system_sample_rate,
 							  &pcm_size_system_sample_rate,
 							  CONFIG_AUDIO_SAMPLE_RATE_HZ,
-							  CONFIG_AUDIO_BIT_DEPTH_BITS);
+							  CONFIG_AUDIO_BIT_DEPTH_BITS,
+							  m_config.decoder.audio_ch);
 				if (ret) {
 					LOG_ERR("Sample rate conversion failed: %d", ret);
 				}
@@ -215,7 +218,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 							  (void *)&pcm_data_mono_system_sample_rate,
 							  &pcm_size_system_sample_rate,
 							  CONFIG_AUDIO_SAMPLE_RATE_HZ,
-							  CONFIG_AUDIO_BIT_DEPTH_BITS);
+							  CONFIG_AUDIO_BIT_DEPTH_BITS, AUDIO_CH_L);
 				if (ret) {
 					LOG_ERR("Sample rate conversion failed: %d", ret);
 				}
@@ -234,7 +237,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 					m_config.decoder.sample_rate_hz,
 					(void *)&pcm_data_mono_right_system_sample_rate,
 					&pcm_size_system_sample_rate, CONFIG_AUDIO_SAMPLE_RATE_HZ,
-					CONFIG_AUDIO_BIT_DEPTH_BITS);
+					CONFIG_AUDIO_BIT_DEPTH_BITS, AUDIO_CH_R);
 				if (ret) {
 					LOG_ERR("Sample rate conversion failed: %d", ret);
 				}

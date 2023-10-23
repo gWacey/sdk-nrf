@@ -103,10 +103,11 @@ int pscm_one_channel_split(void const *const input, size_t input_size, enum audi
  * @return	0 if success.
  */
 int pscm_two_channel_split(void const *const input, size_t input_size, uint8_t pcm_bit_depth,
-			   void *output_left, void *output_right, size_t *output_size);
+	void *output_left, void *output_right, size_t *output_size);
 
-int sample_rate_convert(void *input, size_t input_size, uint32_t input_sample_rate, void *output,
-			size_t *output_size, uint32_t output_sample_rate, uint8_t pcm_bit_depth);
+int sample_rate_convert(void *input, size_t input_size, uint32_t input_sample_rate,
+	void *output, size_t *output_size, uint32_t output_sample_rate,
+	uint8_t pcm_bit_depth, enum audio_channel channel);
 
 /**
  * @}

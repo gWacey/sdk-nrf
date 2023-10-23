@@ -91,12 +91,13 @@ int pscm_zero_pad(void const *const input, size_t input_size, enum audio_channel
 }
 
 int sample_rate_convert(void *input, size_t input_size, uint32_t input_sample_rate, void *output,
-			size_t *output_size, uint32_t output_sample_rate, uint8_t pcm_bit_depth)
+			size_t *output_size, uint32_t output_sample_rate, uint8_t pcm_bit_depth,
+			enum audio_channel channel)
 {
 #ifdef CONFIG_SAMPLE_RATE_CONV_AWARE
-	sample_rate_conv_aware_init(input_sample_rate, output_sample_rate);
+	sample_rate_conv_aware_init(input_sample_rate, output_sample_rate, channel);
 	return sample_rate_conv_aware(input, input_size, input_sample_rate, output, output_size,
-				      output_sample_rate, pcm_bit_depth);
+				      output_sample_rate, pcm_bit_depth, channel);
 #endif
 #if CONFIG_SAMPLE_RATE_CONV_NAIVE
 	return sample_rate_conv_naive(input, input_size, input_sample_rate, output, output_size,
