@@ -249,7 +249,7 @@ static int tx_fifo_put(struct audio_module_handle *handle,
 
 		ret = k_sem_take(&handle->sem, K_NO_WAIT);
 		if (ret) {
-			LOG_ERR("Failed to take semaphore for data release callback function");
+			LOG_ERR("Failed to take semaphore for TX FIFO put");
 		}
 
 		return ret;
@@ -328,8 +328,7 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 
 			ret = k_sem_take(&handle->sem, K_NO_WAIT);
 			if (ret) {
-				LOG_ERR("Failed to take semaphore for data release callback "
-					"function");
+				LOG_ERR("Failed to take semaphore");
 			}
 
 			return ret;
@@ -1151,11 +1150,6 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 		       sizeof(struct audio_metadata));
 		memcpy((uint8_t *)audio_data_rx->data, (uint8_t *)msg_rx->audio_data.data,
 		       msg_rx->audio_data.data_size);
-	}
-
-	if (handle_tx != handle_rx) {
-		audio_data_release_cb((struct audio_module_handle_private *)handle_rx,
-				      &msg_rx->audio_data);
 	}
 
 	data_fifo_block_free(handle_rx->thread.msg_rx, (void **)&msg_rx);

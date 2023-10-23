@@ -75,9 +75,7 @@ int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fif
 	}
 
 	*data = &test_fifo_slab_data->msg[test_fifo_slab_data->tail % test_fifo_slab_data->size];
-	test_fifo_slab_data->tail++;
-
-	k_sleep(timeout);
+	test_fifo_slab_data->tail = (test_fifo_slab_data->tail + 1) % test_fifo_slab_data->size;
 
 	return 0;
 }
@@ -178,8 +176,6 @@ int fake_data_fifo_pointer_last_filled_get__succeeds(struct data_fifo *data_fifo
 
 	test_fifo_msg->locked--;
 
-	k_sleep(timeout);
-
 	return 0;
 }
 
@@ -216,12 +212,7 @@ void fake_data_fifo_block_free__succeeds(struct data_fifo *data_fifo, void **dat
 		return;
 	}
 
-	test_fifo_slab_data->data[test_fifo_slab_data->tail] = NULL;
-	test_fifo_slab_data->tail = (test_fifo_slab_data->tail + 1) % test_fifo_slab_data->size;
-
-	if (test_fifo_slab_data->tail == test_fifo_slab_data->head) {
-		return;
-	}
+	test_fifo_slab_data->head = (test_fifo_slab_data->head + 1) % test_fifo_slab_data->size;
 }
 
 int fake_data_fifo_num_used_get__succeeds(struct data_fifo *data_fifo, uint32_t *alloced_num,
