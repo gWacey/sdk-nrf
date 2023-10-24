@@ -10,9 +10,9 @@
 		.st2 {fill:#768692;fill-opacity:1;stroke:#768692;stroke-opacity:1;stroke-width:0.28409090909091}
 		.st3 {fill:#6ad1e3;stroke:none;stroke-width:1}
 		.st4 {fill:#333f48;font-family:Arial;font-size:0.916672em}
-		.st5 {fill:none;stroke:none;stroke-width:1}
-		.st6 {fill:#768692;font-family:Arial;font-size:0.916672em}
-		.st7 {font-size:1em}
+		.st5 {font-size:1em}
+		.st6 {fill:none;stroke:none;stroke-width:1}
+		.st7 {fill:#768692;font-family:Arial;font-size:0.916672em}
 		.st8 {fill:none;fill-rule:evenodd;font-size:12px;overflow:visible;stroke-linecap:square;stroke-miterlimit:3}
 	]]>
 	</style>
@@ -33,49 +33,51 @@
 		</g>
 		<g id="shape153-7" transform="translate(78.8657,-1)">
 			<title>Nordic Blue.153</title>
-			<desc>Input</desc>
+			<desc>Audio module input</desc>
 			<rect x="0" y="2" width="53.1496" height="42.5197" class="st3"/>
-			<text x="14.34" y="26.56" class="st4">Input</text>		</g>
-		<g id="shape154-10" transform="translate(1,-9.92914)">
+			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st5">module </tspan><tspan x="14.65"
+						dy="1.2em" class="st5">input</tspan></text>		</g>
+		<g id="shape154-12" transform="translate(1,-9.92914)">
 			<title>Sheet.154</title>
 			<desc>Data in</desc>
-			<rect x="0" y="19.8583" width="39.2315" height="24.6614" class="st5"/>
-			<text x="8" y="28.89" class="st6">Data <tspan x="15.33" dy="1.2em" class="st7">in</tspan></text>		</g>
-		<g id="shape156-14" transform="translate(132.015,-29.4128)">
+			<rect x="0" y="19.8583" width="39.2315" height="24.6614" class="st6"/>
+			<text x="8" y="28.89" class="st7">Data <tspan x="15.33" dy="1.2em" class="st5">in</tspan></text>		</g>
+		<g id="shape156-16" transform="translate(132.015,-29.4128)">
 			<title>Dynamic connector.156</title>
 			<path d="M0 51.54 L31.59 51.65" class="st1"/>
 		</g>
-		<g id="shape157-19" transform="translate(170.65,-1)">
+		<g id="shape157-21" transform="translate(170.65,-1)">
 			<title>Nordic Blue.157</title>
 			<desc>Audio module 1</desc>
 			<rect x="0" y="2" width="53.1496" height="42.5197" class="st3"/>
-			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st7">module </tspan><tspan x="23.52"
-						dy="1.2em" class="st7">1</tspan></text>		</g>
-		<g id="shape158-24" transform="translate(223.799,-29.4128)">
+			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st5">module </tspan><tspan x="23.52"
+						dy="1.2em" class="st5">1</tspan></text>		</g>
+		<g id="shape158-26" transform="translate(223.799,-29.4128)">
 			<title>Dynamic connector.158</title>
 			<path d="M0 51.54 L31.59 51.65" class="st1"/>
 		</g>
-		<g id="shape159-29" transform="translate(262.433,-1)">
+		<g id="shape159-31" transform="translate(262.433,-1)">
 			<title>Nordic Blue.159</title>
 			<desc>Audio module 2</desc>
 			<rect x="0" y="2" width="53.1496" height="42.5197" class="st3"/>
-			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st7">module </tspan><tspan x="23.52"
-						dy="1.2em" class="st7">2</tspan></text>		</g>
-		<g id="shape160-34" transform="translate(315.583,-29.4128)">
+			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st5">module </tspan><tspan x="23.52"
+						dy="1.2em" class="st5">2</tspan></text>		</g>
+		<g id="shape160-36" transform="translate(315.583,-29.4128)">
 			<title>Dynamic connector.160</title>
 			<path d="M0 51.54 L31.59 51.65" class="st1"/>
 		</g>
-		<g id="shape161-39" transform="translate(354.217,-1)">
+		<g id="shape161-41" transform="translate(354.217,-1)">
 			<title>Nordic Blue.161</title>
-			<desc>Output</desc>
+			<desc>Audio module output</desc>
 			<rect x="0" y="2" width="53.1496" height="42.5197" class="st3"/>
-			<text x="10.06" y="26.56" class="st4">Output</text>		</g>
-		<g id="shape162-42" transform="translate(446.001,-9.92914)">
+			<text x="12.51" y="13.36" class="st4">Audio <tspan x="8.54" dy="1.2em" class="st5">module </tspan><tspan x="11.28"
+						dy="1.2em" class="st5">output</tspan></text>		</g>
+		<g id="shape162-46" transform="translate(446.001,-9.92914)">
 			<title>Sheet.162</title>
 			<desc>Data out</desc>
-			<rect x="0" y="19.8583" width="39.2315" height="24.6614" class="st5"/>
-			<text x="8" y="28.89" class="st6">Data <tspan x="11.97" dy="1.2em" class="st7">out</tspan></text>		</g>
-		<g id="shape163-46" transform="translate(407.367,-15.1732)">
+			<rect x="0" y="19.8583" width="39.2315" height="24.6614" class="st6"/>
+			<text x="8" y="28.89" class="st7">Data <tspan x="11.97" dy="1.2em" class="st5">out</tspan></text>		</g>
+		<g id="shape163-50" transform="translate(407.367,-15.1732)">
 			<title>Dynamic connector.163</title>
 			<path d="M0 37.43 L31.59 37.43" class="st1"/>
 		</g>
