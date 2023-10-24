@@ -24,9 +24,9 @@
 
 	<g>
 		<title>Page-1</title>
-		<g id="group377-1" transform="translate(0.25,-0.25)">
-			<title>Sheet.377</title>
-			<g id="shape232-2" transform="translate(0,-51.02)">
+		<g id="group379-1" transform="translate(0.25,-0.25)">
+			<title>Sheet.379</title>
+			<g id="shape232-2" transform="translate(6.39488E-14,-51.02)">
 				<title>Round Corner Rectangle.210</title>
 				<desc>Module</desc>
 				<path d="M24.09 643.96 L216.85 643.96 A24.0941 24.0941 -180 0 0 240.94 619.87 L240.94 75.61 A24.0941 24.0941 -180
@@ -68,7 +68,7 @@
 				<desc>open1</desc>
 				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st7"/>
 				<text x="33.97" y="636.33" class="st6">open</text>			</g>
-			<g id="shape240-26" transform="translate(69.3269,-471.256)">
+			<g id="shape240-26" transform="translate(71.1595,-471.256)">
 				<title>Sheet.240</title>
 				<desc>configure_set2</desc>
 				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st5"/>
@@ -113,21 +113,21 @@
 				<desc>Send and Retrieve Data</desc>
 				<rect x="0" y="601.439" width="202.677" height="42.5196" class="st3"/>
 				<text x="4" y="614.44" class="st4">Send and Retrieve Data</text>			</g>
-			<g id="shape249-53" transform="translate(51.7322,-172.91)">
+			<g id="shape249-53" transform="translate(71.1594,-172.91)">
 				<title>Sheet.249</title>
 				<desc>data_process2</desc>
-				<rect x="0" y="622.699" width="124.724" height="21.2598" class="st5"/>
-				<text x="35.26" y="636.33" class="st6">data_process</text>			</g>
-			<g id="shape250-56" transform="translate(53.1495,-122.595)">
+				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st5"/>
+				<text x="17.25" y="636.33" class="st6">data_process</text>			</g>
+			<g id="shape250-56" transform="translate(71.1594,-122.595)">
 				<title>Sheet.250</title>
 				<desc>data_process2</desc>
-				<rect x="0" y="622.699" width="124.724" height="21.2598" class="st5"/>
-				<text x="35.26" y="636.33" class="st6">data_process</text>			</g>
-			<g id="shape251-59" transform="translate(51.7322,-73.6973)">
+				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st5"/>
+				<text x="17.25" y="636.33" class="st6">data_process</text>			</g>
+			<g id="shape251-59" transform="translate(71.1594,-73.6973)">
 				<title>Sheet.251</title>
 				<desc>data_process2</desc>
-				<rect x="0" y="622.699" width="124.724" height="21.2598" class="st5"/>
-				<text x="35.26" y="636.33" class="st6">data_process</text>			</g>
+				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st5"/>
+				<text x="17.25" y="636.33" class="st6">data_process</text>			</g>
 			<g id="shape252-62" transform="translate(14.1732,-515.901)">
 				<title>Sheet.252</title>
 				<desc>Close</desc>
@@ -160,6 +160,11 @@
 				<desc>User supplied function</desc>
 				<rect x="0" y="629.786" width="198.425" height="14.1732" class="st10"/>
 				<text x="4" y="640.47" class="st11">User supplied function (optional)</text>			</g>
+			<g id="shape378-80" transform="translate(71.1595,-520.158)">
+				<title>Sheet.378</title>
+				<desc>open1</desc>
+				<rect x="0" y="622.699" width="88.7044" height="21.2598" class="st7"/>
+				<text x="34.01" y="636.33" class="st6">close</text>			</g>
 		</g>
 	</g>
 </svg>
