@@ -15,6 +15,12 @@ Overview
 The audio module is an interface for constructing custom audio processing modules, such as decoder, encoder, and I2S output.
 It provides a common interface to audio processing algorithms. The operation of the module is determined by a set of user provided functions that perform the processing.
 
+There are three module types:
+
+* Input - obtains data internally within the module.
+* Output - outputs data internally within the module.
+* Input-Output - a processing module that takes input from and outputs to another module.
+
 Using this interface, you can open and configure the custom modules, connect to them, and start and stop them.
 You can also send audio data to and from the application.
 
@@ -26,12 +32,11 @@ This is an example of how you can connect modules together:
 Implementation
 ==============
 
-The audio module is implemented as a set of functions, listed in the following figure:
+The audio module is implemented as a set of functions. These functions call out to the user's implementation and are wrapped in the :c:struct:`audio_module_functions` API, as listed in the following figure:
 
 .. figure:: images/audio_module_functions.svg
    :alt: Audio module functions
 
-These functions call out to the user's implementation and are wrapped in the audio_module_functions API.
 
 The following table outlines the available functions that are defined in :c:struct:`audio_module_functions` and whether they are mandatory or not:
 
@@ -66,10 +71,7 @@ The following table outlines the available functions that are defined in :c:stru
 The audio algorithm can run only if these functions are combined with the audio module.
 The audio module cannot perform a task on its own, as it merely supplies a consistent way to interface to an audio algorithm.
 
-The following figures show the flow and the internal states of the audio module:
-
-.. figure:: images/audio_module_flow.svg
-   :alt: Audio module flow
+The following figure show the internal states of the audio module:
 
 .. figure:: images/audio_module_states.svg
    :alt: Audio module internal states
@@ -90,7 +92,6 @@ To create your own audio module for an LE Audio application, complete the follow
 #. Write the mandatory functions required by the function table API in `Implementation`_.
 #. Write any optional functions.
 #. Assign the function table to an instance of an audio module.
-#. Build with the audio module API and link together with the application.
 
 The audio application opens the module, configures it and connects it to other modules or the application.
 The module can then be started and you can send data to it and get the data from it.
