@@ -13,13 +13,12 @@ Overview
 ********
 
 The audio module is an interface for constructing custom audio processing modules, such as decoder, encoder, and I2S output.
-It provides a common interface to audio processing algorithms.
+It provides a common interface to audio processing algorithms. The operation of the module is determined by a set of user provided functions that perform the processing.
 
 Using this interface, you can open and configure the custom modules, connect to them, and start and stop them.
 You can also send audio data to and from the application.
 
-The operation of the module is determined by a set of functions that perform the processing.
-Connecting these modules lets you create the following audio system or stream:
+This is an example of how you can connect modules together:
 
 .. figure:: images/audio_module_stream.svg
    :alt: Audio stream example
@@ -32,7 +31,7 @@ The audio module is implemented as a set of functions, listed in the following f
 .. figure:: images/audio_module_functions.svg
    :alt: Audio module functions
 
-These functions call out to the user's implementation of these functions written to a predetermined API for the desired audio algorithm.
+These functions call out to the user's implementation and are wrapped in the audio_module_functions API.
 
 The following table outlines the available functions that are defined in :c:struct:`audio_module_functions` and whether they are mandatory or not:
 
@@ -97,7 +96,7 @@ The audio application opens the module, configures it and connects it to other m
 The module can then be started and you can send data to it and get the data from it.
 You can also integrate a different module or output using an audio peripheral module.
 
-The following figure demonstrates a simple decoding stream where the decoded audio is sent to an I2S output and returned to the application:
+The following figure demonstrates a simple decoding audio system, where the decoded audio is sent to an I2S output and returned to the application:
 
 .. figure:: images/audio_module_example.svg
    :alt: Audio module stream example
