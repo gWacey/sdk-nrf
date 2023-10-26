@@ -15,14 +15,14 @@ Overview
 The audio module is an interface for constructing custom audio processing modules, such as decoder, encoder, and I2S output.
 It provides a common interface to audio processing algorithms. The operation of the module is determined by a set of user provided functions that perform the processing.
 
-There are three module types:
-
-* Input - obtains data internally within the module.
-* Output - outputs data internally within the module.
-* Input-Output - a processing module that takes input from and outputs to another module.
-
 Using this interface, you can open and configure the custom modules, connect to them, and start and stop them.
 You can also send audio data to and from the application.
+
+There are three module types:
+
+* Input - Obtains data internally within the module (for example I2S input) and outputs the data to another module, the application or both.
+* Output - Takes input from another module or the application and outputs the data internally within the module (for example I2S output).
+* Input-Output - Takes input from another module or the application, processes the data and then outputs the data to another module, the application or both.
 
 This is an example of how you can connect modules together:
 
@@ -32,7 +32,7 @@ This is an example of how you can connect modules together:
 Implementation
 ==============
 
-The audio module is implemented as a set of functions. These functions call out to the user's implementation and are wrapped in the :c:struct:`audio_module_functions` API, as listed in the following figure:
+The audio module is implemented as a set of functions. These functions call out to the user's implementation that are wrapped in the :c:struct:`audio_module_functions` API. The following figure shows how the audio module functions and the user provided functions relate:
 
 .. figure:: images/audio_module_functions.svg
    :alt: Audio module functions
@@ -48,28 +48,28 @@ The following table outlines the available functions that are defined in :c:stru
       - Comment
     * - ``audio_module_functions.*open``
       - Optional
-      - Perform any algorithm operations to open.
+      - Perform any operations necessary to open the module implementation.
     * - ``audio_module_functions.*close``
       - Optional
-      - Tidy up the algorithm on a close.
+      - Tidy up and close the module implementation.
     * - ``audio_module_functions.*configure_set``
       - Mandatory
-      - Configure the algorithm to perform a particular operation.
+      - Configure the module implementation to perform a particular operation.
     * - ``audio_module_functions.*configuration_get``
       - Mandatory
-      - Return the internal configuration of the algorithm.
+      - Return the internal configuration of the module implementation.
     * - ``audio_module_functions.*start``
       - Optional
-      - Set the algorithm running.
+      - Perform any operations necessary to set the module implementation running.
     * - ``audio_module_functions.*stop``
       - Optional
-      - Stop the algorithms.
+      - Perform any operations to necessary stop the module implementation.
     * - ``audio_module_functions.*data_process``
       - Mandatory
-      - Process the data for the algorithm.
+      - Process the data within the module implementation.
 
-The audio algorithm can run only if these functions are combined with the audio module.
-The audio module cannot perform a task on its own, as it merely supplies a consistent way to interface to an audio algorithm.
+An module implementation can run only if these user provided functions are defined and given to the audio module.
+The audio module framework itself cannot perform any tasks, as it merely supplies a consistent way to interface to an audio algorithm.
 
 The following figure show the internal states of the audio module:
 
@@ -93,9 +93,8 @@ To create your own audio module for an LE Audio application, complete the follow
 #. Write any optional functions.
 #. Assign the function table to an instance of an audio module.
 
-The audio application opens the module, configures it and connects it to other modules or the application.
-The module can then be started and you can send data to it and get the data from it.
-You can also integrate a different module or output using an audio peripheral module.
+The audio application opens the module, configures it and connects it to other modules, the application or both.
+The module can then be started and you can transfer data in accordance to what type the module is :c:enum:`audio_module_type`.
 
 The following figure demonstrates a simple decoding audio system, where the decoded audio is sent to an I2S output and returned to the application:
 
