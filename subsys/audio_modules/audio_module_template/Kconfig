@@ -11,6 +11,7 @@ menu "Modules"
 
 config AUDIO_MODULE_TEMPLATE
 	bool "Enable the audio module template"
+	depends on AUDIO_MODULE
 
 endmenu # Modules
 

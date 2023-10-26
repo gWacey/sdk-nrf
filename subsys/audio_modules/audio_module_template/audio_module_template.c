@@ -17,68 +17,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(audio_module_template, 4); /* CONFIG_AUDIO_MODULE_TEMPLATE_LOG_LEVEL); */
 
-/**
- * @brief Table of the dummy module functions.
- *
- */
-const struct audio_module_functions audio_module_template_functions = {
-	/**
-	 * @brief  Function to an open the dummy module.
-	 */
-	.open = audio_module_template_open,
-
-	/**
-	 * @brief  Function to close the dummy module.
-	 */
-	.close = audio_module_template_close,
-
-	/**
-	 * @brief  Function to set the configuration of the dummy module.
-	 */
-	.configuration_set = audio_module_template_configuration_set,
-
-	/**
-	 * @brief  Function to get the configuration of the dummy module.
-	 */
-	.configuration_get = audio_module_template_configuration_get,
-
-	/**
-	 * @brief Start a module processing data.
-	 */
-	.start = audio_module_template_start,
-
-	/**
-	 * @brief Pause a module processing data.
-	 */
-	.stop = audio_module_template_stop,
-
-	/**
-	 * @brief The core data processing function in the dummy module.
-	 */
-	.data_process = audio_module_template_data_process,
-};
-
-/**
- * @brief The set-up description for the LC3 decoder.
- *
- */
-struct audio_module_description audio_module_template_dept = {
-	.name = "Audio Module Temp",
-	.type = AUDIO_MODULE_TYPE_IN_OUT,
-	.functions = &audio_module_template_functions};
-
-/**
- * @brief A private pointer to the LC3 decoder set-up parameters.
- *
- */
-struct audio_module_description *audio_module_template_description = &audio_module_template_dept;
-
-/**
- * @brief Open an instance of the LC3 decoder.
- *
- */
-int audio_module_template_open(struct audio_module_handle_private *handle,
-			       struct audio_module_configuration const *const configuration)
+static int audio_module_template_open(struct audio_module_handle_private *handle,
+				      struct audio_module_configuration const *const configuration)
 
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
@@ -100,11 +40,7 @@ int audio_module_template_open(struct audio_module_handle_private *handle,
 	return 0;
 }
 
-/**
- * @brief  Function close an instance of the LC3 decoder.
- *
- */
-int audio_module_template_close(struct audio_module_handle_private *handle)
+static int audio_module_template_close(struct audio_module_handle_private *handle)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct audio_module_template_context *ctx =
@@ -112,7 +48,7 @@ int audio_module_template_close(struct audio_module_handle_private *handle)
 
 	/* Perform any other functions required to close the module. */
 
-	/* For example context data */
+	/* For example: Clear the context data */
 	memset(ctx, 0, sizeof(struct audio_module_template_context));
 
 	LOG_DBG("Close %s module", hdl->name);
@@ -120,11 +56,7 @@ int audio_module_template_close(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * @brief  Function to set the configuration of an instance of the audio template module.
- *
- */
-int audio_module_template_configuration_set(
+static int audio_module_template_configuration_set(
 	struct audio_module_handle_private *handle,
 	struct audio_module_configuration const *const configuration)
 {
@@ -136,7 +68,7 @@ int audio_module_template_configuration_set(
 
 	/* Perform any other functions to configure the module. */
 
-	/* Copy the example configuration into the context. */
+	/* For example: Copy the configuration into the context. */
 	memcpy(&ctx->config, config, sizeof(struct audio_module_template_configuration));
 
 	LOG_DBG("Set the configuration for %s module: rate = %d  depth = %d  string = %s",
@@ -145,12 +77,9 @@ int audio_module_template_configuration_set(
 	return 0;
 }
 
-/**
- * @brief  Function to set the configuration of an instance of the audio template module.
- *
- */
-int audio_module_template_configuration_get(struct audio_module_handle_private const *const handle,
-					    struct audio_module_configuration *configuration)
+static int
+audio_module_template_configuration_get(struct audio_module_handle_private const *const handle,
+					struct audio_module_configuration *configuration)
 {
 	struct audio_module_template_configuration *config =
 		(struct audio_module_template_configuration *)configuration;
@@ -160,7 +89,7 @@ int audio_module_template_configuration_get(struct audio_module_handle_private c
 
 	/* Perform any other functions to extract the configuration of the module. */
 
-	/* Copy configuration from the context into the output configuration. */
+	/* For example: Copy the configuration from the context into the output configuration. */
 	memcpy(config, &ctx->config, sizeof(struct audio_module_template_configuration));
 
 	LOG_DBG("Get the configuration for %s module: rate = %d  depth = %d  string = %s",
@@ -169,11 +98,7 @@ int audio_module_template_configuration_get(struct audio_module_handle_private c
 	return 0;
 }
 
-/**
- * @brief Start the audio template module.
- *
- */
-int audio_module_template_start(struct audio_module_handle_private *handle)
+static int audio_module_template_start(struct audio_module_handle_private *handle)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 
@@ -184,11 +109,7 @@ int audio_module_template_start(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * @brief Stop the audio template module.
- *
- */
-int audio_module_template_stop(struct audio_module_handle_private *handle)
+static int audio_module_template_stop(struct audio_module_handle_private *handle)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 
@@ -199,13 +120,9 @@ int audio_module_template_stop(struct audio_module_handle_private *handle)
 	return 0;
 }
 
-/**
- * @brief Process an audio data object in an instance of the audio template module.
- *
- */
-int audio_module_template_data_process(struct audio_module_handle_private *handle,
-				       struct audio_data const *const audio_data_in,
-				       struct audio_data *audio_data_out)
+static int audio_module_template_data_process(struct audio_module_handle_private *handle,
+					      struct audio_data const *const audio_data_in,
+					      struct audio_data *audio_data_out)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct audio_module_template_context *ctx =
@@ -247,3 +164,56 @@ int audio_module_template_data_process(struct audio_module_handle_private *handl
 
 	return 0;
 }
+
+/**
+ * @brief Table of the dummy module functions.
+ */
+const struct audio_module_functions audio_module_template_functions = {
+	/**
+	 * @brief  Function to an open the dummy module.
+	 */
+	.open = audio_module_template_open,
+
+	/**
+	 * @brief  Function to close the dummy module.
+	 */
+	.close = audio_module_template_close,
+
+	/**
+	 * @brief  Function to set the configuration of the dummy module.
+	 */
+	.configuration_set = audio_module_template_configuration_set,
+
+	/**
+	 * @brief  Function to get the configuration of the dummy module.
+	 */
+	.configuration_get = audio_module_template_configuration_get,
+
+	/**
+	 * @brief Start a module processing data.
+	 */
+	.start = audio_module_template_start,
+
+	/**
+	 * @brief Pause a module processing data.
+	 */
+	.stop = audio_module_template_stop,
+
+	/**
+	 * @brief The core data processing function in the dummy module.
+	 */
+	.data_process = audio_module_template_data_process,
+};
+
+/**
+ * @brief The set-up description for the LC3 decoder.
+ */
+struct audio_module_description audio_module_template_dept = {
+	.name = "Audio Module Temp",
+	.type = AUDIO_MODULE_TYPE_IN_OUT,
+	.functions = &audio_module_template_functions};
+
+/**
+ * @brief A private pointer to the LC3 decoder set-up parameters.
+ */
+struct audio_module_description *audio_module_template_description = &audio_module_template_dept;
