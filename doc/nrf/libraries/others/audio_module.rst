@@ -63,12 +63,12 @@ The following table outlines the available functions that are defined in :c:stru
       - Perform any operations necessary to set the module implementation running.
     * - ``audio_module_functions.*stop``
       - Optional
-      - Perform any operations to necessary stop the module implementation.
+      - Perform any operations necessary to stop the module implementation.
     * - ``audio_module_functions.*data_process``
       - Mandatory
       - Process the data within the module implementation.
 
-An module implementation can run only if these user provided functions are defined and given to the audio module.
+A module implementation can run only if these user provided functions are defined and given to the audio module.
 The audio module framework itself cannot perform any tasks, as it merely supplies a consistent way to interface to an audio algorithm.
 
 The following figure show the internal states of the audio module:
@@ -94,7 +94,7 @@ To create your own audio module for an LE Audio application, complete the follow
 #. Assign the function table to an instance of an audio module.
 
 The audio application opens the module, configures it and connects it to other modules, the application or both.
-The module can then be started and you can transfer data in accordance to what type the module is :c:enum:`audio_module_type`.
+The module can then be started and you can transfer data in accordance to what type the module is. The module types are described in `Overview`_.
 
 The following figure demonstrates a simple decoding audio system, where the decoded audio is sent to an I2S output and returned to the application:
 
