@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2023 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Audio"
+
+#----------------------------------------------------------------------------#
+menu "Modules"
+
+config AUDIO_MODULE_TEMPLATE
+	bool "Enable the audio module template"
+	depends on AUDIO_MODULE
+
+endmenu # Modules
+
+#----------------------------------------------------------------------------#
+module = AUDIO_MODULE_TEMPLATE
+module-str = audio_module_template
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Audio

@@ -1012,8 +1012,6 @@ int audio_module_flush(struct audio_module_handle *handle)
 		}
 	}
 
-	handle->state = AUDIO_MODULE_STATE_STOPPED;
-
 	return 0;
 }
 
