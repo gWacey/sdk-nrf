@@ -943,7 +943,7 @@ int audio_module_start(struct audio_module_handle *handle)
 		ret = handle->description->functions->start(
 			(struct audio_module_handle_private *)handle);
 		if (ret) {
-			LOG_ERR("Failed user start for module %s, ret %d", handle->name, ret);
+			LOG_ERR("Failed to start module %s, ret %d", handle->name, ret);
 			return ret;
 		}
 	}
@@ -977,7 +977,37 @@ int audio_module_stop(struct audio_module_handle *handle)
 		ret = handle->description->functions->stop(
 			(struct audio_module_handle_private *)handle);
 		if (ret) {
-			LOG_ERR("Failed user pause for module %s, ret %d", handle->name, ret);
+			LOG_ERR("Failed to stop module %s, ret %d", handle->name, ret);
+			return ret;
+		}
+	}
+
+	handle->state = AUDIO_MODULE_STATE_STOPPED;
+
+	return 0;
+}
+
+int audio_module_flush(struct audio_module_handle *handle)
+{
+	int ret;
+
+	if (handle == NULL) {
+		LOG_ERR("Module handle is NULL");
+		return -EINVAL;
+	}
+
+	if (!state_not_undefined(handle->state) || !type_not_undefined(handle->description->type) ||
+	    state_running(handle->state)) {
+		LOG_ERR("Module %s in an invalid state (%d) or type (%d) to flush", handle->name,
+			handle->state, handle->description->type);
+		return -ECANCELED;
+	}
+
+	if (handle->description->functions->flush != NULL) {
+		ret = handle->description->functions->flush(
+			(struct audio_module_handle_private *)handle);
+		if (ret) {
+			LOG_ERR("Failed to flush for module %s, ret %d", handle->name, ret);
 			return ret;
 		}
 	}

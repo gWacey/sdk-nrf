@@ -64,6 +64,9 @@ The following table outlines the available functions that are defined in :c:stru
     * - ``audio_module_functions.*stop``
       - Optional
       - Perform any operations necessary to stop the module implementation.
+    * - ``audio_module_functions.*flush``
+      - Optional
+      - Perform any operations necessary to flush the module implementation.
     * - ``audio_module_functions.*data_process``
       - Mandatory
       - Process the data within the module implementation.

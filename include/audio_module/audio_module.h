@@ -178,6 +178,17 @@ struct audio_module_functions {
 	int (*stop)(struct audio_module_handle_private *handle);
 
 	/**
+	 * @brief Flush the input to an audio module.
+	 *
+	 * @note This is an optional function for an audio module.
+	 *
+	 * @param handle  [in/out]  The handle for the module to be flushed.
+	 *
+	 * @return 0 if successful, error otherwise.
+	 */
+	int (*flush)(struct audio_module_handle_private *handle);
+
+	/**
 	 * @brief The core data processing for an audio module. Can be either an
 	 *        input, output or input/output module type.
 	 *
@@ -405,6 +416,15 @@ int audio_module_start(struct audio_module_handle *handle);
  * @return 0 if successful, error otherwise.
  */
 int audio_module_stop(struct audio_module_handle *handle);
+
+/**
+ * @brief Flush the audio data in the audio module given by handle.
+ *
+ * @param handle  [in/out]  The handle for the module to be flushed.
+ *
+ * @return 0 if successful, error otherwise.
+ */
+int audio_module_flush(struct audio_module_handle *handle);
 
 /**
  * @brief Send an audio data item to an audio module, all data is consumed by the module.

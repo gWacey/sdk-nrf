@@ -493,6 +493,54 @@ ZTEST(suite_audio_module_bad_param, test_data_tx_rx_null)
 		      -EINVAL, ret);
 }
 
+ZTEST(suite_audio_module_bad_param, test_flush_bad_state)
+{
+	int ret;
+
+	test_initialize_description(&test_description_rx, "Module Test",
+				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
+
+	test_initialize_handle(&handle, "TEST Flush", &test_description,
+			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
+
+	ret = audio_module_flush(&handle);
+	zassert_equal(ret, -ECANCELED, "Flush function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Flush returns with incorrect state: %d", handle.state);
+
+	handle.state = AUDIO_MODULE_STATE_CONFIGURED;
+	ret = audio_module_flush(&handle);
+	zassert_equal(ret, -ECANCELED, "Flush function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_CONFIGURED,
+		      "Flush returns with incorrect state: %d", handle.state);
+
+	handle.state = AUDIO_MODULE_STATE_RUNNING;
+	ret = audio_module_flush(&handle);
+	zassert_equal(ret, -ECANCELED, "Flush function did not return -ECANCELED (%d): ret %d",
+		      -ECANCELED, ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
+		      "Flush returns with incorrect state: ret %d", ret);
+}
+
+ZTEST(suite_audio_module_bad_param, test_flush_null)
+{
+	int ret;
+
+	test_initialize_description(&test_description_rx, "Module Test",
+				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
+
+	test_initialize_handle(&handle, "TEST Flush", &test_description,
+			       AUDIO_MODULE_STATE_UNDEFINED, NULL, NULL);
+
+	ret = audio_module_flush(NULL);
+	zassert_equal(ret, -EINVAL, "Flush function did not return successfully (%d): ret %d",
+		      -EINVAL, ret);
+	zassert_equal(handle.state, AUDIO_MODULE_STATE_UNDEFINED,
+		      "Flush returns with incorrect state: %d", handle.state);
+}
+
 ZTEST(suite_audio_module_bad_param, test_stop_bad_state)
 {
 	int ret;
@@ -537,11 +585,6 @@ ZTEST(suite_audio_module_bad_param, test_stop_null)
 	ret = audio_module_stop(NULL);
 	zassert_equal(ret, -EINVAL, "Stop function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
-
-	handle.state = AUDIO_MODULE_STATE_RUNNING;
-	ret = audio_module_stop(NULL);
-	zassert_equal(ret, -EINVAL, "Stop function did not return successfully (%d): ret %d",
-		      -EINVAL, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_RUNNING,
 		      "Stop returns with incorrect state: %d", handle.state);
 }
@@ -587,17 +630,12 @@ ZTEST(suite_audio_module_bad_param, test_start_null)
 	test_initialize_description(&test_description_rx, "Module Test",
 				    AUDIO_MODULE_TYPE_UNDEFINED, NULL);
 
-	test_initialize_handle(&handle, "TEST Start", &test_description, AUDIO_MODULE_STATE_RUNNING,
+	test_initialize_handle(&handle, "TEST Start", &test_description, AUDIO_MODULE_STATE_STOPPED,
 			       NULL, NULL);
 
 	ret = audio_module_start(NULL);
 	zassert_equal(ret, -EINVAL, "Start function did not return -EINVAL (%d): ret %d", -EINVAL,
 		      ret);
-
-	handle.state = AUDIO_MODULE_STATE_STOPPED;
-	ret = audio_module_start(NULL);
-	zassert_equal(ret, -EINVAL, "Start function did not return successfully (%d): ret %d",
-		      -EINVAL, ret);
 	zassert_equal(handle.state, AUDIO_MODULE_STATE_STOPPED,
 		      "Start returns with incorrect state: %d", handle.state);
 }
