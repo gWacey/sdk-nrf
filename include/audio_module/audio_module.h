@@ -234,6 +234,15 @@ struct audio_module_thread_configuration {
 	/* Thread priority. */
 	int priority;
 
+	/* Pointer to a module's command input FIFO, cannot be NULL. */
+	struct data_fifo *msg_cmd;
+
+	/* Module's command retrieval timeout. */
+	k_timeout_t cmd_timeout;
+
+	/* Module's data retrieval timeout. */
+	k_timeout_t data_timeout;
+
 	/* A pointer to a module's audio data receiver FIFO, can be NULL. */
 	struct data_fifo *msg_rx;
 
