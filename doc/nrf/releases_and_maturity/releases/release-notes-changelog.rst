@@ -273,6 +273,9 @@ nRF5340 Audio
 
 * Added:
 
+* Added:
+
+  * Changed the default controller from the :ref:`_lib_bt_ll_acs_nrf53_readme` to the :ref:`ug_ble_controller_softdevice`. Read :ref:`migration_2.6` for information about how this affects your application.
   * Support for Filter Accept List; enabled as default.
   * Metadata used in Auracast, such as ``active_state`` and ``parental_rating``.
 
