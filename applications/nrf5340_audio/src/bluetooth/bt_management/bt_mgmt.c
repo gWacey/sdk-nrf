@@ -355,9 +355,17 @@ static int local_identity_addr_print(void)
 	return 0;
 }
 
+static void found_bond_cb(const struct bt_bond_info *info, void *user_data)
+{
+	LOG_ERR("FOUND A BOND!!!");
+}
+
 int bt_mgmt_bonding_clear(void)
 {
 	int ret;
+
+	LOG_INF("Bonds before clear")
+	bt_foreach_bond(BT_ID_DEFAULT, found_bond_cb, NULL);
 
 	if (IS_ENABLED(CONFIG_SETTINGS)) {
 		LOG_INF("Clearing all bonds");
@@ -368,6 +376,9 @@ int bt_mgmt_bonding_clear(void)
 			return ret;
 		}
 	}
+
+	LOG_INF("Bonds after clear")
+	bt_foreach_bond(BT_ID_DEFAULT, found_bond_cb, NULL);
 
 	return 0;
 }
@@ -430,7 +441,7 @@ int bt_mgmt_init(void)
 		return ret;
 	}
 
-	if (IS_ENABLED(CONFIG_TESTING_BLE_ADDRESS_RANDOM)) {
+	if (IS_ENABLED(CONFIG_TESTING_BLE_ADDRESS_RANDOM) && (CONFIG_AUDIO_DEV == 1)) {
 		ret = random_static_addr_set();
 		if (ret) {
 			return ret;
@@ -448,7 +459,7 @@ int bt_mgmt_init(void)
 			return ret;
 		}
 
-		if (IS_ENABLED(CONFIG_TESTING_BLE_ADDRESS_RANDOM)) {
+		if (IS_ENABLED(CONFIG_TESTING_BLE_ADDRESS_RANDOM) && (CONFIG_AUDIO_DEV == 1)) {
 			ret = bt_mgmt_bonding_clear();
 			if (ret) {
 				return ret;
