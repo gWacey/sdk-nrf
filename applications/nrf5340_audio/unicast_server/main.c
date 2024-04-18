@@ -27,6 +27,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
 
+#define ZBUS_PP_TIMEOUT (500)
+
 ZBUS_SUBSCRIBER_DEFINE(button_evt_sub, CONFIG_BUTTON_MSG_SUB_QUEUE_SIZE);
 
 ZBUS_MSG_SUBSCRIBER_DEFINE(le_audio_evt_sub);
@@ -56,111 +58,310 @@ static void stream_state_set(enum stream_state stream_state_new)
 }
 
 /**
+ * @brief Number of buttons.
+ */
+#define CONFIG_BUTTONS_COUNT (5)
+
+/****/
+#define BUTTON_REPEAT_TRACK_NEXT  (1)
+#define BUTTON_REPEAT_TRACK_PREVIOUS  (2)
+
+/**
+ * @brief The private context structure for a single button.
+ */
+struct button_context_private;
+
+/**
+ * @brief Structure for the buttons functions.
+ */
+struct button_functions
+{
+	/**
+	 * @brief Function to execute after multiple single button presses have been detected.
+	 *
+	 * @param button_pressed  [in/out]  The context of the button.
+	 * @param repeat_count    [in]      The number of times the button was pressed.
+	 *
+	 * @return 0 if successful, error otherwise.
+	 */
+    int (*repeat)(struct button_context_private * button_pressed, int repeat_count);
+
+	/**
+	 * @brief Function to execute after a single button press has been detected.
+	 *
+	 * @param button_pressed  [in/out]  The context of the button.
+	 *
+	 * @return 0 if successful, error otherwise.
+	 */
+    int (*single)(struct button_context_private * button_pressed);
+};
+
+/**
+ * @brief The context structure for a single button.
+ */
+struct button_context
+{
+	/* Button pin assignment. */
+    int pin;
+
+	/* Name of the button. */
+    char *name;
+
+	/* Maximum repeat presses for the button. */
+    int repeat_max;
+
+	/* Time between repeated presses for a button. */
+	int repeat_timeout;
+
+	/* Functions to call for the button. */
+    struct button_functions cb;
+};
+
+static int volume_down(struct button_context_private * button_pressed)
+{
+	int ret;
+
+    ret = bt_r_and_c_volume_down();
+    if (ret) {
+        LOG_DBG("Failed volume down");
+        return ret;
+    }
+
+    return 0;
+}
+
+static int volume_up(struct button_context_private * button_pressed)
+{
+	int ret;
+
+    ret = bt_r_and_c_volume_up();
+    if (ret) {
+        LOG_DBG("Failed volume up");
+        return ret;
+    }
+
+    return 0;
+}
+
+static int button_4(struct button_context_private * button_pressed)
+{
+    int ret;
+
+    if (IS_ENABLED(CONFIG_AUDIO_TEST_TONE)) {
+        if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
+            LOG_DBG("Test tone is disabled in walkie-talkie mode");
+            return -ENOTSUP;
+        }
+
+        if (strm_state != STATE_STREAMING) {
+            LOG_WRN("Not in streaming state");
+            return -EINVAL;
+        }
+
+        ret = audio_system_encode_test_tone_step();
+        if (ret) {
+            LOG_WRN("Failed to play test tone, ret: %d", ret);
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+static int button_5(struct button_context_private * button_pressed)
+{
+    int ret;
+
+    if (IS_ENABLED(CONFIG_AUDIO_MUTE)) {
+        ret = bt_r_and_c_volume_mute(false);
+        if (ret) {
+            LOG_WRN("Failed to mute, ret: %d", ret);
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+static int ppnp_single(struct button_context_private * button_pressed)
+{
+    int ret;
+
+	if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
+		LOG_WRN("Play/pause not supported in walkie-talkie mode");
+		return -ENOTSUP;
+	}
+
+	if (bt_content_ctlr_media_state_playing()) {
+		ret = bt_content_ctrl_stop(NULL);
+		if (ret) {
+			LOG_WRN("Could not stop: %d", ret);
+		}
+
+	} else if (!bt_content_ctlr_media_state_playing()) {
+		ret = bt_content_ctrl_start(NULL);
+		if (ret) {
+			LOG_WRN("Could not start: %d", ret);
+		}
+
+	} else {
+		LOG_WRN("In invalid state: %d", strm_state);
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+static int ppnp_repeat(struct button_context_private *button_pressed_private, int repeat_count)
+{
+    int ret;
+
+    if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
+        LOG_WRN(
+            "Next/previous track not supported in walkie-talkie and "
+            "bidirectional mode");
+        return -ENOTSUP;
+    }
+
+    if (repeat_count == BUTTON_REPEAT_TRACK_NEXT)  {
+        LOG_INF("Button repeat action skip");
+        return 0;
+    } else if (repeat_count == BUTTON_REPEAT_TRACK_PREVIOUS) {
+        LOG_INF("Button repeat action previous");
+        return 0;
+    } else {
+        LOG_WRN("Unhandled button repeat action");
+        return -EINVAL;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Array of button contexts.
+ */
+static struct button_context audio_buttons_ctx[CONFIG_BUTTONS_COUNT] = {
+    { BUTTON_VOLUME_DOWN, "volume down", 0, 500, .cb = { NULL, volume_down } },
+    { BUTTON_VOLUME_UP, "volume up", 0, 500, .cb = { NULL, volume_up } },
+    { BUTTON_PLAY_PAUSE, "play/pause/next/previous", 2, 500, .cb = { ppnp_repeat, ppnp_single } },
+    { BUTTON_4, "4", 0, 500, .cb = { NULL, button_4 } },
+    { BUTTON_5, "5", 0, 500, .cb = { NULL, button_5 } }
+};
+
+/**
+ * @brief Find the button context index from the pin number.
+ */
+int get_button(struct button_context *ctx, int pin, int *button_id)
+{
+	struct button_context *button;
+
+	for(int i = 0; i < CONFIG_BUTTONS_COUNT; i++) {
+		button = &ctx[i];
+
+		if (button->pin == pin) {
+			*button_id = i;
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+/**
+ * @brief Decode button press.
+ */
+static int button_decode(struct button_context *button_pressed, int repeat_count)
+{
+    int ret = 0;
+
+    if (repeat_count) {
+        if (button_pressed->cb.repeat != NULL) {
+            ret = button_pressed->cb.repeat((struct button_context_private *)button_pressed, repeat_count);
+			if (ret) {
+            	LOG_DBG("Failed the button %s repeated press callback", button_pressed->name);
+            return ret;
+        	}
+		}
+    } else {
+        if (button_pressed->cb.single != NULL) {
+            ret = button_pressed->cb.single((struct button_context_private *)button_pressed);
+        	if (ret) {
+            	LOG_DBG("Failed the button %s single press callback", button_pressed->name);
+            	return ret;
+        	}
+		}
+    }
+
+    return 0;
+}
+
+/**
  * @brief	Handle button activity.
  */
 static void button_msg_sub_thread(void)
 {
-	int ret;
-	const struct zbus_channel *chan;
+    int ret;
+    const struct zbus_channel *chan;
+	struct button_msg msg;
+	int repeat_count;
+	int button_id;
+	struct button_context *button_pressed;
 
-	while (1) {
-		ret = zbus_sub_wait(&button_evt_sub, &chan, K_FOREVER);
-		ERR_CHK(ret);
+    while (1) {
+        ret = zbus_sub_wait(&button_evt_sub, &chan, K_FOREVER);
+        ERR_CHK(ret);
 
-		struct button_msg msg;
+        ret = zbus_chan_read(chan, &msg, K_FOREVER);
+        ERR_CHK(ret);
 
-		ret = zbus_chan_read(chan, &msg, ZBUS_READ_TIMEOUT_MS);
-		ERR_CHK(ret);
+        LOG_DBG("Got btn evt from queue - id = %d, action = %d", msg.button_pin, msg.button_action);
 
-		LOG_DBG("Got btn evt from queue - id = %d, action = %d", msg.button_pin,
-			msg.button_action);
-
-		if (msg.button_action != BUTTON_PRESS) {
-			LOG_WRN("Unhandled button action");
-			return;
+        ret = get_button(&audio_buttons_ctx[0], msg.button_pin, &button_id);
+		if (ret) {
+			 LOG_DBG("Button decode failed: %d", ret);
+			 return;
 		}
 
-		switch (msg.button_pin) {
-		case BUTTON_PLAY_PAUSE:
-			if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
-				LOG_WRN("Play/pause not supported in walkie-talkie mode");
-				break;
-			}
+        button_pressed = &audio_buttons_ctx[button_id];
+		LOG_DBG("Found button %d, with max repeat of %d", button_id, button_pressed->repeat_max);
 
-			if (bt_content_ctlr_media_state_playing()) {
-				ret = bt_content_ctrl_stop(NULL);
-				if (ret) {
-					LOG_WRN("Could not stop: %d", ret);
-				}
+        repeat_count = 0;
 
-			} else if (!bt_content_ctlr_media_state_playing()) {
-				ret = bt_content_ctrl_start(NULL);
-				if (ret) {
-					LOG_WRN("Could not start: %d", ret);
-				}
+        while (repeat_count < button_pressed->repeat_max) {
+            ret = zbus_sub_wait(&button_evt_sub, &chan, K_MSEC(button_pressed->repeat_timeout));
+            if (ret == -EAGAIN) {
+				LOG_DBG("Repeat timed out");
+                break;
+            }
+            ERR_CHK(ret);
 
-			} else {
-				LOG_WRN("In invalid state: %d", strm_state);
-			}
+            ret = zbus_chan_read(chan, &msg, K_NO_WAIT);
+            ERR_CHK(ret);
 
-			break;
+            if (msg.button_action != BUTTON_PRESS) {
+                LOG_DBG("Button repeat test timedout");
+                break;
+            }
 
-		case BUTTON_VOLUME_UP:
-			ret = bt_r_and_c_volume_up();
-			if (ret) {
-				LOG_WRN("Failed to increase volume: %d", ret);
-			}
+            if (msg.button_pin == button_pressed->pin) {
+                repeat_count += 1;
+                LOG_DBG("Repeat %s button press count: %d", button_pressed->name, repeat_count);
+            } else {
+                LOG_DBG("End repeat cycle as %s button pressed",
+                        audio_buttons_ctx[msg.button_pin].name);
+                break;
+            }
+        }
 
-			break;
+		LOG_DBG("Number of repeat presses %d", repeat_count);
 
-		case BUTTON_VOLUME_DOWN:
-			ret = bt_r_and_c_volume_down();
-			if (ret) {
-				LOG_WRN("Failed to decrease volume: %d", ret);
-			}
+        ret = button_decode(button_pressed, repeat_count);
+        if (ret) {
+            LOG_DBG("Button %s decode failed: %d", audio_buttons_ctx[msg.button_pin].name, ret);
+        }
 
-			break;
-
-		case BUTTON_4:
-			if (IS_ENABLED(CONFIG_AUDIO_TEST_TONE)) {
-				if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
-					LOG_DBG("Test tone is disabled in walkie-talkie mode");
-					break;
-				}
-
-				if (strm_state != STATE_STREAMING) {
-					LOG_WRN("Not in streaming state");
-					break;
-				}
-
-				ret = audio_system_encode_test_tone_step();
-				if (ret) {
-					LOG_WRN("Failed to play test tone, ret: %d", ret);
-				}
-
-				break;
-			}
-
-			break;
-
-		case BUTTON_5:
-			if (IS_ENABLED(CONFIG_AUDIO_MUTE)) {
-				ret = bt_r_and_c_volume_mute(false);
-				if (ret) {
-					LOG_WRN("Failed to mute, ret: %d", ret);
-				}
-
-				break;
-			}
-
-			break;
-
-		default:
-			LOG_WRN("Unexpected/unhandled button id: %d", msg.button_pin);
-		}
-
-		STACK_USAGE_PRINT("button_msg_thread", &button_msg_sub_thread_data);
-	}
+        STACK_USAGE_PRINT("button_msg_thread", &button_msg_sub_thread_data);
+    }
 }
 
 /**

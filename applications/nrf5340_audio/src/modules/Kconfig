@@ -17,6 +17,10 @@ config AUDIO_SYNC_TIMER_USES_RTC
 	default y
 	select NRFX_RTC0
 
+config VU_METERING
+	bool "Enable VU metering"
+	default n
+
 #----------------------------------------------------------------------------#
 menu "Power measurement"
 

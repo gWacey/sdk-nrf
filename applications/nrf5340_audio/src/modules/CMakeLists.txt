@@ -20,4 +20,8 @@ if (CONFIG_SD_CARD_PLAYBACK)
   list(APPEND SRCS ${CMAKE_CURRENT_SOURCE_DIR}/sd_card_playback.c)
 endif()
 
+if (CONFIG_VU_METERING)
+  list(APPEND SRCS ${CMAKE_CURRENT_SOURCE_DIR}/vu_metering.c)
+endif()
+
 target_sources(app PRIVATE ${SRCS})
