@@ -28,7 +28,7 @@ module = AUDIO_MODULE
 module-str = audio_module
 source "subsys/logging/Kconfig.template.log_config"
 
-endif
+endif # AUDIO_MODULE || AUDIO_MODULE_TEST
 
 endmenu # Log levels
 endmenu # Audio Modules
