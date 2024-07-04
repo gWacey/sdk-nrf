@@ -72,7 +72,8 @@ static int audio_module_template_configuration_set(
 	memcpy(&ctx->config, config, sizeof(struct audio_module_template_configuration));
 
 	LOG_DBG("Set the configuration for %s module: rate = %d  depth = %d  string = %s",
-		hdl->name, ctx->config.rate, ctx->config.depth, ctx->config.some_text);
+		hdl->name, ctx->config.sample_rate_hz, ctx->config.bit_depth,
+		ctx->config.some_text);
 
 	return 0;
 }
@@ -93,7 +94,7 @@ audio_module_template_configuration_get(struct audio_module_handle_private const
 	memcpy(config, &ctx->config, sizeof(struct audio_module_template_configuration));
 
 	LOG_DBG("Get the configuration for %s module: rate = %d  depth = %d  string = %s",
-		hdl->name, config->rate, config->depth, config->some_text);
+		hdl->name, config->sample_rate_hz, config->bit_depth, config->some_text);
 
 	return 0;
 }
@@ -125,34 +126,18 @@ static int audio_module_template_data_process(struct audio_module_handle_private
 					      struct audio_data *audio_data_out)
 {
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
-	struct audio_module_template_context *ctx =
-		(struct audio_module_template_context *)hdl->context;
 
 	/* Perform any other functions to process the data within the module. */
 
-	/* For example: Copy the last input to the output and save the
-	 *              AUDIO_MODULE_TEMPLATE_LAST_BYTES bytes to the modules context.
-	 */
+	/* For example: Copy the input to the output. */
 	{
 		uint8_t *data_in, *data_out;
 		size_t size = audio_data_in->data_size < audio_data_out->data_size
-				      ? audio_data_out->data_size
-				      : audio_data_in->data_size;
+				      ? audio_data_in->data_size
+				      : audio_data_out->data_size;
 
 		data_in = (uint8_t *)audio_data_in->data;
 		data_out = (uint8_t *)audio_data_out->data;
-
-		for (size_t i = 0; i < size; i++) {
-			*data_out++ = *data_in++;
-		}
-
-		size = audio_data_in->data_size < AUDIO_MODULE_TEMPLATE_LAST_BYTES
-			       ? audio_data_in->data_size
-			       : AUDIO_MODULE_TEMPLATE_LAST_BYTES;
-
-		data_in = (uint8_t *)&audio_data_in->data;
-		data_in += audio_data_in->data_size - size;
-		data_out = (uint8_t *)&ctx->audio_module_template_data[0];
 
 		for (size_t i = 0; i < size; i++) {
 			*data_out++ = *data_in++;

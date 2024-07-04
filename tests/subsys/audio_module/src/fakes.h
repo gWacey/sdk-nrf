@@ -38,6 +38,8 @@ DECLARE_FAKE_VALUE_FUNC(int, data_fifo_init, struct data_fifo *);
 		FUNC(data_fifo_init)                                                               \
 	} while (0)
 
+void reset_fake_fifo_counter(void);
+
 int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fifo, void **data,
 						      k_timeout_t timeout);
 int fake_data_fifo_pointer_first_vacant_get__timeout_fails(struct data_fifo *data_fifo, void **data,

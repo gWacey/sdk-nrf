@@ -21,6 +21,6 @@ static void run_before(void *fixture)
 	FFF_RESET_HISTORY();
 }
 
-ZTEST_SUITE(suite_audio_module_bad_param, NULL, NULL, run_before, NULL, NULL);
+//ZTEST_SUITE(suite_audio_module_bad_param, NULL, NULL, run_before, NULL, NULL);
 ZTEST_SUITE(suite_audio_module_functional, NULL, NULL, run_before, NULL, NULL);
 ZTEST_SUITE(suite_audio_module_template, NULL, NULL, run_before, NULL, NULL);

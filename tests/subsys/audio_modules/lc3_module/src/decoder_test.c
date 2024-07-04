@@ -10,7 +10,7 @@
 #include <errno.h>
 
 #include "fakes.h"
-#include "audio_module/audio_module.h"
+#include "audio_module.h"
 #include "lc3_test_common.h"
 #include "lc3_decoder.h"
 #include "sweep21ms_16b48khz_mono_lc3_in.h"

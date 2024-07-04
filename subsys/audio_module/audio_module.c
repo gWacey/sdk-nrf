@@ -1031,11 +1031,11 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 {
 	int ret;
 
-	struct audio_module_message *msg_rx;
-	size_t msg_rx_size;
+	struct audio_module_message *msg_rx = NULL;
+	size_t msg_rx_size = 0;
 
-	if (handle == NULL) {
-		LOG_ERR("Module handle is NULL");
+	if (handle == NULL || audio_data == NULL) {
+		LOG_ERR("Module handle or audio data pointer are NULL");
 		return -EINVAL;
 	}
 
@@ -1055,11 +1055,6 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return -ECANCELED;
 	}
 
-	if (audio_data == NULL) {
-		LOG_ERR("Input audio data for module %s has a NULL pointer", handle->name);
-		return -EINVAL;
-	}
-
 	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
@@ -1067,25 +1062,37 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return ret;
 	}
 
-	if (msg_rx->audio_data.data == NULL ||
-	    msg_rx->audio_data.data_size > audio_data->data_size) {
-		LOG_ERR("Data output pointer NULL or not enough room for buffer from module %s",
-			handle->name);
-		ret = -EINVAL;
+	if (msg_rx == NULL) {
+		LOG_ERR("Failed to retrieve message from %s", handle->name);
+		return -ECANCELED;
+	}
+
+	ret = 0;
+
+	if (audio_data->data_size != 0) {
+		if (msg_rx->audio_data.data_size > audio_data->data_size) {
+			LOG_ERR("Not enough room for buffer from module %s", handle->name);
+			ret = -ECANCELED;
+		} else if (audio_data->data == NULL) {
+			LOG_WRN("Data pointer to buffer is NULL");
+		} else {
+			memcpy(&audio_data->meta, &msg_rx->audio_data.meta, sizeof(struct audio_metadata));
+			memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_rx->audio_data.data,
+		       		msg_rx->audio_data.data_size);
+			audio_data->data_size = msg_rx->audio_data.data_size;
+		}
 	} else {
-		memcpy(&audio_data->meta, &msg_rx->audio_data.meta, sizeof(struct audio_metadata));
-		memcpy((uint8_t *)audio_data->data, (uint8_t *)msg_rx->audio_data.data,
-		       msg_rx->audio_data.data_size);
+		LOG_WRN("Data buffer size is 0");
 	}
 
 	if (msg_rx->response_cb != NULL) {
 		msg_rx->response_cb((struct audio_module_handle_private *)msg_rx->tx_handle,
-				    &msg_rx->audio_data);
+			    &msg_rx->audio_data);
 	}
 
 	data_fifo_block_free(handle->thread.msg_tx, (void *)msg_rx);
 
-	return ret;
+	return 0;
 }
 
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
@@ -1139,6 +1146,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 	if (ret) {
 		LOG_ERR("Failed to retrieve audio data from module %s, ret %d", handle_tx->name,
 			ret);
+		LOG_ERR("Initialised %s", (handle_rx->thread.msg_tx->initialized ? "Yes" : "No"));
 		return ret;
 	}
 

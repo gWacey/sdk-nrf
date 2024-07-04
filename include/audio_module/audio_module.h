@@ -423,8 +423,8 @@ int audio_module_stop(struct audio_module_handle *handle);
  * @brief Send an audio data item to an audio module, all data is consumed by the module.
  *
  * @note: The data pointer and its associated size that are passed via the audio data
- *         pointer, can be NULL and/or 0. It is the responsibility of the low level module functions
- *         to handle this correctly.
+ *        pointer, can be NULL and/or 0. It is the responsibility of the low level module functions
+ *        to handle this correctly.
  *
  * @param handle       [in/out]  The handle for the receiving module instance.
  * @param audio_data   [in]      Pointer to the audio data to send to the module.
@@ -441,8 +441,8 @@ int audio_module_data_tx(struct audio_module_handle *handle,
  * @brief Retrieve an audio data item from an audio module.
  *
  * @note: The data pointer and its associated size that are passed via the audio data
- *         pointer, can be NULL and/or 0. It is the responsibility of the low level module functions
- *         to handle this correctly.
+ *        pointer, can be NULL and/or 0. It is the responsibility of the low level module functions
+ *        to handle this correctly.
  *
  * @param handle      [in/out]  The handle to the module instance.
  * @param audio_data  [out]     Pointer to the audio data from the module.

@@ -7,7 +7,7 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
-#include "audio_module/audio_module.h"
+#include "audio_module.h"
 
 #define TEST_SAMPLE_BIT_DEPTH	    16
 #define TEST_PCM_BIT_DEPTH	    16

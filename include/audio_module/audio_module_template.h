@@ -25,8 +25,8 @@ extern struct audio_module_description *audio_module_template_description;
  *
  */
 struct audio_module_template_configuration {
-	/* The rate. */
-	uint32_t bit_rate_bps;
+	/* The sample rate. */
+	uint32_t sample_rate_hz;
 
 	/* the depth. */
 	uint32_t bit_depth;
@@ -43,7 +43,7 @@ struct audio_module_template_context {
 	/* Array of data to illustrate the data process function. */
 	uint8_t audio_module_template_data[AUDIO_MODULE_TEMPLATE_LAST_BYTES];
 
-	/* The decoder configuration. */
+	/* The template configuration. */
 	struct audio_module_template_configuration config;
 };
 
