@@ -1173,7 +1173,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 				    &msg_rx->audio_data);
 	}
 
-	data_fifo_block_free(handle_tx->thread.msg_tx, (void *)msg_rx);
+	data_fifo_block_free(handle_rx->thread.msg_tx, (void *)msg_rx);
 
 	return ret;
 };
