@@ -18,7 +18,6 @@ config AUDIO_MODULE_T2_LC3_DECODER_TEST
 	help
 	  Enable the T2 LC3 decoder audio module in test mode.
 
-
 config LC3_DEC_CHANNELS_MAX
 	int "Maximum audio channels"
 	default 2

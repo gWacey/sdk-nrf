@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Nordic Semiconductor ASA
+ * Copyright (c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
@@ -35,15 +35,6 @@ static int dec_count;
 static LC3DecoderHandle_t enc_session[TEST_ENC_SESSIONS_NUM];
 
 struct lc3_dec_session dec_session_ctx[TEST_DEC_SESSIONS_NUM];
-
-void data_fifo_deinit(struct data_fifo *data_fifo)
-{
-	data_fifo->msgq_buffer = (char *)NULL;
-	data_fifo->slab_buffer = (char *)NULL;
-	data_fifo->elements_max = 0;
-	data_fifo->block_size_max = 0;
-	data_fifo->initialized = false;
-}
 
 /*
  * Stubs are defined here, so that multiple .C files can share them
@@ -140,7 +131,8 @@ LC3EncoderHandle_t fake_LC3EncodeSessionOpen__succeeds(uint16_t sampleRate, uint
 	ARG_UNUSED(frameSize);
 	ARG_UNUSED(buffer);
 	ARG_UNUSED(bufferSize);
-	ARG_UNUSED(result);
+
+	*result = 0;
 
 	return &enc_session[enc_count++];
 }
@@ -155,7 +147,8 @@ LC3EncoderHandle_t fake_LC3EncodeSessionOpen__fails(uint16_t sampleRate, uint8_t
 	ARG_UNUSED(frameSize);
 	ARG_UNUSED(buffer);
 	ARG_UNUSED(bufferSize);
-	ARG_UNUSED(result);
+
+	*result = -1;
 
 	return NULL;
 }
@@ -288,9 +281,8 @@ uint16_t fake_LC3BitstreamBuffersize__succeeds(uint16_t sampleRate, uint32_t max
 					       LC3FrameSize_t frameSize, int32_t *result)
 {
 	ARG_UNUSED(sampleRate);
-	ARG_UNUSED(maxBitRate);
-	ARG_UNUSED(frameSize);
-	ARG_UNUSED(result);
+
+	result = 0;
 
 	return TEST_ENC_MONO_BUF_SIZE;
 }
@@ -301,7 +293,8 @@ uint16_t fake_LC3BitstreamBuffersize__fails(uint16_t sampleRate, uint32_t maxBit
 	ARG_UNUSED(sampleRate);
 	ARG_UNUSED(maxBitRate);
 	ARG_UNUSED(frameSize);
-	ARG_UNUSED(result);
+
+	*result = -1;
 
 	return 0;
 }
@@ -312,9 +305,10 @@ uint16_t fake_LC3PCMBuffersize__succeeds(uint16_t sampleRate, uint8_t bitDepth,
 	ARG_UNUSED(sampleRate);
 	ARG_UNUSED(bitDepth);
 	ARG_UNUSED(frameSize);
-	ARG_UNUSED(result);
 
-	return 0;
+	*result = 0;
+
+	return TEST_DEC_MONO_BUF_SIZE;
 }
 
 uint16_t fake_LC3PCMBuffersize__fails(uint16_t sampleRate, uint8_t bitDepth,
@@ -323,7 +317,8 @@ uint16_t fake_LC3PCMBuffersize__fails(uint16_t sampleRate, uint8_t bitDepth,
 	ARG_UNUSED(sampleRate);
 	ARG_UNUSED(bitDepth);
 	ARG_UNUSED(frameSize);
-	ARG_UNUSED(result);
+
+	*result = -1;
 
 	return -1;
 }

@@ -1,21 +1,21 @@
 /*
- * Copyright(c) 2023 Nordic Semiconductor ASA
+ * Copyright(c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include "lc3_decoder.h"
+#include "audio_modules/lc3_decoder.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <errno.h>
 
 #include "audio_defines.h"
-#include "audio_module.h"
+#include "audio_module/audio_module.h"
 #include "LC3API.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(lc3_decoder, 4); /* CONFIG_LC3_DECODER_LOG_LEVEL); */
+LOG_MODULE_REGISTER(t2_lc3_decoder, CONFIG_AUDIO_MODULE_LC3_DECODER_LOG_LEVEL);
 
 /**
  * @brief Number of micro seconds in a second.
@@ -26,14 +26,16 @@ LOG_MODULE_REGISTER(lc3_decoder, 4); /* CONFIG_LC3_DECODER_LOG_LEVEL); */
 /**
  * @brief Interleave a channel into a buffer of N channels of PCM
  *
+ * @note: The interleaver can not be executed inplace (i.e. input != output)
+ *
  * @param[in]	input			Pointer to the single channel input buffer.
  * @param[in]	input_size		Number of bytes in input. Must be divisible by two.
  * @param[in]	channel			Channel to interleave into.
- * @param[in]	pcm_bit_depth	Bit depth of PCM samples (16, 24, or 32).
+ * @param[in]	pcm_bit_depth	Bit depth of PCM samples (8, 16, 24, or 32).
  * @param[out]	output			Pointer to the output start of the multi-channel output.
  * @param[in]	output_size		Number of bytes in output. Must be divisible by two and
  *                              at least (input_size * bytes_per_sample * output_channels).
- * @param[out]	output_channels	Number of output channels in the output buffer.
+ * @param[in]	output_channels	Number of output channels in the output buffer.
  *
  * @return 0 if successful, error value
  */
@@ -41,24 +43,27 @@ static int interleave(void const *const input, size_t input_size, uint8_t channe
 		      uint8_t pcm_bit_depth, void *output, size_t output_size,
 		      uint8_t output_channels)
 {
-	uint32_t samples_per_channel;
 	uint8_t bytes_per_sample = pcm_bit_depth / 8;
 	size_t step;
-	char *pointer_input;
-	char *pointer_output;
+	uint8_t *pointer_input;
+	uint8_t *pointer_output;
+
+	if (input == NULL || input_size == 0 || channel > output_channels || pcm_bit_depth == 0 ||
+	    output == NULL || output_size == 0 || output_channels == 0) {
+		return -EINVAL;
+	}
 
 	if (output_size < (input_size * output_channels)) {
 		LOG_DBG("Output buffer too small to interleave input into");
 		return -EINVAL;
 	}
 
-	samples_per_channel = input_size / bytes_per_sample;
 	step = bytes_per_sample * (output_channels - 1);
-	pointer_input = (char *)input;
-	pointer_output = (char *)output + (bytes_per_sample * channel);
+	pointer_input = (uint8_t *)input;
+	pointer_output = (uint8_t *)output + (step * channel);
 
-	for (uint32_t i = 0; i < samples_per_channel; i++) {
-		for (uint8_t j = 0; j < bytes_per_sample; j++) {
+	for (size_t i = 0; i < input_size; i += bytes_per_sample) {
+		for (size_t j = 0; j < bytes_per_sample; j++) {
 			*pointer_output++ = *pointer_input++;
 		}
 
@@ -69,7 +74,7 @@ static int interleave(void const *const input, size_t input_size, uint8_t channe
 }
 
 /**
- * @brief  Open an audio module.
+ * @brief  Open the LC3 module.
  *
  * @param handle         A pointer to the audio module's handle.
  * @param configuration  A pointer to the audio module's configuration to set.
@@ -85,11 +90,13 @@ static int lc3_dec_t2_open(struct audio_module_handle_private *handle,
 	/* Clear the context */
 	memset(ctx, 0, sizeof(struct lc3_decoder_context));
 
+	LOG_DBG("Open LC3 decoder module");
+
 	return 0;
 }
 
 /**
- * @brief  Close an open audio module.
+ * @brief  Close the LC3 audio module.
  *
  * @param handle  A pointer to the audio module's handle.
  *
@@ -108,7 +115,7 @@ static int lc3_dec_t2_close(struct audio_module_handle_private *handle)
 	for (uint8_t i = 0; i < number_channels; i++) {
 		if (dec_handles[i] != NULL) {
 			LC3DecodeSessionClose(dec_handles[i]);
-			dec_handles = NULL;
+			dec_handles[i] = NULL;
 		}
 	}
 
@@ -161,7 +168,7 @@ lc3_dec_t2_configuration_set(struct audio_module_handle_private *handle,
 		return -EINVAL;
 	}
 
-	coded_bytes_req = LC3BitstreamBuffersize(config->sample_rate_hz, config->bitrate_bps,
+	coded_bytes_req = LC3BitstreamBuffersize(config->sample_rate_hz, config->bitrate_bps_max,
 						 framesize, &ret);
 	if (coded_bytes_req == 0) {
 		LOG_ERR("Required coded bytes to LC3 instance %s is zero", hdl->name);
@@ -187,13 +194,18 @@ lc3_dec_t2_configuration_set(struct audio_module_handle_private *handle,
 	memcpy(&ctx->config, config, sizeof(struct lc3_decoder_configuration));
 
 	ctx->coded_bytes_req = coded_bytes_req;
-	ctx->samples_per_frame =
-		(ctx->config.data_len_us * ctx->config.sample_rate_hz) / LC3_DECODER_US_IN_A_SECOND;
+	ctx->sample_frame_bytes = ((ctx->config.data_len_us * ctx->config.sample_rate_hz) /
+				   LC3_DECODER_US_IN_A_SECOND) *
+				  (ctx->config.carried_bits_per_sample / 8);
+
+	LOG_DBG("LC3 decode module %s requires %d coded bytes to produce %d decoded sample bytes",
+		hdl->name, ctx->coded_bytes_req, ctx->sample_frame_bytes);
 
 	/* Configure decoder */
-	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits (sample bits %d) %dus %d "
+	LOG_DBG("LC3 decode module %s configuration: %d Hz %d bits (sample bits %d) "
+		"%d us %d "
 		"channel(s)",
-		hdl->name, ctx->config.sample_rate_hz, ctx->config.carried_bits_pr_sample,
+		hdl->name, ctx->config.sample_rate_hz, ctx->config.carried_bits_per_sample,
 		ctx->config.bits_per_sample, ctx->config.data_len_us, number_channels);
 
 	return 0;
@@ -219,7 +231,7 @@ static int lc3_dec_t2_configuration_get(struct audio_module_handle_private const
 	/* Configure decoder */
 	LOG_DBG("LC3 decode module %s configuration: %dHz %dbits (sample bits %d) %dus channel(s) "
 		"mapped as 0x%X",
-		hdl->name, config->sample_rate_hz, config->carried_bits_pr_sample,
+		hdl->name, config->sample_rate_hz, config->carried_bits_per_sample,
 		config->bits_per_sample, config->data_len_us, config->locations);
 
 	return 0;
@@ -246,11 +258,12 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 	uint16_t plc_counter = 0;
 	size_t data_out_size;
 	size_t session_in_size;
-	size_t frame_size_bytes;
 	uint8_t *data_in;
 	uint8_t *data_out;
-	uint8_t temp_pcm[LC3_PCM_NUM_BYTES_MONO];
+	uint8_t temp_pcm[LC3_DECODER_PCM_NUM_BYTES_MONO];
 	int8_t number_channels;
+
+	LOG_DBG("LC3 decoder module %s start process", hdl->name);
 
 	if (audio_data_in->meta.data_coding != LC3) {
 		LOG_DBG("LC3 decoder module %s has incorrect input data type: %d", hdl->name,
@@ -273,47 +286,50 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 
 	audio_module_number_channels_calculate(ctx->config.locations, &number_channels);
 
-	session_in_size = audio_data_in->data_size / number_channels;
-	if (session_in_size < ctx->coded_bytes_req) {
-		LOG_ERR("Too few coded bytes to decode. Bytes required %d, input framesize is %d",
-			ctx->coded_bytes_req, session_in_size);
-		return -EINVAL;
+	if (audio_data_in->data_size) {
+		session_in_size = audio_data_in->data_size / number_channels;
+		if (session_in_size < ctx->coded_bytes_req) {
+			LOG_ERR("Too few coded bytes to decode. Bytes required- %d, input "
+				"framesize "
+				"is %d",
+				ctx->coded_bytes_req, session_in_size);
+			return -EINVAL;
+		}
+	} else {
+		session_in_size = 0;
 	}
 
-	frame_size_bytes = (ctx->samples_per_frame * (ctx->config.carried_bits_pr_sample / 8));
-
-	if (audio_data_out->data_size < frame_size_bytes * number_channels) {
+	if (audio_data_out->data_size < ctx->sample_frame_bytes * number_channels) {
 		LOG_ERR("Output buffer too small. Bytes required %d, output buffer is %d",
-			(frame_size_bytes * number_channels), audio_data_out->data_size);
+			(ctx->sample_frame_bytes * number_channels), audio_data_out->data_size);
 		return -EINVAL;
 	}
-
-	data_out = (uint8_t *)audio_data_out->data;
-	data_out_size = audio_data_out->data_size;
-
-	memcpy(audio_data_out, audio_data_in, sizeof(struct audio_data));
-	audio_data_out->data = (void *)data_out;
-	audio_data_out->data_size = data_out_size;
-	audio_data_out->meta.data_coding = PCM;
 
 	if (ctx->config.interleaved) {
-		data_out = &temp_pcm[0];
+		data_out = temp_pcm;
+	} else {
+		data_out = (uint8_t *)audio_data_out->data;
 	}
 
 	data_out_size = 0;
 
+	/* Should be able to decode only the channel(s) of interest here.
+	 * These will be put in the first channel or channels and the location
+	 * will indicate which channel(s) they are. Prior to playout (I2S or TDM)
+	 * all other channels can be zeroed.
+	 */
 	for (uint8_t chan = 0; chan < number_channels; chan++) {
 		data_in = (uint8_t *)audio_data_in->data + (session_in_size * chan);
 
 		LC3DecodeInput_t LC3DecodeInput = {
 			.inputData = data_in, .inputDataLength = session_in_size, frame_status};
 		LC3DecodeOutput_t LC3DecodeOutput = {.PCMData = data_out,
-						     .PCMDataLength = frame_size_bytes,
+						     .PCMDataLength = ctx->sample_frame_bytes,
 						     .bytesWritten = 0,
 						     .PLCCounter = plc_counter};
 
 		if (dec_handles[chan] == NULL) {
-			LOG_DBG("LC3 dec ch:%d is not initialized", chan);
+			LOG_DBG("LC3 dec ch: %d is not initialized", chan);
 			return -EINVAL;
 		}
 
@@ -324,11 +340,11 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 			return ret;
 		}
 
-		if (LC3DecodeOutput.bytesWritten != frame_size_bytes) {
+		if (LC3DecodeOutput.bytesWritten != ctx->sample_frame_bytes) {
 			/* handle error */
 			LOG_DBG("Error in decoder, output incorrect size %d when should "
 				"be %d",
-				LC3DecodeOutput.bytesWritten, frame_size_bytes);
+				LC3DecodeOutput.bytesWritten, ctx->sample_frame_bytes);
 
 			/* Clear this channel as it is not correct */
 			memset(data_out, 0, LC3DecodeOutput.bytesWritten);
@@ -336,26 +352,27 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 			return -EFAULT;
 		}
 
+		/* Could also perform the resampling here, while we are operating
+		 * on this area of memory.
+		 */
 		if (ctx->config.interleaved) {
-			uint8_t bits_per_sample =
-				audio_data_in->meta.bits_per_sample <
-						audio_data_in->meta.carried_bits_pr_sample
-					? audio_data_in->meta.carried_bits_pr_sample
-					: audio_data_in->meta.bits_per_sample;
-
 			ret = interleave(LC3DecodeOutput.PCMData, LC3DecodeOutput.bytesWritten,
-					 chan, bits_per_sample, audio_data_out->data,
+					 chan, ctx->config.bits_per_sample, audio_data_out->data,
 					 audio_data_out->data_size, number_channels);
 
 			if (ret) {
 				LOG_DBG("Failed to interleave output");
 				return ret;
 			}
+
+			LOG_DBG("Completed decoders PCM interleaving for ch: %d", chan);
 		} else {
 			data_out += LC3DecodeOutput.bytesWritten;
 		}
 
 		data_out_size += LC3DecodeOutput.bytesWritten;
+
+		LOG_DBG("Completed LC3 decode of ch: %d", chan);
 	}
 
 	ctx->plc_count = plc_counter;
