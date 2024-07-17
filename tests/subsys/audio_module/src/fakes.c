@@ -34,10 +34,8 @@ struct test_msg_fifo_queue {
 };
 
 /* FIFO "slab" */
-/* FIFO "slab" */
 static struct test_slab_queue test_fifo_slab[FAKE_FIFO_NUM];
 
-/* FIFO "message" queue */
 /* FIFO "message" queue */
 static struct test_msg_fifo_queue test_fifo_msg_queue[FAKE_FIFO_NUM];
 
