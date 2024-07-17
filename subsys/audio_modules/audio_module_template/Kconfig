@@ -5,26 +5,23 @@
 #
 menu "Audio Modules"
 
-config AUDIO_MODULE
-	tristate "Enable the audio module"
-	depends on DATA_FIFO || AUDIO_MODULE_TEST
-
-config AUDIO_MODULE_TEST
-	bool "Enable test mode"
-	default n
+config AUDIO_MODULE_TEMPLATE
+	bool "Audio module template"
 	help
-	  Enable the test mode for the audio module.
+	  Enable the audio module template, the
+	  starting point for a new audio module
 
-config AUDIO_MODULE_NAME_SIZE
-	int "Maximum size for module naming in characters"
-	default 20
+if AUDIO_MODULE_TEMPLATE
 
 #----------------------------------------------------------------------------#
 menu "Log levels"
 
-module = AUDIO_MODULE
+module = AUDIO_MODULE_TEMPLATE
 module-str = audio_module
 source "subsys/logging/Kconfig.template.log_config"
 
 endmenu # Log levels
+
+endif # AUDIO_MODULE_TEMPLATE
+
 endmenu # Audio Modules
