@@ -1094,7 +1094,7 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 
 	data_fifo_block_free(handle->thread.msg_tx, (void *)msg_rx);
 
-	return 0;
+	return ret;
 }
 
 int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,

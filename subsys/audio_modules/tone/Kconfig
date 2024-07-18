@@ -1,0 +1,37 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Audio Modules"
+
+config AUDIO_MODULE_TONE_GENERATOR
+	bool "Enable the tone generator"
+	default y
+	help
+	  Enable the tone generator audio module in test mode.
+
+config TONE_GENERATOR_THREAD_PRIO
+	int "Priority for the tone generator thread"
+	default 3
+	help
+	  This is a preemptible thread.
+
+config TONE_GENERATOR_STACK_SIZE
+	int "Stack size for the tone generator thread"
+	default 11000
+	help
+	  The modules thread stack size.
+
+osource "./tone/Kconfig"
+
+#----------------------------------------------------------------------------#
+menu "Log levels"
+
+module = AUDIO_MODULE_TONE_GENERATOR
+module-str = audio_module_tone_generator
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Log levels
+endmenu # Audio Modules
