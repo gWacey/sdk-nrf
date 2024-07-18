@@ -10,6 +10,12 @@ config AUDIO_MODULE_TONE_GENERATOR
 	bool "Enable the tone generator"
 	default y
 	help
+	  Enable the tone generator audio module.
+
+config AUDIO_MODULE_TONE_GENERATOR_TEST
+	bool "Enable the tone generator for testing"
+	default n
+	help
 	  Enable the tone generator audio module in test mode.
 
 config TONE_GENERATOR_THREAD_PRIO

@@ -31,9 +31,9 @@ extern "C" {
 	(p).thread.stack = (sck);                                                                  \
 	(p).thread.stack_size = (sck_size);                                                        \
 	(p).thread.priority = (pri);                                                               \
-	(p).thread.msg_rx = &(fifo_rx);                                                            \
-	(p).thread.msg_tx = &(fifo_tx);                                                            \
-	(p).thread.data_slab = &(slab);                                                            \
+	(p).thread.msg_rx = (fifo_rx);                                                            \
+	(p).thread.msg_tx = (fifo_tx);                                                            \
+	(p).thread.data_slab = (slab);                                                            \
 	(p).thread.data_size = (slab_size);
 
 /**
