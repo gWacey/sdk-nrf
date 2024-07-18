@@ -61,12 +61,10 @@ static int audio_module_tone_gen_configuration_set(
 
 	memcpy(&ctx->config, config, sizeof(struct audio_module_tone_gen_configuration));
 
-	LOG_DBG("Set the configuration for %s module: Sample rate = %d Hz
-		Sample depth = % d bits Carrier = % d bits Interleaved
-		: % d ",
-			  hdl->name,
-		  ctx->config.sample_rate_hz, ctx->config.bits_per_sample,
-		  ctx->config.carried_bits_per_sample, (ctx->config.interleaved ? "YES" : "NO"));
+	LOG_DBG("Set the configuration for %s module: Sample rate = %d Hz Sample depth = %d bits "
+		"Carrier = % d bits Interleaved: %s ",
+		hdl->name, ctx->config.sample_rate_hz, ctx->config.bits_per_sample,
+		ctx->config.carried_bits_per_sample, (ctx->config.interleaved ? "YES" : "NO"));
 
 	return 0;
 }
@@ -84,12 +82,10 @@ audio_module_tone_gen_configuration_get(struct audio_module_handle_private const
 
 	memcpy(config, &ctx->config, sizeof(struct audio_module_tone_gen_configuration));
 
-	LOG_DBG("Set the configuration for %s module: Sample rate = %d  Hz
-		Sample depth = % d bits Carrier = % d bits Interleaved
-		: % d ",
-			  hdl->name,
-		  config.sample_rate_hz, config.bits_per_sample, config.carried_bits_per_sample,
-		  (config.interleaved ? "YES" : "NO"));
+	LOG_DBG("Get the configuration for %s module: Sample rate = %d Hz Sample depth = %d bits "
+		"Carrier = % d bits Interleaved: %s ",
+		hdl->name, ctx->config.sample_rate_hz, ctx->config.bits_per_sample,
+		ctx->config.carried_bits_per_sample, (ctx->config.interleaved ? "YES" : "NO"));
 
 	return 0;
 }
@@ -110,7 +106,7 @@ static int audio_module_tone_gen_data_process(struct audio_module_handle_private
 		return -EINVAL;
 	}
 
-	ret = tone_gen(audio_data_out->data, &audio_data_out->data_size, ctx->config.frequency,
+	ret = tone_gen(audio_data_out->data, &audio_data_out->data_size, ctx->config.frequency_hz,
 		       ctx->config.sample_rate_hz, ctx->config.amplitude);
 	if (ret) {
 		LOG_WRN("Failed to generate a tone for module %s", hdl->name);
@@ -158,7 +154,7 @@ const struct audio_module_functions audio_module_tone_generator_functions = {
 	/**
 	 * @brief The core data processing function in the dummy module.
 	 */
-	.data_process = audio_module_tone_generator_data_process,
+	.data_process = audio_module_tone_gen_data_process,
 };
 
 /**

@@ -23,6 +23,9 @@ extern struct audio_module_description *audio_module_tone_gen_description;
  *
  */
 struct audio_module_tone_gen_configuration {
+	/* Frequency of the tone to generate. */
+	uint16_t frequency_hz;
+
 	/* Sample rate for the instance */
 	uint32_t sample_rate_hz;
 
