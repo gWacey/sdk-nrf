@@ -11,6 +11,7 @@ project("Audio module")
 
 target_sources(app PRIVATE
 	src/main.c
+	src/fakes.c
 	src/tone_test.c
 )
 

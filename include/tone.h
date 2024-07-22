@@ -27,7 +27,7 @@
  *
  * @param tone          User provided buffer. Must be large enough to hold
  *                      the generated PCM tone, depending on settings.
- * @param tone_size     Resulting tone size.
+ * @param tone_size     Resulting tone size in bytes.
  * @param tone_freq_hz  The desired tone frequency in the range [100..10000] Hz.
  * @param smpl_freq_hz  Sampling frequency.
  * @param amplitude     Amplitude in the range [0..1].

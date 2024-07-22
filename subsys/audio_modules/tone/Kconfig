@@ -18,6 +18,18 @@ config AUDIO_MODULE_TONE_GENERATOR_TEST
 	help
 	  Enable the tone generator audio module in test mode.
 
+config TONE_GENERATION_FREQUENCY_HZ_MAX
+	int "Maxiumun tone frequency"
+	default 10000
+	help
+	  The maximum tone frequency that can be generated.
+
+config TONE_GENERATION_FREQUENCY_HZ_MIN
+	int "Minimum tone frequency"
+	default 100
+	help
+	  The minimum tone frequency that can be generated.
+
 config TONE_GENERATOR_THREAD_PRIO
 	int "Priority for the tone generator thread"
 	default 3

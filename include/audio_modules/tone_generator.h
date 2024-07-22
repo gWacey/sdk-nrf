@@ -12,6 +12,9 @@
 #include "audio_defines.h"
 #include "audio_module.h"
 
+/* @brief Calculate the maximum size of the tone buffer in bytes. */
+#define TONE_GEN_BUFFER_SIZE_MAX ((CONFIG_TONE_GENERATION_SAMPLE_RATE_HZ / CONFIG_TONE_GENERATION_FREQUENCY_HZ_MAX) * CONFIG_TONE_GENERATION_BIT_DEPTH_BYTES)
+
 /**
  * @brief Private pointer to the module's parameters.
  *
@@ -23,29 +26,13 @@ extern struct audio_module_description *audio_module_tone_gen_description;
  *
  */
 struct audio_module_tone_gen_configuration {
-	/* Frequency of the tone to generate. */
+	/* Frequency of the tone to generate, in the range [100..10000] Hz. */
 	uint16_t frequency_hz;
 
-	/* Sample rate for the instance */
-	uint32_t sample_rate_hz;
-
-	/* Number of valid bits for a sample (bit depth).
-	 * Typically 16 or 24.
-	 */
-	uint8_t bits_per_sample;
-
-	/* Number of bits used to carry a sample of size bits_per_sample.
-	 * For example, say we have a 24 bit sample stored in a 32 bit
-	 * word (int32_t), then:
-	 *     bits_per_sample = 24
-	 *     carrier_size    = 32
-	 */
-	uint32_t carried_bits_per_sample;
-
-	/* The amplitude of the tone to generate. */
+	/* The amplitude of the tone to generate, in the range [0..1]. */
 	float amplitude;
 
-	/* A flag indicating if the buffer is sample interleaved or not */
+	/* A flag indicating if the buffer is sample interleaved or not. */
 	bool interleaved;
 };
 
@@ -54,6 +41,29 @@ struct audio_module_tone_gen_configuration {
  *
  */
 struct audio_module_tone_gen_context {
+	/* Single tone cycle sample buffer. */
+	uint16_t tone_buffer[TONE_GEN_BUFFER_SIZE_MAX];
+
+	/* Number of bytes for one tone cycle. */
+	size_t cycle_bytes_num;
+
+	/* Byte position of the next byte in the tone buffer. */
+	size_t byte_remain_index;
+
+	/* Number of bytes for a sample. */
+	uint8_t bytes_per_sample;
+
+	/* Number of bytes used to carry a sample of size bytes_per_sample.
+	 * For example, say we have a 24 bit sample stored in a 32 bit
+	 * word (int32_t), then:
+	 *     bytes_per_sample = 3
+	 *     carrier_size     = 4
+	 */
+	uint32_t carried_bytes_per_sample;
+
+	/* Metadat defining the tone buffer. */
+	struct audio_metadata meta;
+
 	/* The tone generator configuration. */
 	struct audio_module_tone_gen_configuration config;
 };

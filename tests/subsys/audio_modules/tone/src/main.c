@@ -7,5 +7,18 @@
 #include <zephyr/fff.h>
 #include <zephyr/ztest.h>
 #include <errno.h>
+#include "fakes.h"
 
-ZTEST_SUITE(suite_audio_module_tone_generator, NULL, NULL, NULL, NULL, NULL);
+/* This function runs before each test */
+static void run_before(void *fixture)
+{
+	ARG_UNUSED(fixture);
+
+	/* Register resets */
+	DO_FOREACH_FAKE(RESET_FAKE);
+
+	/* Reset common FFF internal structures */
+	FFF_RESET_HISTORY();
+}
+
+ZTEST_SUITE(suite_audio_module_tone_generator, NULL, NULL, run_before, NULL, NULL);
