@@ -12,18 +12,24 @@
 #include "audio_defines.h"
 #include "audio_module.h"
 
-/* @brief Calculate the maximum size of the tone buffer in bytes. */
-#define TONE_GEN_BUFFER_SIZE_MAX ((CONFIG_TONE_GENERATION_SAMPLE_RATE_HZ / CONFIG_TONE_GENERATION_FREQUENCY_HZ_MAX) * CONFIG_TONE_GENERATION_BIT_DEPTH_BYTES)
+/* @brief Calculate the maximum size of the tone buffer in 16 bit samples. */
+#define TONE_GEN_BUFFER_SIZE_MAX ((CONFIG_TONE_GENERATION_SAMPLE_RATE_HZ_MAX / CONFIG_TONE_GENERATION_FREQUENCY_HZ_MAX) * sizeof(uint8_t))
+
+/**
+ * @brief Tone generator mix options.
+ */
+enum tone_gen_mix_option {
+	TONE_GEN_NO_MIX,
+	TONE_GEN_MIX_ALL
+};
 
 /**
  * @brief Private pointer to the module's parameters.
- *
  */
 extern struct audio_module_description *audio_module_tone_gen_description;
 
 /**
  * @brief The module configuration structure.
- *
  */
 struct audio_module_tone_gen_configuration {
 	/* Frequency of the tone to generate, in the range [100..10000] Hz. */
@@ -32,13 +38,12 @@ struct audio_module_tone_gen_configuration {
 	/* The amplitude of the tone to generate, in the range [0..1]. */
 	float amplitude;
 
-	/* A flag indicating if the buffer is sample interleaved or not. */
-	bool interleaved;
+	/* Mixer control option. */
+	enum tone_gen_mix_option mix_opt;
 };
 
 /**
  * @brief Private module context.
- *
  */
 struct audio_module_tone_gen_context {
 	/* Single tone cycle sample buffer. */

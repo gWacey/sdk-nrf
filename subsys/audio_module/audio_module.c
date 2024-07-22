@@ -510,18 +510,9 @@ static void module_thread_in_out(struct audio_module_handle *handle, void *p2, v
 			(struct audio_module_handle_private *)handle, &msg_rx->audio_data,
 			&audio_data);
 		if (ret) {
-			if (msg_rx->response_cb != NULL) {
-				msg_rx->response_cb(
-					(struct audio_module_handle_private *)(msg_rx->tx_handle),
-					&msg_rx->audio_data);
-			}
+			LOG_WRN("Data process error in module %s, ret %d", handle->name, ret);
 
-			data_fifo_block_free(handle->thread.msg_rx, (void *)(msg_rx));
-
-			k_mem_slab_free(handle->thread.data_slab, (void *)(data));
-
-			LOG_ERR("Data process error in module %s, ret %d", handle->name, ret);
-			continue;
+			audio_data.data_size = 0;
 		}
 
 		/* Send processed audio data to next module(s). */
@@ -1056,6 +1047,11 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return -ECANCELED;
 	}
 
+	if (audio_data->data_size == 0) {
+		LOG_WRN("Recieve buffer has zero size");
+		return -ECANCELED;
+	}
+
 	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
@@ -1063,14 +1059,7 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return ret;
 	}
 
-	if (msg_rx == NULL) {
-		LOG_ERR("Failed to retrieve message from %s", handle->name);
-		return -ECANCELED;
-	}
-
-	ret = 0;
-
-	if (audio_data->data_size != 0) {
+	if (msg_rx->audio_data.data_size != 0) {
 		if (msg_rx->audio_data.data_size > audio_data->data_size) {
 			LOG_ERR("Not enough room for buffer from module %s", handle->name);
 			ret = -ECANCELED;
@@ -1084,7 +1073,8 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 			audio_data->data_size = msg_rx->audio_data.data_size;
 		}
 	} else {
-		LOG_WRN("Data buffer size is 0");
+		LOG_WRN("Recieved data buffer size is 0");
+		ret = -ECANCELED;
 	}
 
 	if (msg_rx->response_cb != NULL) {
@@ -1137,6 +1127,11 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 		return -EINVAL;
 	}
 
+	if (audio_data_rx->data_size == 0) {
+		LOG_WRN("Recieve buffer has zero size");
+		return -ECANCELED;
+	}
+
 	ret = data_tx(NULL, handle_rx, audio_data_tx, NULL);
 	if (ret) {
 		LOG_ERR("Failed to send audio data to module %s, ret %d", handle_tx->name, ret);
@@ -1151,7 +1146,7 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 		return ret;
 	}
 
-	if (audio_data_rx->data_size != 0) {
+	if (msg_rx->audio_data.data_size != 0) {
 		if (msg_rx->audio_data.data_size > audio_data_rx->data_size) {
 			LOG_ERR("Not enough room for buffer from module %s", handle_rx->name);
 			ret = -ECANCELED;
@@ -1165,7 +1160,8 @@ int audio_module_data_tx_rx(struct audio_module_handle *handle_tx,
 			audio_data_rx->data_size = msg_rx->audio_data.data_size;
 		}
 	} else {
-		LOG_WRN("Data buffer size is 0");
+		LOG_WRN("Recieved data buffer size is 0");
+		ret = -ECANCELED;
 	}
 
 	if (msg_rx->response_cb != NULL) {

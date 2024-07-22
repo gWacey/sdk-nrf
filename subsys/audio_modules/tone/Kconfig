@@ -18,6 +18,12 @@ config AUDIO_MODULE_TONE_GENERATOR_TEST
 	help
 	  Enable the tone generator audio module in test mode.
 
+config TONE_GENERATION_SAMPLE_RATE_HZ_MAX
+	int "Maxiumun sampling frequency"
+	default 48000
+	help
+	  The maximum sampling frequency.
+
 config TONE_GENERATION_FREQUENCY_HZ_MAX
 	int "Maxiumun tone frequency"
 	default 10000

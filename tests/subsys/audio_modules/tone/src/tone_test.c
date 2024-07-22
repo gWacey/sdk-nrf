@@ -40,6 +40,7 @@
 #define TEST_TONE_GEN_MULTI_BUF_SAMPLES	 (TEST_TONE_GEN_MULTI_BUF_SIZE / (TEST_PCM_BIT_DEPTH / 8))
 
 #define TEST_PCM_SAMPLE_RATE_48000	48000
+#define TEST_PCM_SAMPLE_RATE_32000	32000
 #define TEST_PCM_SAMPLE_RATE_16000	16000
 #define TEST_FRAME_SIZE_US		10000
 #define TEST_BITS_PER_SAMPLE		16
@@ -82,12 +83,126 @@ static struct audio_module_parameters mod_parameters;
 static struct audio_module_tone_gen_configuration configuration = {
 	.frequency_hz = 200,
 	.amplitude = 1,
-	.interleaved = false};
+	.mix_opt = TONE_GEN_NO_MIX};
 
 static struct audio_module_tone_gen_context context = {0};
 
 static uint8_t test_data_in[TEST_TONE_GEN_MONO_BUF_SIZE * TEST_TONE_GEN_DATA_OBJECTS_NUM];
 static uint8_t test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE * TEST_TONE_GEN_DATA_OBJECTS_NUM];
+
+ZTEST(suite_audio_module_tone_generator, test_module_tone_generator_bad_reconfig)
+{
+	int ret;
+	struct audio_module_tone_gen_configuration test_config;
+
+	AUDIO_MODULE_PARAMETERS(mod_parameters, audio_module_tone_gen_description,
+			tone_gen_thread_stack, CONFIG_TONE_GENERATOR_STACK_SIZE,
+			CONFIG_TONE_GENERATOR_THREAD_PRIO, &msg_fifo_rx, &msg_fifo_tx,
+			&mod_data_slab, TEST_TONE_GEN_MONO_BUF_SIZE);
+
+	ret = audio_module_open(
+		&mod_parameters, (struct audio_module_configuration const *const)&configuration,
+		test_instance_name, (struct audio_module_context *)&context, &handle);
+	zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+
+	test_config.frequency_hz = 10,
+	test_config.amplitude = 0.5,
+	test_config.mix_opt = TONE_GEN_NO_MIX;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+
+	test_config.frequency_hz = 20000,
+	test_config.amplitude = 0.5,
+	test_config.mix_opt = TONE_GEN_NO_MIX;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+
+	test_config.frequency_hz = 400,
+	test_config.amplitude = 1.5,
+	test_config.mix_opt = TONE_GEN_NO_MIX;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+
+	test_config.frequency_hz = 400,
+	test_config.amplitude = -0.5,
+	test_config.mix_opt = TONE_GEN_NO_MIX;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+
+	test_config.frequency_hz = 400,
+	test_config.amplitude = 0.5,
+	test_config.mix_opt = TONE_GEN_NO_MIX - 1;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+
+	test_config.frequency_hz = 400,
+	test_config.amplitude = 0.5,
+	test_config.mix_opt = TONE_GEN_MIX_ALL + 1;
+	ret = audio_module_reconfigure(&handle, (struct audio_module_configuration const *const)&test_config);
+	zassert_equal(ret, -EINVAL, "Reconfigure function did not return %d: ret %d", -EINVAL, ret);
+}
+
+ZTEST(suite_audio_module_tone_generator, test_module_tone_generator_bad_data)
+{
+	int ret;
+
+	/* Fake tone generation success */
+	tone_gen_fake.custom_fake = fake_tone_gen__succeeds;
+
+	audio_data_tx.meta = test_metadata;
+	audio_data_rx.meta = test_metadata;
+
+	data_fifo_init(&msg_fifo_tx);
+	data_fifo_init(&msg_fifo_rx);
+
+	AUDIO_MODULE_PARAMETERS(mod_parameters, audio_module_tone_gen_description,
+				tone_gen_thread_stack, CONFIG_TONE_GENERATOR_STACK_SIZE,
+				CONFIG_TONE_GENERATOR_THREAD_PRIO, &msg_fifo_rx, &msg_fifo_tx,
+				&mod_data_slab, TEST_TONE_GEN_MONO_BUF_SIZE);
+
+	ret = audio_module_open(
+		&mod_parameters, (struct audio_module_configuration const *const)&configuration,
+		test_instance_name, (struct audio_module_context *)&context, &handle);
+	zassert_equal(ret, 0, "Open function did not return successfully (0): ret %d", ret);
+
+	ret = audio_module_connect(&handle, NULL, true);
+	zassert_equal(ret, 0, "Connect function did not return successfully (0): ret %d", ret);
+
+	ret = audio_module_start(&handle);
+	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
+
+	audio_data_tx.data = (void *)&test_data_in[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_tx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE * 2;
+	audio_data_rx.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_rx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+	ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_tx, &audio_data_rx, TEST_TX_RX_TIMEOUT_US);
+	zassert_equal(ret, -ECANCELED, "Data in size > data out size test did not return %d: ret %d", -ECANCELED, ret);
+
+	audio_data_tx.data = (void *)&test_data_in[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_tx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+	audio_data_tx.meta.data_coding = LC3;
+	audio_data_rx.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_rx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+	ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_tx, &audio_data_rx, TEST_TX_RX_TIMEOUT_US);
+	zassert_equal(ret, -ECANCELED, "Data in size > data out size test did not return %d: ret %d", -ECANCELED, ret);
+
+	audio_data_tx.data = (void *)&test_data_in[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_tx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+	audio_data_tx.meta.data_coding = PCM;
+	audio_data_rx.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
+	audio_data_rx.data_size = 0;
+	ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_tx, &audio_data_rx, TEST_TX_RX_TIMEOUT_US);
+	zassert_equal(ret, -ECANCELED, "Data in size > data out size test did not return %d: ret %d", -ECANCELED, ret);
+
+	ret = audio_module_stop(&handle);
+	zassert_equal(ret, 0, "Stop function did not return successfully (0): ret %d", ret);
+
+	ret = audio_module_disconnect(&handle, NULL, true);
+	zassert_equal(ret, 0, "Disconnect function did not return successfully (0): ret %d", ret);
+
+	ret = audio_module_close(&handle);
+	zassert_equal(ret, 0, "Close function did not return successfully (0): ret %d", ret);
+}
 
 ZTEST(suite_audio_module_tone_generator, test_module_tone_generator)
 {
@@ -120,8 +235,30 @@ ZTEST(suite_audio_module_tone_generator, test_module_tone_generator)
 	zassert_equal(ret, 0, "Start function did not return successfully (0): ret %d", ret);
 
 	for (int i = 0; i < TEST_TONE_GEN_DATA_OBJECTS_NUM; i++) {
-		printk("Process audio buffer %d\n", i);
+		audio_data_ref.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
+		audio_data_ref.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
 
+		audio_data_tx.data = (void *)&test_data_in[TEST_TONE_GEN_MONO_BUF_SIZE];
+		audio_data_tx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+
+		audio_data_rx.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
+		audio_data_rx.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
+
+		ret = audio_module_data_tx_rx(&handle, &handle, &audio_data_tx,  &audio_data_rx, TEST_TX_RX_TIMEOUT_US);
+		zassert_equal(ret, 0, "Data RX function did not return successfully (0): ret %d",
+			      ret);
+		zassert_mem_equal(audio_data_ref.data, audio_data_rx.data, TEST_TONE_GEN_MONO_BUF_SIZE,
+				  "Failed to generate tone data");
+		zassert_equal(audio_data_ref.data_size, audio_data_rx.data_size,
+			      "Failed to generate tone data, sizes differ");
+		zassert_mem_equal(&audio_data_ref.meta, &audio_data_rx.meta, sizeof(struct audio_metadata),
+				  "Failed to generate tone data, meta data differs");
+	}
+
+	audio_data_tx.meta.sample_rate_hz = TEST_PCM_SAMPLE_RATE_16000;
+	audio_data_ref.meta.sample_rate_hz = TEST_PCM_SAMPLE_RATE_16000;
+
+	for (int i = 0; i < TEST_TONE_GEN_DATA_OBJECTS_NUM; i++) {
 		audio_data_ref.data = (void *)&test_data_out[TEST_TONE_GEN_MONO_BUF_SIZE];
 		audio_data_ref.data_size = TEST_TONE_GEN_MONO_BUF_SIZE;
 
