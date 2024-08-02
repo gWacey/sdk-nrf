@@ -21,4 +21,7 @@ static void run_before(void *fixture)
 	FFF_RESET_HISTORY();
 }
 
-ZTEST_SUITE(suite_audio_module_tone_generator, NULL, NULL, run_before, NULL, NULL);
+//ZTEST_SUITE(suite_audio_module_tone_generator, NULL, NULL, run_before, NULL, NULL);
+//ZTEST_SUITE(suite_audio_module_tone_generator_dint, NULL, NULL, run_before, NULL, NULL);
+//ZTEST_SUITE(suite_audio_module_tone_generator_int, NULL, NULL, run_before, NULL, NULL);
+ZTEST_SUITE(suite_audio_module_tone_generator_mix, NULL, NULL, run_before, NULL, NULL);

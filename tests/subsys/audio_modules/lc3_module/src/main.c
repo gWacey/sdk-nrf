@@ -22,3 +22,4 @@ static void run_before(void *fixture)
 }
 
 ZTEST_SUITE(suite_lc3_decoder_functional, NULL, NULL, run_before, NULL, NULL);
+ZTEST_SUITE(suite_lc3_encoder_functional, NULL, NULL, run_before, NULL, NULL);

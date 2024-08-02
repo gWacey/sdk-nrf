@@ -45,7 +45,7 @@ struct audio_metadata test_metadata = {.data_coding = LC3,
 				       .data_len_us = 10000,
 				       .sample_rate_hz = 48000,
 				       .bits_per_sample = 16,
-				       .carried_bits_pr_sample = 16,
+				       .carried_bits_per_sample = 16,
 				       .locations = 0x00000003,
 				       .reference_ts_us = 0,
 				       .data_rx_ts_us = 0,
@@ -90,9 +90,6 @@ ZTEST(suite_audio_module_template, test_module_template)
 	uint8_t test_data_out[TEST_MOD_DATA_SIZE * TEST_AUDIO_DATA_ITEMS_NUM];
 
 	struct audio_module_handle handle;
-
-	data_fifo_init(&msg_fifo_rx);
-	data_fifo_init(&msg_fifo_tx);
 
 	mod_parameters.description = audio_module_template_description;
 	mod_parameters.thread.stack = mod_temp_stack[0];
@@ -249,9 +246,6 @@ ZTEST(suite_audio_module_template, test_module_template_stream)
 	for (i = 0; i < TEST_MODULES_NUM; i++) {
 
 		memset(&handle[i], 0, sizeof(struct audio_module_handle));
-
-		data_fifo_init(msg_fifo_rx_array[i]);
-		data_fifo_init(msg_fifo_tx_array[i]);
 
 		mod_parameters.description = audio_module_template_description;
 		mod_parameters.thread.stack = mod_temp_stack[i];

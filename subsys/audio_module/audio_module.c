@@ -243,6 +243,7 @@ static int tx_fifo_put(struct audio_module_handle *handle,
 	/* Send audio data to modules output message queue. */
 	ret = data_fifo_block_lock(handle->thread.msg_tx, (void **)&data_msg_tx,
 				   sizeof(struct audio_module_message));
+
 	if (ret) {
 		LOG_ERR("Failed to send audio data to output of module %s, ret %d", handle->name,
 			ret);
@@ -325,7 +326,9 @@ static int send_to_connected_modules(struct audio_module_handle *handle,
 	 * process with audio_module_rx().
 	 */
 	if (handle->use_tx_queue && handle->thread.msg_tx) {
+
 		ret = tx_fifo_put(handle, audio_data);
+
 		if (ret) {
 			LOG_ERR("Failed to send audio data on module %s TX message queue",
 				handle->name);
@@ -604,6 +607,14 @@ int audio_module_open(struct audio_module_parameters const *const parameters,
 		return -EINVAL;
 	}
 
+	if (handle->thread.msg_rx != NULL) {
+		data_fifo_init(handle->thread.msg_rx);
+	}
+
+	if (handle->thread.msg_tx != NULL) {
+		data_fifo_init(handle->thread.msg_tx);
+	}
+
 	sys_slist_init(&handle->handle_dest_list);
 	k_mutex_init(&handle->dest_mutex);
 
@@ -668,10 +679,10 @@ int audio_module_close(struct audio_module_handle *handle)
 
 	k_thread_abort(handle->thread_id);
 
+	LOG_DBG("Closed module %s", handle->name);
+
 	/* Ensure module handle data is fully cleared. */
 	memset(handle, 0, sizeof(struct audio_module_handle));
-
-	LOG_DBG("Closed module %s", handle->name);
 
 	return 0;
 };
@@ -1047,11 +1058,6 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		return -ECANCELED;
 	}
 
-	if (audio_data->data_size == 0) {
-		LOG_WRN("Recieve buffer has zero size");
-		return -ECANCELED;
-	}
-
 	ret = data_fifo_pointer_last_filled_get(handle->thread.msg_tx, (void **)&msg_rx,
 						&msg_rx_size, timeout);
 	if (ret) {
@@ -1061,8 +1067,7 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 
 	if (msg_rx->audio_data.data_size != 0) {
 		if (msg_rx->audio_data.data_size > audio_data->data_size) {
-			LOG_ERR("Not enough room for buffer from module %s", handle->name);
-			ret = -ECANCELED;
+			LOG_WRN("Not enough room for buffer from module %s", handle->name);
 		} else if (audio_data->data == NULL) {
 			LOG_WRN("Data pointer to buffer is NULL");
 		} else {
@@ -1074,7 +1079,6 @@ int audio_module_data_rx(struct audio_module_handle *handle, struct audio_data *
 		}
 	} else {
 		LOG_WRN("Recieved data buffer size is 0");
-		ret = -ECANCELED;
 	}
 
 	if (msg_rx->response_cb != NULL) {
@@ -1212,7 +1216,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
 	return 0;
 };
 
-int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels)
+int audio_module_number_channels_calculate(uint32_t locations, uint8_t *number_channels)
 {
 	if (number_channels == NULL) {
 		LOG_ERR("Invalid parameters");

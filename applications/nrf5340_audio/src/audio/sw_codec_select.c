@@ -256,7 +256,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 			audio_data_tx.meta.data_len_us = CONFIG_AUDIO_FRAME_DURATION_US;
 			audio_data_tx.meta.sample_rate_hz = m_config.decoder.sample_rate_hz;
 			audio_data_tx.meta.bits_per_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
-			audio_data_tx.meta.carried_bits_pr_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
+			audio_data_tx.meta.carried_bits_per_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
 			if (m_config.decoder.channel_mode == SW_CODEC_MONO) {
 				audio_data_tx.meta.locations = BIT(m_config.decoder.audio_ch);
 			} else {
@@ -271,7 +271,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 			audio_data_rx.meta.data_len_us = CONFIG_AUDIO_FRAME_DURATION_US;
 			audio_data_rx.meta.sample_rate_hz = m_config.decoder.sample_rate_hz;
 			audio_data_rx.meta.bits_per_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
-			audio_data_rx.meta.carried_bits_pr_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
+			audio_data_rx.meta.carried_bits_per_sample = CONFIG_AUDIO_BIT_DEPTH_BITS;
 			audio_data_rx.meta.locations = audio_data_tx.meta.locations;
 
 			ret = audio_module_data_tx_rx(&handle[LC3_MODULE_ID_DECODER],

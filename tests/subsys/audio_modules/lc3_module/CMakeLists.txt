@@ -12,6 +12,7 @@ project("Audio LC3 module")
 target_sources(app PRIVATE
 	src/main.c
 	src/fakes.c
+	src/lc3_test_common.c
 	src/decoder_test.c
 )
 

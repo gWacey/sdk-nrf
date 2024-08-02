@@ -253,14 +253,12 @@ static void test_close(const struct audio_module_functions *test_fnct,
 	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
 	if (fifo_rx_set) {
-		data_fifo_init(&fifo_rx);
 		handle.thread.msg_rx = &fifo_rx;
 	} else {
 		handle.thread.msg_rx = NULL;
 	}
 
 	if (fifo_tx_set) {
-		data_fifo_init(&fifo_tx);
 		handle.thread.msg_tx = &fifo_tx;
 	} else {
 		handle.thread.msg_tx = NULL;
@@ -313,14 +311,12 @@ static void test_open(enum audio_module_type test_type, bool fifo_rx_set, bool f
 	test_context_set(&test_mod_context, &mod_config);
 
 	if (fifo_rx_set) {
-		data_fifo_init(&fifo_rx);
 		mod_parameters.thread.msg_rx = &fifo_rx;
 	} else {
 		mod_parameters.thread.msg_rx = NULL;
 	}
 
 	if (fifo_tx_set) {
-		data_fifo_init(&fifo_tx);
 		mod_parameters.thread.msg_tx = &fifo_tx;
 	} else {
 		mod_parameters.thread.msg_tx = NULL;
@@ -992,7 +988,7 @@ ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 	char data[TEST_MOD_DATA_SIZE] = {0};
 	struct audio_data audio_data_out = {0};
 	struct audio_module_message *data_msg_tx;
-	struct data_fifo fifo_tx = {0};
+	struct data_fifo fifo_tx;
 	struct audio_module_handle handle;
 
 	test_context_set(&mod_context, &mod_config);

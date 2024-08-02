@@ -34,7 +34,7 @@ LOG_MODULE_REGISTER(t2_lc3_decoder, CONFIG_AUDIO_MODULE_LC3_DECODER_LOG_LEVEL);
  * @param[in]	pcm_bit_depth	Bit depth of PCM samples (8, 16, 24, or 32).
  * @param[out]	output			Pointer to the output start of the multi-channel output.
  * @param[in]	output_size		Number of bytes in output. Must be divisible by two and
- *                              at least (input_size * bytes_per_sample * output_channels).
+ *                              at least (input_size * output_channels).
  * @param[in]	output_channels	Number of output channels in the output buffer.
  *
  * @return 0 if successful, error value
@@ -312,6 +312,7 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 	}
 
 	data_out_size = 0;
+	memcpy(&audio_data_out->meta, &audio_data_in->meta, sizeof(struct audio_metadata));
 
 	/* Should be able to decode only the channel(s) of interest here.
 	 * These will be put in the first channel or channels and the location
@@ -378,6 +379,7 @@ static int lc3_dec_t2_data_process(struct audio_module_handle_private *handle,
 	ctx->plc_count = plc_counter;
 
 	audio_data_out->data_size = data_out_size;
+	audio_data_out->meta.data_coding = PCM;
 
 	return 0;
 }

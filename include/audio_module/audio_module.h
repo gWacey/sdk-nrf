@@ -514,7 +514,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
  *
  * @return 0 if successful, error otherwise.
  */
-int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels);
+int audio_module_number_channels_calculate(uint32_t locations, uint8_t *number_channels);
 
 #ifdef __cplusplus
 }

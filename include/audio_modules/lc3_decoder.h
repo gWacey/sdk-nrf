@@ -62,7 +62,7 @@ struct lc3_decoder_configuration {
  */
 struct lc3_decoder_context {
 	/* Array of decoder channel handles. */
-	struct lc3_decoder_handle *lc3_dec_channel[CONFIG_LC3_DEC_CHANNELS_MAX];
+	struct lc3_decoder_handle *lc3_dec_channel[CONFIG_LC3_DECODER_CHANNELS_MAX];
 
 	/* Number of decoder channel handles. */
 	uint32_t dec_handles_count;

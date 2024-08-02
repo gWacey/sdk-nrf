@@ -11,28 +11,13 @@
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <errno.h>
+#include <contin_array.h>
 #include "audio_defines.h"
 #include "audio_module.h"
 #include "tone.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(audio_module_tone_generator, CONFIG_AUDIO_MODULE_TONE_GENERATOR_LOG_LEVEL);
-
-/**
- * @brief Helper function to validate the modules mix option.
- *
- * @param mix_opt  [in]  The module's mix_opt.
- *
- * @return true if mix_opt is invalid, false otherwise.
- */
-static bool mix_option_invalid(enum tone_gen_mix_option mix_opt)
-{
-	if (mix_opt == TONE_GEN_NO_MIX || mix_opt == TONE_GEN_MIX_ALL) {
-		return false;
-	}
-
-	return true;
-}
 
 static int audio_module_tone_gen_open(struct audio_module_handle_private *handle,
 				      struct audio_module_configuration const *const configuration)
@@ -84,14 +69,24 @@ static int audio_module_tone_gen_configuration_set(
 		return -EINVAL;
 	}
 
-	if (mix_option_invalid(config->mix_opt)) {
-		LOG_WRN("Tone mix option is invalid %d for module %s", 
-		config->mix_opt, hdl->name);
+	if ((double)config->tone_scale > 1.0 || (double)config->tone_scale < 0.0) {
+		LOG_WRN("Tone amplitude out of range %.4lf for module %s", 
+		(double)config->amplitude, hdl->name);
 		return -EINVAL;
-
 	}
 
-	memset(&ctx->meta, 0, sizeof(struct audio_metadata));
+	if ((double)config->input_scale > 1.0 || (double)config->input_scale < 0.0) {
+		LOG_WRN("Tone amplitude out of range %.4lf for module %s", 
+		(double)config->amplitude, hdl->name);
+		return -EINVAL;
+	}
+
+	memset(ctx, 0, sizeof(struct audio_module_tone_gen_context));
+	
+	ctx->tone_audio_data.data = (void *)&ctx->tone_buffer;
+	ctx->tone_int_scale = (uint32_t)(config->tone_scale * (float)UINT32_MAX);
+	ctx->pcm_int_scale = (uint32_t)(config->input_scale * (float)UINT32_MAX);
+
 	memcpy(&ctx->config, config, sizeof(struct audio_module_tone_gen_configuration));
 
 	return 0;
@@ -110,9 +105,9 @@ audio_module_tone_gen_configuration_get(struct audio_module_handle_private const
 	memcpy(config, &ctx->config, sizeof(struct audio_module_tone_gen_configuration));
 
 	LOG_DBG("Get the configuration for %s module: Tone frequency = %d Hz Sample rate = %d Hz  Sample depth = %d bits "
-		"Carrier = %d bits  Amplitude = %.4lf  Mixer option = %d",
-		hdl->name, ctx->config.frequency_hz, ctx->meta.sample_rate_hz, ctx->meta.bits_per_sample,
-		ctx->meta.carried_bits_per_sample, (double)ctx->config.amplitude, ctx->config.mix_opt);
+		"Carrier = %d bits  Amplitude = %.4lf  Mixer locations = 0x%8X",
+		hdl->name, ctx->config.frequency_hz, ctx->tone_audio_data.meta.sample_rate_hz, ctx->tone_audio_data.meta.bits_per_sample,
+		ctx->tone_audio_data.meta.carried_bits_per_sample, (double)ctx->config.amplitude, ctx->config.mix_locations);
 
 	return 0;
 }
@@ -125,85 +120,58 @@ static int audio_module_tone_gen_data_process(struct audio_module_handle_private
 	struct audio_module_handle *hdl = (struct audio_module_handle *)handle;
 	struct audio_module_tone_gen_context *ctx =
 		(struct audio_module_tone_gen_context *)hdl->context;
-	uint8_t *data_out = audio_data_out->data;
-	int step_out = ctx->carried_bytes_per_sample - ctx->bytes_per_sample;
-	size_t full_cycles;
-	size_t bytes_remaining;
-	uint8_t *tone_input = (uint8_t *)ctx->tone_buffer;
-	size_t size;
-	int8_t channels;
-
+	uint8_t channels;
+	 
 	if (audio_data_in->data_size > audio_data_out->data_size ||
 		audio_data_in->meta.data_coding != PCM) {
-		LOG_WRN("Data input missmatch for module %s", hdl->name);
+		LOG_WRN("Data input missmatch for module %s (%d %d %d)", 
+		hdl->name, audio_data_in->data_size, audio_data_out->data_size, audio_data_in->meta.data_coding);
 		return -EINVAL;
 	}
 
 	audio_module_number_channels_calculate(audio_data_in->meta.locations, &channels);
 
 	/* Generate the tone into the tone buffer if the specification has changed. */
-	if (audio_data_in->meta.sample_rate_hz != ctx->meta.sample_rate_hz) {
-		ret = tone_gen(ctx->tone_buffer, &ctx->cycle_bytes_num, ctx->config.frequency_hz,
-			       ctx->meta.sample_rate_hz, ctx->config.amplitude);
+	if (audio_data_in->meta.sample_rate_hz != ctx->tone_audio_data.meta.sample_rate_hz ||
+		audio_data_in->meta.bits_per_sample != ctx->tone_audio_data.meta.bits_per_sample ||
+		audio_data_in->meta.carried_bits_per_sample != ctx->tone_audio_data.meta.carried_bits_per_sample ||
+		ctx->tone_audio_data.meta.locations != ctx->config.mix_locations) {
+		ret = tone_gen_size(ctx->tone_audio_data.data, &ctx->tone_audio_data.data_size, ctx->config.frequency_hz,
+			       audio_data_in->meta.sample_rate_hz, audio_data_in->meta.bits_per_sample, 
+				   audio_data_in->meta.carried_bits_per_sample, ctx->config.amplitude);
 		if (ret) {
 			LOG_WRN("Failed to generate a tone for module %s", hdl->name);
 			return ret;
 		}
 
-		ctx->bytes_per_sample = ctx->meta.bits_per_sample / 8;
-		ctx->carried_bytes_per_sample = ctx->meta.carried_bits_per_sample / 8;
+		ctx->tone_audio_data.meta.sample_rate_hz = audio_data_in->meta.sample_rate_hz;
+		ctx->tone_audio_data.meta.bits_per_sample = audio_data_in->meta.bits_per_sample;
+		ctx->tone_audio_data.meta.carried_bits_per_sample = audio_data_in->meta.carried_bits_per_sample;
+		ctx->tone_audio_data.meta.locations = ctx->config.mix_locations;
 
-		memcpy(&ctx->meta, &audio_data_in->meta, sizeof(struct audio_metadata));
+		ctx->finite_pos = 0;
+
+		LOG_DBG("New tone at %d Hz at a sample rate %d Hz",
+			  ctx->config.frequency_hz, audio_data_in->meta.sample_rate_hz);
 	}
 
-	if (ctx->bytes_per_sample != ctx->carried_bytes_per_sample) {
-		memset(audio_data_out->data, 0, audio_data_out->data_size);
-	}
-
-	if (ctx->byte_remain_index) {
-		for (size_t i = ctx->byte_remain_index; i < ctx->cycle_bytes_num; i += sizeof(int16_t)) {
-			for (size_t k = 0; k < sizeof(int16_t); k++) {
-				*data_out++ = *tone_input++;
-			}
-
-			data_out += step_out;
-		}
-	}
-
-	if (audio_data_in->data_size == 0) {
-		size = audio_data_out->data_size;
-	} else {
-		size = audio_data_in->data_size;
-	}
-
-	full_cycles = (size - ctx->byte_remain_index) / ctx->cycle_bytes_num;
-	bytes_remaining = (size - ctx->byte_remain_index) % ctx->cycle_bytes_num;
-
-	for (size_t i = 0; i < full_cycles; i++) {
-		uint8_t *tone_input = (uint8_t *)ctx->tone_buffer;
-
-		for (size_t j = 0; j < ctx->cycle_bytes_num; j += sizeof(int16_t)) {
-			for (size_t k = 0; k < sizeof(int16_t); k++) {
-				*data_out++ = *tone_input++;
-			}
-
-			data_out += step_out;
-		}
-	}
-
-	if (bytes_remaining) {
-		for (size_t i = 0; i < bytes_remaining; i += sizeof(int16_t)) {
-			for (size_t k = 0; k < sizeof(int16_t); k++) {
-				*data_out++ = *tone_input++;
-			}
-
-			data_out += step_out;
-		}
-	}
-
-	ctx->byte_remain_index = bytes_remaining;
-
+	memset(audio_data_out->data, 0, audio_data_out->data_size);
 	memcpy(&audio_data_out->meta, &audio_data_in->meta, sizeof(struct audio_metadata));
+
+	if (audio_data_in->data_size != 0 || audio_data_in->data_size < audio_data_out->data_size) { 
+		audio_data_out->data_size = audio_data_in->data_size;
+	}
+
+	ret = cont_array_chans_create(audio_data_out, &ctx->tone_audio_data,
+		  channels, ctx->config.interleave_output, &ctx->finite_pos);
+	if (ret){
+		LOG_ERR("Continuose tone array not constructed correctly: ret %d", ret);
+		return ret;
+	}
+
+	if (ctx->config.mix_locations){
+		LOG_DBG("Start mixer %#08X", ctx->config.mix_locations);
+	}
 
 	LOG_DBG("Process the tone into the output audio data item for %s module", hdl->name);
 
@@ -211,26 +179,26 @@ static int audio_module_tone_gen_data_process(struct audio_module_handle_private
 }
 
 /**
- * @brief Table of the dummy module functions.
+ * @brief Table of the  module functions.
  */
 const struct audio_module_functions audio_module_tone_generator_functions = {
 	/**
-	 * @brief  Function to an open the dummy module.
+	 * @brief  Function to an open the module.
 	 */
 	.open = audio_module_tone_gen_open,
 
 	/**
-	 * @brief  Function to close the dummy module.
+	 * @brief  Function to close the module.
 	 */
 	.close = audio_module_tone_gen_close,
 
 	/**
-	 * @brief  Function to set the configuration of the dummy module.
+	 * @brief  Function to set the configuration of the module.
 	 */
 	.configuration_set = audio_module_tone_gen_configuration_set,
 
 	/**
-	 * @brief  Function to get the configuration of the dummy module.
+	 * @brief  Function to get the configuration of the module.
 	 */
 	.configuration_get = audio_module_tone_gen_configuration_get,
 
@@ -245,7 +213,9 @@ const struct audio_module_functions audio_module_tone_generator_functions = {
 	.stop = NULL,
 
 	/**
-	 * @brief The core data processing function in the dummy module.
+	 * @brief The core data processing function in the module.
+	 * 
+	 * @note This only generates/mixes non-interleaved tone buffers.
 	 */
 	.data_process = audio_module_tone_gen_data_process,
 };
@@ -263,3 +233,4 @@ struct audio_module_description audio_module_tone_generator_dept = {
  */
 struct audio_module_description *audio_module_tone_gen_description =
 	&audio_module_tone_generator_dept;
+ 

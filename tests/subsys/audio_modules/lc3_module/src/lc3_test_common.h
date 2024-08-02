@@ -36,4 +36,28 @@
 #define TEST_AUDIO_STEREO_LOCATIONS	   ((1 << AUDIO_CH_L) | (1 << AUDIO_CH_R))
 #define TEST_AUDIO_MULTI_CHANNEL_LOCATIONS ((1 << AUDIO_CH_L) | (1 << AUDIO_CH_R))
 
+enum test_module_id {
+	TEST_MODULE_LC3_DECODER = 0,
+	TEST_MODULE_LC3_ENCODER,
+	TEST_MODULES_NUM
+};
+
+/**
+ * @brief Initialize the LC3 codec.
+ * 
+ * @note This function is called only once and configures both 
+ *       the encoder and decoder.
+ *
+ * @param duration_us  [in]  The duration of a frame of LC3 in micro seconds.
+ */
+void lc3_initialize(int duration_us);
+
+/**
+ * @brief Uninitialize the LC3 codec.
+ * 
+ * @note This function is called only once and unintializes both 
+ *       the encoder and decoder.
+ */
+void lc3_deinitialize(void);
+
 #endif /* _COMMON_H_ */
