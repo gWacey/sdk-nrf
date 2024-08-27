@@ -206,3 +206,10 @@ int data_fifo_init(struct data_fifo *data_fifo)
 
 	return ret;
 }
+
+bool data_fifo_state(struct data_fifo *data_fifo)
+{
+	__ASSERT_NO_MSG(data_fifo != NULL);
+
+	return data_fifo->initialized;
+}

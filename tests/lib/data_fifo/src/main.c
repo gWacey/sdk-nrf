@@ -231,4 +231,28 @@ ZTEST(suite_data_fifo, test_data_fifo_data_put_size_zero)
 	zassert_equal(ret, -EINVAL, "block_lock did not return -EINVAL");
 }
 
+ZTEST(suite_data_fifo, test_data_fifo_state)
+{
+	DATA_FIFO_DEFINE(data_fifo, 10, 128);
+
+	int ret;
+	bool state;
+
+	state = data_fifo_state(&data_fifo);
+	zassert_equal(state, false, "state did not return false");
+
+	ret = data_fifo_init(&data_fifo);
+	zassert_equal(ret, 0, "init did not return 0");
+
+	state = data_fifo_state(&data_fifo);
+	zassert_equal(state, true, "state did not return true");
+
+	ret = data_fifo_uninit(&data_fifo);
+	zassert_equal(ret, 0, "deinit did not return 0");
+	zassert_equal(data_fifo.initialized, false, "deinit did not reset initialize flag");
+
+	state = data_fifo_state(&data_fifo);
+	zassert_equal(state, false, "state did not return false");
+}
+
 ZTEST_SUITE(suite_data_fifo, NULL, NULL, NULL, NULL, NULL);
