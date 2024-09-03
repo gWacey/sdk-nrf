@@ -16,6 +16,7 @@ target_sources(app PRIVATE
 	src/sweep21ms_16b48khz_mono_wav.c
 	src/lc3_test_common.c
 	src/decoder_test.c
+	src/encoder_test.c
 )
 
 zephyr_include_directories(
@@ -27,4 +28,5 @@ zephyr_include_directories(
 target_include_directories(app PRIVATE
 	${ZEPHYR_NRF_MODULE_DIR}/include/audio_module
 	${ZEPHYR_NRF_MODULE_DIR}/subsys/audio_modules/lc3/t2/decoder
+	${ZEPHYR_NRF_MODULE_DIR}/subsys/audio_modules/lc3/t2/encoder
 )
