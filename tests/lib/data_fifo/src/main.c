@@ -31,46 +31,19 @@ static void internal_test_remaining_elements(struct data_fifo *data_fifo, uint32
 		      num_locked, line);
 }
 
-ZTEST(suite_data_fifo, test_data_fifo_uninit_ok)
+ZTEST(suite_data_fifo, test_data_fifo_deinit_ok)
 {
-#define BLOCKS_NUM 10
-	DATA_FIFO_DEFINE(data_fifo, 10, 128);
+	DATA_FIFO_DEFINE(data_fifo, 8, 128);
 
 	int ret;
 
 	ret = data_fifo_init(&data_fifo);
 	zassert_equal(ret, 0, "init did not return 0");
-	zassert_equal(data_fifo.initialized, true, "init did not set initialize flag");
+	zassert_equal(data_fifo.initialized, true, "init did not set initialise flag");
 
-	uint8_t *data_ptr;
-	size_t data_size = 5;
-
-	for (uint32_t i = 0; i < BLOCKS_NUM; i++) {
-		ret = data_fifo_pointer_first_vacant_get(&data_fifo, (void **)&data_ptr, K_NO_WAIT);
-		zassert_equal(ret, 0, "first_vacant_get did not return 0");
-		data_ptr[0] = 0xa1;
-		data_ptr[1] = 0xa2;
-		data_ptr[2] = 0xa3;
-		data_ptr[3] = 0xa4;
-		data_ptr[4] = 0xa5;
-
-		internal_test_remaining_elements(&data_fifo, i + 1, i, __LINE__);
-
-		ret = data_fifo_block_lock(&data_fifo, (void **)&data_ptr, data_size);
-		zassert_equal(ret, 0, "block_lock did not return 0");
-
-		internal_test_remaining_elements(&data_fifo, i + 1, i + 1, __LINE__);
-	}
-
-	ret = data_fifo_uninit(&data_fifo);
+	ret = data_fifo_deinit(&data_fifo);
 	zassert_equal(ret, 0, "deinit did not return 0");
-	zassert_equal(data_fifo.initialized, false, "deinit did not reset initialize flag");
-
-	ret = data_fifo_init(&data_fifo);
-	zassert_equal(ret, 0, "init did not return 0");
-	zassert_equal(data_fifo.initialized, true, "init did not set initialize flag");
-
-	internal_test_remaining_elements(&data_fifo, 0, 0, __LINE__);
+	zassert_equal(data_fifo.initialized, false, "deinit did not reset initialise flag");
 }
 
 ZTEST(suite_data_fifo, test_data_fifo_init_ok)

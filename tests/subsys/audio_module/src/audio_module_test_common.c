@@ -9,7 +9,8 @@
 #include "audio_module/audio_module.h"
 
 #include "audio_module_test_common.h"
-#include "audio_module_test_fakes.h"
+#include "audio_module.h"
+#include "fakes.h"
 
 const char *TEST_INSTANCE_NAME = "Test instance";
 const char *TEST_STRING = "This is a test string";
@@ -20,7 +21,7 @@ void test_context_set(struct mod_context *ctx, struct mod_config const *const co
 	memcpy(&ctx->test_string, TEST_STRING, sizeof(TEST_STRING));
 	ctx->test_uint32 = TEST_UINT32;
 	memcpy(&ctx->config, config, sizeof(struct mod_config));
-	fake_fifo_counter_reset();
+	reset_fake_fifo_counter();
 }
 
 int test_open_function(struct audio_module_handle_private *handle,
@@ -101,12 +102,8 @@ int test_data_process_function(struct audio_module_handle_private *handle,
 
 	if (audio_data_rx->data != NULL && audio_data_tx->data != NULL) {
 		memcpy(audio_data_tx->data, audio_data_rx->data, audio_data_rx->data_size);
-
-		audio_data_tx->data_size = audio_data_rx->data_size;
-	} else {
-		printk("The input and output data pointers are NULL");
-		return -1;
 	}
+	audio_data_tx->data_size = audio_data_rx->data_size;
 
 	return 0;
 }

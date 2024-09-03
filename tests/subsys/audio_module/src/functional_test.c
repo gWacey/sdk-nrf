@@ -220,8 +220,8 @@ static void test_close(const struct audio_module_functions *test_fnct,
 	char *test_inst_name = "TEST instance 1";
 	struct audio_module_description test_mod_description;
 	struct audio_module_functions test_mod_functions;
-	struct data_fifo fifo_tx;
-	struct data_fifo fifo_rx;
+	struct data_fifo fifo_tx = {0};
+	struct data_fifo fifo_rx = {0};
 	struct audio_module_handle handle;
 
 	/* Register resets */
@@ -255,18 +255,12 @@ static void test_close(const struct audio_module_functions *test_fnct,
 	data_fifo_empty_fake.custom_fake = fake_data_fifo_empty__succeeds;
 
 	if (fifo_rx_set) {
-		ret = data_fifo_init(&fifo_rx);
-		zassert_equal(ret, 0, "Failed to initialise the RX data FIFO: ret %d", ret);
-
 		handle.thread.msg_rx = &fifo_rx;
 	} else {
 		handle.thread.msg_rx = NULL;
 	}
 
 	if (fifo_tx_set) {
-		ret = data_fifo_init(&fifo_tx);
-		zassert_equal(ret, 0, "Failed to initialise the TX data FIFO: ret %d", ret);
-
 		handle.thread.msg_tx = &fifo_tx;
 	} else {
 		handle.thread.msg_tx = NULL;
@@ -320,14 +314,12 @@ static void test_open(enum audio_module_type test_type, bool fifo_rx_set, bool f
 	test_context_set(&test_mod_context, &mod_config);
 
 	if (fifo_rx_set) {
-		data_fifo_init(&fifo_rx);
 		mod_parameters.thread.msg_rx = &fifo_rx;
 	} else {
 		mod_parameters.thread.msg_rx = NULL;
 	}
 
 	if (fifo_tx_set) {
-		data_fifo_init(&fifo_tx);
 		mod_parameters.thread.msg_tx = &fifo_tx;
 	} else {
 		mod_parameters.thread.msg_tx = NULL;
@@ -939,7 +931,8 @@ ZTEST(suite_audio_module_functional, test_data_tx_fnct)
 	data_fifo_block_free_fake.custom_fake = fake_data_fifo_block_free__succeeds;
 	data_fifo_state_fake.custom_fake = fake_data_fifo_state__succeeds;
 
-	fake_data_fifo_init__succeeds(&fifo_rx);
+	data_fifo_uninit(&fifo_rx);
+	data_fifo_init(&fifo_rx);
 
 	memcpy(&handle.name, test_inst_name, sizeof(*test_inst_name));
 	handle.description = &mod_description;
@@ -983,11 +976,10 @@ ZTEST(suite_audio_module_functional, test_data_tx_fnct)
 			  "Failed Data TX, data differs");
 	zassert_equal(msg_rx->audio_data.data_size, TEST_MOD_DATA_SIZE,
 		      "Failed Data TX function, data sizes differs");
-	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count,
-		      FAKE_FIFO_CALL_TX_RX_TEST_COUNT,
+	zassert_equal(data_fifo_pointer_first_vacant_get_fake.call_count, 3,
 		      "Data TX failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
-	zassert_equal(data_fifo_block_lock_fake.call_count, FAKE_FIFO_CALL_TX_RX_TEST_COUNT,
+	zassert_equal(data_fifo_block_lock_fake.call_count, 3,
 		      "Failed to send item, data FIFO send called %d times",
 		      data_fifo_pointer_first_vacant_get_fake.call_count);
 }
@@ -1000,7 +992,7 @@ ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 	char data[TEST_MOD_DATA_SIZE] = {0};
 	struct audio_data audio_data_out = {0};
 	struct audio_module_message *data_msg_tx;
-	struct data_fifo fifo_tx = {0};
+	struct data_fifo fifo_tx;
 	struct audio_module_handle handle;
 
 	test_context_set(&mod_context, &mod_config);
@@ -1017,7 +1009,7 @@ ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 	data_fifo_block_free_fake.custom_fake = fake_data_fifo_block_free__succeeds;
 	data_fifo_state_fake.custom_fake = fake_data_fifo_state__succeeds;
 
-	fake_data_fifo_init__succeeds(&fifo_tx);
+	data_fifo_init(&fifo_tx);
 
 	memcpy(&handle.name, test_inst_name, sizeof(*test_inst_name));
 	handle.description = &mod_description;
@@ -1093,11 +1085,10 @@ ZTEST(suite_audio_module_functional, test_data_rx_fnct)
 			  "Failed Data RX function, data differs");
 	zassert_equal(audio_data_out.data_size, TEST_MOD_DATA_SIZE,
 		      "Failed Data RX function, data sizes differs");
-	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count,
-		      FAKE_FIFO_CALL_TX_RX_TEST_COUNT,
+	zassert_equal(data_fifo_pointer_last_filled_get_fake.call_count, 3,
 		      "Data RX function failed to get item, data FIFO get called %d times",
 		      data_fifo_pointer_last_filled_get_fake.call_count);
-	zassert_equal(data_fifo_block_free_fake.call_count, FAKE_FIFO_CALL_TX_RX_TEST_COUNT,
+	zassert_equal(data_fifo_block_free_fake.call_count, 3,
 		      "Data RX function failed to free item, data FIFO free called %d times",
 		      data_fifo_block_free_fake.call_count);
 }

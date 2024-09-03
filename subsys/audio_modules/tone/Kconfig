@@ -1,0 +1,61 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Audio Modules"
+
+config AUDIO_MODULE_TONE_GENERATOR
+	bool "Enable the tone generator"
+	default y
+	help
+	  Enable the tone generator audio module.
+
+config AUDIO_MODULE_TONE_GENERATOR_TEST
+	bool "Enable the tone generator for testing"
+	default n
+	help
+	  Enable the tone generator audio module in test mode.
+
+config TONE_GENERATION_SAMPLE_RATE_HZ_MAX
+	int "Maxiumun sampling frequency"
+	default 48000
+	help
+	  The maximum sampling frequency.
+
+config TONE_GENERATION_FREQUENCY_HZ_MAX
+	int "Maxiumun tone frequency"
+	default 10000
+	help
+	  The maximum tone frequency that can be generated.
+
+config TONE_GENERATION_FREQUENCY_HZ_MIN
+	int "Minimum tone frequency"
+	default 100
+	help
+	  The minimum tone frequency that can be generated.
+
+config TONE_GENERATOR_THREAD_PRIO
+	int "Priority for the tone generator thread"
+	default 3
+	help
+	  This is a preemptible thread.
+
+config TONE_GENERATOR_STACK_SIZE
+	int "Stack size for the tone generator thread"
+	default 11000
+	help
+	  The modules thread stack size.
+
+osource "./tone/Kconfig"
+
+#----------------------------------------------------------------------------#
+menu "Log levels"
+
+module = AUDIO_MODULE_TONE_GENERATOR
+module-str = audio_module_tone_generator
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Log levels
+endmenu # Audio Modules

@@ -7,7 +7,7 @@
 #include <zephyr/fff.h>
 #include <zephyr/ztest.h>
 #include <errno.h>
-#include "audio_module_test_fakes.h"
+#include "fakes.h"
 
 /* This function runs before each test */
 static void run_before(void *fixture)
