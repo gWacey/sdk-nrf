@@ -40,7 +40,7 @@ DECLARE_FAKE_VALUE_FUNC(bool, data_fifo_state, struct data_fifo *);
 		FUNC(data_fifo_state)                                                              \
 	} while (0)
 
-void fake_fifo_counter_reset(void);
+void reset_fake_fifo_counter(void);
 
 int fake_data_fifo_pointer_first_vacant_get__succeeds(struct data_fifo *data_fifo, void **data,
 						      k_timeout_t timeout);

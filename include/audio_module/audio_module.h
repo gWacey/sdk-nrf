@@ -26,14 +26,14 @@ extern "C" {
 /**
  * @brief Helper macro to configure the modules parameters.
  */
-#define AUDIO_MODULE_PARAMETERS(p, dest, stk, stk_size, pri, fifo_rx, fifo_tx, slab, slab_size)    \
+#define AUDIO_MODULE_PARAMETERS(p, dest, sck, sck_size, pri, fifo_rx, fifo_tx, slab, slab_size)    \
 	(p).description = (dest);                                                                  \
-	(p).thread.stack = (stk);                                                                  \
-	(p).thread.stack_size = (stk_size);                                                        \
+	(p).thread.stack = (sck);                                                                  \
+	(p).thread.stack_size = (sck_size);                                                        \
 	(p).thread.priority = (pri);                                                               \
-	(p).thread.msg_rx = (fifo_rx);                                                             \
-	(p).thread.msg_tx = (fifo_tx);                                                             \
-	(p).thread.data_slab = (slab);                                                             \
+	(p).thread.msg_rx = (fifo_rx);                                                            \
+	(p).thread.msg_tx = (fifo_tx);                                                            \
+	(p).thread.data_slab = (slab);                                                            \
 	(p).thread.data_size = (slab_size);
 
 /**
@@ -514,7 +514,7 @@ int audio_module_state_get(struct audio_module_handle const *const handle,
  *
  * @return 0 if successful, error otherwise.
  */
-int audio_module_number_channels_calculate(uint32_t locations, int8_t *number_channels);
+int audio_module_number_channels_calculate(uint32_t locations, uint8_t *number_channels);
 
 #ifdef __cplusplus
 }
