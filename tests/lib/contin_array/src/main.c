@@ -50,11 +50,10 @@ ZTEST(suite_contin_array, test_simp_arr_loop)
 
 		if (i == 0) { /* First run */
 			zassert_equal(contin_arr[0], test_arr[0], "First value is not identical");
-			zassert_equal(contin_arr[CONTIN_LAST_VAL_IDX],
-				      test_arr[CONTIN_LAST_VAL_IDX],
-				      "Last value is not identical 0x%x 0x%x",
-				      contin_arr[CONTIN_LAST_VAL_IDX],
-				      test_arr[CONTIN_LAST_VAL_IDX]);
+			zassert_equal(
+				contin_arr[CONTIN_LAST_VAL_IDX], test_arr[CONTIN_LAST_VAL_IDX],
+				"Last value is not identical 0x%x 0x%x",
+				contin_arr[CONTIN_LAST_VAL_IDX], test_arr[CONTIN_LAST_VAL_IDX]);
 		} else {
 			/* The last val is the last element of the test_arr */
 			if (contin_last_val == test_arr[const_arr_size - 1]) {
@@ -63,7 +62,8 @@ ZTEST(suite_contin_array, test_simp_arr_loop)
 			} else {
 				zassert_equal(
 					contin_arr[0], contin_last_val + 1,
-					"First value is not identical to last val + 1. contin_arr[0]: 0x%04x, contin_last_val - 1: 0x%04x\n",
+					"First value is not identical to last val + 1. "
+					"contin_arr[0]: 0x%04x, contin_last_val - 1: 0x%04x\n",
 					contin_arr[0], contin_last_val + 1);
 			}
 		}
@@ -103,10 +103,10 @@ ZTEST(suite_contin_array, test_simp_arr_loop_short)
 				zassert_equal(contin_arr[0], test_arr[0],
 					      "First value is not identical after wrap");
 			} else {
-				zassert_equal(
-					contin_arr[0], contin_last_val + 1,
-					"Last value is not identical. contin_arr[0]: 0x%04x, contin_last_val - 1: 0x%04x\n",
-					contin_arr[0], contin_last_val + 1);
+				zassert_equal(contin_arr[0], contin_last_val + 1,
+					      "Last value is not identical. contin_arr[0]: 0x%04x, "
+					      "contin_last_val - 1: 0x%04x\n",
+					      contin_arr[0], contin_last_val + 1);
 			}
 		}
 
@@ -115,4 +115,157 @@ ZTEST(suite_contin_array, test_simp_arr_loop_short)
 	}
 }
 
+#define CONTIN_TEST_DATA_SIZE (3)
+
+#define TEST_CONTIN_AUDIO_DATA(ad1, ad2, d1, d2, ds1, ds2)                                         \
+	(ad1).data = (d1);                                                                         \
+	(ad2).data = (d2);                                                                         \
+	(ad1).data_size = (ds1);                                                                   \
+	(ad2).data_size = (ds2);
+
+struct audio_metadata test_meta = {.data_coding = PCM,
+				   .data_len_us = 10000,
+				   .sample_rate_hz = 48000,
+				   .bits_per_sample = 16,
+				   .carried_bits_pr_sample = 16,
+				   .locations = 0x00000001,
+				   .reference_ts_us = 0,
+				   .data_rx_ts_us = 0,
+				   .bad_data = false};
+
+/* Test parameter validation */
+ZTEST(suite_contin_array, test_contin_array_bad_param)
+{
+	int ret;
+	struct audio_data pcm_cont;
+	struct audio_data pcm_finite;
+	uint8_t data[CONTIN_TEST_DATA_SIZE];
+	uint16_t data_size = sizeof(data);
+	uint8_t channels = CONTIN_TEST_DATA_SIZE;
+	bool interleaved = false;
+	uint32_t finite_pos;
+
+	/* Test for pcm_cont pointer NULL */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(NULL, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -ENXIO, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test for pcm_finite pointer NULL */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, NULL, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -ENXIO, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test for pcm_cont.data pointer NULL */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, NULL, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -ENXIO, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test for pcm_finite.data pointer NULL */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, NULL, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -ENXIO, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test pcm_cont.bits_per_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_cont.meta.bits_per_sample = 8;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test pcm_cont.meta.bits_per_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_cont.meta.bits_per_sample = 32;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to recognise NULL pointer: %d", ret);
+
+	/* Test pcm_finite.bits_per_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_finite.meta.bits_per_sample = 8;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to detect bits per sample difference: %d", ret);
+
+	/* Test pcm_finite.meta.bits_per_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_finite.meta.bits_per_sample = 32;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to detect bits per sample difference: %d", ret);
+
+	/* Test pcm_finite.carried_bits_pr_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_cont.meta.carried_bits_pr_sample = 8;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to detect bits per sample difference: %d", ret);
+
+	/* Test pcm_finite.meta.carried_bits_pr_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_cont.meta.carried_bits_pr_sample = 32;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to detect bits per sample difference: %d", ret);
+
+	/* Test pcm_finite.carried_bits_pr_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_finite.meta.carried_bits_pr_sample = 8;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to data size of 0: %d", ret);
+
+	/* Test pcm_finite.meta.carried_bits_pr_sample */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	pcm_finite.meta.carried_bits_pr_sample = 32;
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to data size of 0: %d", ret);
+
+	/* Test for pcm_cont.data_size 0 */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, 0, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to data size of 0: %d", ret);
+
+	/* Test for pcm_finite.data_size 0 */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, 0);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, channels, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to data size of 0: %d", ret);
+
+	/* Test for 0 output location */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, 0, interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to there are 0 output locations: %d", ret);
+
+	/* Test for too many output location */
+	TEST_CONTIN_AUDIO_DATA(pcm_cont, pcm_finite, data, data, data_size, data_size);
+	memcpy(&pcm_cont.meta, &test_meta, sizeof(struct audio_metadata));
+	memcpy(&pcm_finite.meta, &test_meta, sizeof(struct audio_metadata));
+	ret = contin_array_chans_create(&pcm_cont, &pcm_finite, CONTIN_TEST_DATA_SIZE + 1,
+					interleaved, &finite_pos);
+	zassert_equal(ret, -EINVAL, "Failed to detect too many output locations: %d", ret);
+}
+
 ZTEST_SUITE(suite_contin_array, NULL, NULL, NULL, NULL, NULL);
+ZTEST_SUITE(suite_contin_chan_array, NULL, NULL, NULL, NULL, NULL);

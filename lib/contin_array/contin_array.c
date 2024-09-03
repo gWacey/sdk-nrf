@@ -8,6 +8,7 @@
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <string.h>
+#include "audio_defines.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(contin_array, CONFIG_CONTIN_ARRAY_LOG_LEVEL);
@@ -33,6 +34,81 @@ int contin_array_create(void *const pcm_cont, uint32_t pcm_cont_size, void const
 		((char *)pcm_cont)[i] = ((char *)pcm_finite)[*finite_pos];
 		(*finite_pos)++;
 	}
+
+	return 0;
+}
+
+int contin_array_chans_create(struct audio_data *pcm_cont, struct audio_data *pcm_finite,
+			      uint8_t channels, bool interleaved, uint32_t *const finite_pos)
+{
+	uint32_t step;
+	uint8_t *output;
+	uint8_t carrier_bytes;
+	uint32_t tone_pos = *finite_pos;
+	uint32_t frame_step;
+	uint32_t bytes_per_channel;
+	uint8_t chan;
+
+	if (pcm_cont == NULL || pcm_finite == NULL) {
+		LOG_ERR("audio data pointers can not be NULL");
+		return -ENXIO;
+	}
+
+	if (pcm_cont->data == NULL || pcm_finite->data == NULL) {
+		LOG_ERR("data pointers can not be NULL");
+		return -ENXIO;
+	}
+
+	if (pcm_cont->meta.bits_per_sample != pcm_finite->meta.bits_per_sample ||
+	    pcm_cont->meta.carried_bits_pr_sample != pcm_finite->meta.carried_bits_pr_sample) {
+		LOG_ERR("sample/carrier size miss match");
+		return -EINVAL;
+	}
+
+	if (channels == 0) {
+		LOG_ERR("number of channels cannot be zero");
+		return -EINVAL;
+	}
+
+	carrier_bytes = pcm_cont->meta.carried_bits_pr_sample / 8;
+
+	if (!pcm_cont->data_size || !pcm_finite->data_size ||
+	    pcm_cont->data_size < (carrier_bytes * channels)) {
+		LOG_ERR("size cannot be zero or output buffer insufficient");
+		return -EINVAL;
+	}
+
+	bytes_per_channel = pcm_cont->data_size / channels;
+
+	if (interleaved) {
+		step = carrier_bytes * (channels - 1);
+		frame_step = step;
+	} else {
+		step = 0;
+		frame_step = bytes_per_channel * (channels - 1);
+	}
+
+	chan = 0;
+
+	for (uint8_t chan = 0; chan < channels; chan++) {
+		output = &((uint8_t *)pcm_cont->data)[frame_step * chan];
+		tone_pos = *finite_pos;
+
+		for (uint32_t i = 0; i < bytes_per_channel; i += carrier_bytes) {
+			for (uint32_t j = 0; j < carrier_bytes; j++) {
+				if (tone_pos > (pcm_finite->data_size - 1)) {
+					tone_pos = 0;
+				}
+
+				*output++ = ((uint8_t *)pcm_finite->data)[tone_pos];
+				tone_pos++;
+			}
+
+			output += step;
+		}
+	}
+
+	*finite_pos = tone_pos;
 
 	return 0;
 }
