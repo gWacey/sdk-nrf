@@ -44,7 +44,7 @@ int contin_array_chans_create(struct audio_data *pcm_cont, struct audio_data *pc
 	uint32_t step;
 	uint8_t *output;
 	uint8_t carrier_bytes;
-	uint32_t tone_pos = *finite_pos;
+	uint32_t in_pos = *finite_pos;
 	uint32_t frame_step;
 	uint32_t bytes_per_channel;
 	uint8_t chan;
@@ -60,7 +60,7 @@ int contin_array_chans_create(struct audio_data *pcm_cont, struct audio_data *pc
 	}
 
 	if (pcm_cont->meta.bits_per_sample != pcm_finite->meta.bits_per_sample ||
-	    pcm_cont->meta.carried_bits_pr_sample != pcm_finite->meta.carried_bits_pr_sample) {
+	    pcm_cont->meta.carried_bits_per_sample != pcm_finite->meta.carried_bits_per_sample) {
 		LOG_ERR("sample/carrier size miss match");
 		return -EINVAL;
 	}
@@ -70,7 +70,7 @@ int contin_array_chans_create(struct audio_data *pcm_cont, struct audio_data *pc
 		return -EINVAL;
 	}
 
-	carrier_bytes = pcm_cont->meta.carried_bits_pr_sample / 8;
+	carrier_bytes = pcm_cont->meta.carried_bits_per_sample / 8;
 
 	if (!pcm_cont->data_size || !pcm_finite->data_size ||
 	    pcm_cont->data_size < (carrier_bytes * channels)) {
@@ -92,23 +92,23 @@ int contin_array_chans_create(struct audio_data *pcm_cont, struct audio_data *pc
 
 	for (uint8_t chan = 0; chan < channels; chan++) {
 		output = &((uint8_t *)pcm_cont->data)[frame_step * chan];
-		tone_pos = *finite_pos;
+		in_pos = *finite_pos;
 
 		for (uint32_t i = 0; i < bytes_per_channel; i += carrier_bytes) {
 			for (uint32_t j = 0; j < carrier_bytes; j++) {
-				if (tone_pos > (pcm_finite->data_size - 1)) {
-					tone_pos = 0;
+				if (in_pos > (pcm_finite->data_size - 1)) {
+					in_pos = 0;
 				}
 
-				*output++ = ((uint8_t *)pcm_finite->data)[tone_pos];
-				tone_pos++;
+				*output++ = ((uint8_t *)pcm_finite->data)[in_pos];
+				in_pos++;
 			}
 
 			output += step;
 		}
 	}
 
-	*finite_pos = tone_pos;
+	*finite_pos = in_pos;
 
 	return 0;
 }
