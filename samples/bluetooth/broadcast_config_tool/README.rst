@@ -36,6 +36,9 @@ The sample supports only and exclusively the following development kits:
 
 .. _broadcast_configuration_tool_ui:
 
+The sample only supports pre-encoded LC3 data stored as <filename>.lc3 files on
+an SD-card. The SD-card shall be formatted with either FAT or Ext2 file system.
+
 Shell commands list
 *******************
 
@@ -782,6 +785,7 @@ In this testing procedure, the development kit is programmed with the Broadcast 
 
 To test the Broadcast Configuration Tool sample, complete the following steps:
 
+#. Insert the SD card loaded with the pre-encoded LC3 data.
 #. Turn on the development kit.
 #. Set up the serial connection with the development kit.
 #. Configure a BIG using use case 1:
