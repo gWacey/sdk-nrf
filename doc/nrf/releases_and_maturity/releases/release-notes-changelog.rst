@@ -197,7 +197,21 @@ Matter Bridge
 nRF5340 Audio
 -------------
 
-|no_changes_yet_note|
+* Added:
+
+  * The functions :c:func:`bt_hci_err_to_str` and :c:func:`bt_security_err_to_str` that are used to allow printing error codes as strings.
+    Each function returns string representations of the error codes when the corresponding Kconfig option, :kconfig:option:`CONFIG_BT_HCI_ERR_TO_STR` or :kconfig:option:`CONFIG_BT_SECURITY_ERR_TO_STR`, is enabled.
+  * CSIS to the BIS sink if the scan delegator feature if, :kconfig:option:`CONFIG_BT_AUDIO_SCAN_DELEGATOR`, is enabled. Once a phone is connected to a BIS sink, the phone will find and connect to the second headset.
+    Also the phone can control the BIS headset in a group and deliver the PAST to both headsets at the same time.
+  * Create CIG after reading the PACS from the first connected unicast server.
+  * A minimal scan delegator to the unicast server if the feature, :kconfig:option:`CONFIG_BT_AUDIO_SCAN_DELEGATOR`, is enabled.
+  * Add available/support context type to PACS in broadcast sink and unicast client if the feature, :kconfig:option:`CONFIG_BT_PAC_SRC_NOTIFIABLE` is enabled.
+  * Added the nRF Auraconfig tool :ref:`nrf_auraconfig` documentation.
+
+* Updated:
+
+  * The :ref:`nrf53_audio_app_overview` documentation page with the :ref:`nrf53_audio_app_overview_files` section.
+  * Removed EXPERIMENTAL flag from the sample rate converter.
 
 nRF Desktop
 -----------
@@ -232,7 +246,54 @@ Amazon Sidewalk samples
 Bluetooth samples
 -----------------
 
-|no_changes_yet_note|
+* Added:
+
+  * The :ref:`ble_radio_notification_conn_cb` sample demonstrating how to use the :ref:`ug_radio_notification_conn_cb` feature.
+  * The :ref:`bluetooth_conn_time_synchronization` sample demonstrating microsecond-accurate synchronization of connections that are happening over Bluetooth® Low Energy Asynchronous Connection-oriented Logical transport (ACL).
+  * The :ref:`ble_subrating` sample that showcases the effect of the LE Connection Subrating feature on the duty cycle of a connection.
+  * The :ref:`nrf_auraconfig` sample that implements the :ref:`BIS gateway mode <nrf53_audio_app_overview>` and may act as an `Auracast™`_ broadcaster if you are using a preset compatible with Auracast.
+  * Support for the :ref:`zephyr:nrf54l15dk_nrf54l15` board in the following samples:
+
+    * :ref:`central_bas`
+    * :ref:`bluetooth_central_hr_coded`
+    * :ref:`multiple_adv_sets`
+    * :ref:`peripheral_bms`
+    * :ref:`peripheral_cgms`
+    * :ref:`peripheral_cts_client`
+    * :ref:`peripheral_gatt_dm`
+    * :ref:`peripheral_hr_coded`
+    * :ref:`peripheral_mds`
+    * :ref:`peripheral_nfc_pairing`
+    * :ref:`power_profiling`
+    * :ref:`peripheral_rscs`
+    * :ref:`shell_bt_nus`
+    * :ref:`ble_throughput`
+
+* :ref:`bluetooth_isochronous_time_synchronization`:
+
+  * Fixed **LED** toggling issues on nRF52 and nRF53 Series devices that would occur after RTC wraps that occur every ~8.5 minutes.
+    The **LED** previously toggled unintentionally, at the wrong point in time, or not at all.
+
+* :ref:`ble_event_trigger` sample:
+
+  * Moved to the :file:`samples/bluetooth/event_trigger` folder.
+
+* :ref:`peripheral_hr_coded` sample:
+
+  * Fixed an issue where the HCI LE Set Extended Advertising Enable command was called with a NULL pointer.
+
+* :ref:`peripheral_mds` sample:
+
+  * Fixed an issue where device ID was incorrectly set during system initialization because MAC address was not available at that time.
+    The device ID is now set to ``ncs-ble-testdevice`` by default using the :kconfig:option:`CONFIG_MEMFAULT_NCS_DEVICE_ID` Kconfig option.
+
+* :ref:`ble_llpm` sample:
+
+  * Added support for the :ref:`zephyr:nrf54h20dk_nrf54h20` board.
+
+* :ref:`bluetooth_radio_coex_1wire_sample` sample:
+
+  * Added support for the ``nrf54h20dk/nrf54h20/cpurad`` and ``nrf54l15dk/nrf54l15/cpuapp`` build targets.
 
 Bluetooth Fast Pair samples
 ---------------------------
