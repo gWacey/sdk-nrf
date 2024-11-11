@@ -13,6 +13,9 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/shell/shell.h>
 #include <nrfx_clock.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led.h>
 
 #include "nrf_auraconfig.h"
 #include "broadcast_source.h"
@@ -21,7 +24,7 @@
 #include "bt_mgmt.h"
 #include "sd_card.h"
 #include "lc3_streamer.h"
-#include "led.h"
+#include "led_nrf5340.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
@@ -665,7 +668,7 @@ int main(void)
 	ret = led_init();
 	ERR_CHK_MSG(ret, "Failed to initialize LED module");
 
-	ret = led_on(LED_APP_RGB, LED_COLOR_GREEN);
+	ret = led_set_color(led_app_dev, LED_APP_RGB, COLORS_RGB_NUM, LED_COLOR_GREEN);
 	ERR_CHK(ret);
 
 	ret = bt_mgmt_init();
@@ -1091,7 +1094,7 @@ static int cmd_start(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-	led_blink(LED_APP_RGB, LED_COLOR_GREEN);
+	led_blink(led_app_dev, LED_APP_RGB, LED_COLOR_GREEN, 0, 0);
 
 	return 0;
 }
@@ -1171,7 +1174,7 @@ static int cmd_stop(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-	led_on(LED_APP_RGB, LED_COLOR_GREEN);
+	led_set_color(led_app_dev, LED_APP_RGB, LED_COLOR_GREEN);
 
 	return 0;
 }
