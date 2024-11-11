@@ -5,8 +5,11 @@
  */
 
 #include <nrfx_clock.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led.h>
 
-#include "led.h"
+#include "led_nrf5340.h"
 #include "button_handler.h"
 #include "button_assignments.h"
 #include "sd_card.h"
@@ -25,7 +28,7 @@ static int leds_set(void)
 	int ret;
 
 	/* Blink LED 3 to indicate that APP core is running */
-	ret = led_blink(LED_APP_3_GREEN);
+	ret = led_blink(led_app_dev, LED_AUDIO_STATUS, 0, 0);
 	if (ret) {
 		return ret;
 	}
@@ -36,12 +39,12 @@ static int leds_set(void)
 	channel_assignment_get(&channel);
 
 	if (channel == AUDIO_CH_L) {
-		ret = led_on(LED_APP_RGB, LED_COLOR_BLUE);
+		ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_BLUE);
 	} else {
-		ret = led_on(LED_APP_RGB, LED_COLOR_MAGENTA);
+		ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_GREEN);
 	}
 #elif (CONFIG_AUDIO_DEV == GATEWAY)
-	ret = led_on(LED_APP_RGB, LED_COLOR_GREEN);
+	ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_GREEN);
 #endif /* (CONFIG_AUDIO_DEV == HEADSET) */
 
 	if (ret) {

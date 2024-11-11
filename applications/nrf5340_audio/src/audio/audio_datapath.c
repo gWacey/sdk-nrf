@@ -16,10 +16,13 @@
 #include <contin_array.h>
 #include <tone.h>
 #include <pcm_mix.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led.h>
 
 #include "zbus_common.h"
 #include "macros_common.h"
-#include "led.h"
+#include "led_nrf5340.h"
 #include "audio_i2s.h"
 #include "sw_codec_select.h"
 #include "audio_system.h"
@@ -354,9 +357,9 @@ static void pres_comp_state_set(enum pres_comp_state new_state)
 	/* NOTE: The string below is used by the Nordic CI system */
 	LOG_INF("Pres comp state: %s", pres_comp_state_names[new_state]);
 	if (new_state == PRES_STATE_LOCKED) {
-		ret = led_on(LED_APP_2_GREEN);
+		ret = led_on(led_app_dev, LED_CORE_STATUS);
 	} else {
-		ret = led_off(LED_APP_2_GREEN);
+		ret = led_off(led_app_dev, LED_CORE_STATUS);
 	}
 	ERR_CHK(ret);
 }

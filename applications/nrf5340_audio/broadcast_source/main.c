@@ -10,11 +10,14 @@
 #include <zephyr/kernel.h>
 #include <zephyr/zbus/zbus.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led.h>
 
 #include "broadcast_source.h"
 #include "zbus_common.h"
 #include "nrf5340_audio_dk.h"
-#include "led.h"
+#include "led_nrf5340.h"
 #include "button_assignments.h"
 #include "macros_common.h"
 #include "audio_system.h"
@@ -206,7 +209,7 @@ static void le_audio_msg_sub_thread(void)
 
 			audio_system_start();
 			stream_state_set(STATE_STREAMING);
-			ret = led_blink(LED_APP_1_BLUE);
+			ret = led_blink(led_app_dev, LED_CONNECTION_STATUS, 0, 0);
 			ERR_CHK(ret);
 
 			break;
@@ -223,7 +226,7 @@ static void le_audio_msg_sub_thread(void)
 
 			stream_state_set(STATE_PAUSED);
 			audio_system_stop();
-			ret = led_on(LED_APP_1_BLUE);
+			ret = led_on(led_app_dev, LED_CONNECTION_STATUS);
 			ERR_CHK(ret);
 
 			break;

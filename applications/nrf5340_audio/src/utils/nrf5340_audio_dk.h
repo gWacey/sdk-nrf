@@ -7,8 +7,6 @@
 #ifndef _NRF5340_AUDIO_DK_H_
 #define _NRF5340_AUDIO_DK_H_
 
-#include "led.h"
-
 /**
  * @brief	Initialize the hardware related modules on the nRF5340 Audio DK/PCA10121.
  *
