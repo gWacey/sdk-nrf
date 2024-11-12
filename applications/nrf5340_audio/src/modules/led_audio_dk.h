@@ -7,6 +7,8 @@
 #ifndef _LED_AUDIO_DK_H_
 #define _LED_AUDIO_DK_H_
 
+#include <zephyr/kernel.h>
+
 /**
  * @brief DK LED unit indexes.
  */
@@ -36,7 +38,7 @@
 /**
  * @brief Color sizes.
  */
-#define COLORS_MONO_NUM 1
+#define COLORS_MONO_NUM 2
 #define COLORS_RGB_NUM	3
 #define COLORS_MAX_NUM	3
 
@@ -50,7 +52,7 @@
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_0_blink_hdl(struct k_work *work)
+static void led_unit_0_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_RGB);
 }
@@ -60,7 +62,7 @@ static inline void led_unit_0_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_1_blink_hdl(struct k_work *work)
+static void led_unit_1_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_NET_RGB);
 }
@@ -70,7 +72,7 @@ static inline void led_unit_1_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_2_blink_hdl(struct k_work *work)
+static void led_unit_2_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_1_BLUE);
 }
@@ -80,20 +82,16 @@ static inline void led_unit_2_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_3_blink_hdl(struct k_work *work)
+static void led_unit_3_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_2_GREEN);
 }
 
 /**
- * @brief Periodically invoked by the timer to blink LED unit led4.
- *
- * @param work		Pointer to the work item.
+ * @brief Table of LED unit blink work functions.
  */
-static inline void led_unit_4_blink_hdl(struct k_work *work)
-{
-	led_unit_blink(LED_APP_3_GREEN);
-}
+k_work_handler_t led_unit_blink_work_handler[] = {&led_unit_0_blink_hdl, &led_unit_1_blink_hdl,
+						  &led_unit_2_blink_hdl, &led_unit_3_blink_hdl};
 
 /**
  * @brief LED unit labels.

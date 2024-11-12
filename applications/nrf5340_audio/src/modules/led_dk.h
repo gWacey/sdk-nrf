@@ -28,7 +28,7 @@
 /**
  * @brief Color indexes.
  */
-#define COLORS_MONO_NUM 1
+#define COLORS_MONO_NUM 4
 
 /**
  * @brief Color sizes.
@@ -45,7 +45,7 @@
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_0_blink_hdl(struct k_work *work)
+void led_unit_0_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_1_GREEN);
 }
@@ -55,7 +55,7 @@ static inline void led_unit_0_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_1_blink_hdl(struct k_work *work)
+void led_unit_1_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_2_GREEN);
 }
@@ -65,7 +65,7 @@ static inline void led_unit_1_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_2_blink_hdl(struct k_work *work)
+void led_unit_2_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_3_GREEN);
 }
@@ -75,7 +75,7 @@ static inline void led_unit_2_blink_hdl(struct k_work *work)
  *
  * @param work		Pointer to the work item.
  */
-static inline void led_unit_3_blink_hdl(struct k_work *work)
+void led_unit_3_blink_hdl(struct k_work *work)
 {
 	led_unit_blink(LED_APP_4_GREEN);
 }
@@ -83,10 +83,8 @@ static inline void led_unit_3_blink_hdl(struct k_work *work)
 /**
  * @brief Table of LED unit blink work functions.
  */
-struct led_unit_blink_work_handler led_blink_handler_tab[] = {{.blink_work = led_unit_0_blink_hdl},
-							      {.blink_work = led_unit_1_blink_hdl},
-							      {.blink_work = led_unit_2_blink_hdl},
-							      {.blink_work = led_unit_3_blink_hdl}};
+k_work_handler_t led_unit_blink_work_handler[] = {&led_unit_0_blink_hdl, &led_unit_1_blink_hdl,
+						  &led_unit_2_blink_hdl, &led_unit_3_blink_hdl};
 
 /**
  * @brief LED labels.
