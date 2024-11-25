@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+/ {
+	aliases {
+		connection-status = &led1;
+		core-status = &led3;
+		device-type = &led0;
+		audio-status = &led2;
+	};
+};
+
 &usbd {
 	hs_0: hs_0 {
 		compatible = "usb-audio-hs";

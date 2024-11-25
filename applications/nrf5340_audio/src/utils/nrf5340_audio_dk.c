@@ -6,12 +6,11 @@
 
 #include <nrfx_clock.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/led.h>
+#include <led_ctrl.h>
 
-#include "led_nrf5340.h"
 #include "button_handler.h"
 #include "button_assignments.h"
+#include "led_assignments.h"
 #include "sd_card.h"
 #include "board_version.h"
 #include "channel_assignment.h"
@@ -23,12 +22,12 @@ LOG_MODULE_REGISTER(nrf5340_audio_dk, CONFIG_MODULE_NRF5340_AUDIO_DK_LOG_LEVEL);
 
 static struct board_version board_rev;
 
-static int leds_set(void)
+static int leds_initial_setting(void)
 {
 	int ret;
 
 	/* Blink LED 3 to indicate that APP core is running */
-	ret = led_blink(led_app_dev, LED_AUDIO_STATUS, 0, 0);
+	ret = led_ctrl_blink(LED_AUDIO_STATUS, LED_BLINK_MS_ON, LED_BLINK_MS_OFF);
 	if (ret) {
 		return ret;
 	}
@@ -39,12 +38,12 @@ static int leds_set(void)
 	channel_assignment_get(&channel);
 
 	if (channel == AUDIO_CH_L) {
-		ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_BLUE);
+		ret = led_ctrl_set_color(LED_DEVICE_TYPE, LED_COLOR_BLUE);
 	} else {
-		ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_GREEN);
+		ret = led_ctrl_set_color(LED_DEVICE_TYPE, LED_COLOR_MAGENTA);
 	}
 #elif (CONFIG_AUDIO_DEV == GATEWAY)
-	ret = led_set_color(led_app_dev, LED_DEVICE_TYPE, LED_COLOR_GREEN);
+	ret = led_ctrl_set_color(LED_DEVICE_TYPE, LED_COLOR_GREEN);
 #endif /* (CONFIG_AUDIO_DEV == HEADSET) */
 
 	if (ret) {
@@ -88,12 +87,6 @@ int nrf5340_audio_dk_init(void)
 {
 	int ret;
 
-	ret = led_init();
-	if (ret) {
-		LOG_ERR("Failed to initialize LED module");
-		return ret;
-	}
-
 	ret = button_handler_init();
 	if (ret) {
 		LOG_ERR("Failed to initialize button handler");
@@ -124,7 +117,7 @@ int nrf5340_audio_dk_init(void)
 		}
 	}
 
-	ret = leds_set();
+	ret = leds_initial_setting();
 	if (ret) {
 		LOG_ERR("Failed to set LEDs");
 		return ret;

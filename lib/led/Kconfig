@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menuconfig LED_CONTROL
+	bool "LED Library for Nordic DKs"
+
+if LED_CONTROL
+
+choice LED_CONTROL_TYPE
+	prompt "LED controller"
+	default LED_CONTROL_GPIO
+
+config LED_CONTROL_PWM
+	select LED
+	select LED_PWM
+	select PWM
+	bool "Enable LED controller using the pwm-leds driver"
+
+config LED_CONTROL_GPIO
+	select LED
+	select LED_GPIO
+	bool "Enable LED controller using the gpio-leds driver"
+
+config LED_CONTROL_DISABLED
+	bool "Disable LED controller"
+endchoice
+
+module = LED_CONTROL
+module-str = led-control
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # LED_CONTROLLER
