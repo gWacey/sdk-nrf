@@ -7,15 +7,14 @@
 #include "streamctrl.h"
 
 #include <zephyr/zbus/zbus.h>
+#include <led_ctrl.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/led.h>
 
 #include "unicast_client.h"
 #include "zbus_common.h"
 #include "nrf5340_audio_dk.h"
-#include "led_nrf5340.h"
 #include "button_assignments.h"
+#include "led_assignments.h"
 #include "macros_common.h"
 #include "audio_system.h"
 #include "button_handler.h"
@@ -237,7 +236,7 @@ static void le_audio_msg_sub_thread(void)
 			audio_system_start();
 			stream_state_set(STATE_STREAMING);
 
-			ret = led_blink(led_app_dev, LED_CONNECTION_STATUS, 0, 0);
+			ret = led_ctrl_on(LED_CONNECTION_STATUS);
 			ERR_CHK(ret);
 			break;
 
@@ -256,7 +255,7 @@ static void le_audio_msg_sub_thread(void)
 			stream_state_set(STATE_PAUSED);
 			audio_system_stop();
 
-			ret = led_on(led_app_dev, LED_CONNECTION_STATUS);
+			ret = led_ctrl_off(LED_CONNECTION_STATUS);
 			ERR_CHK(ret);
 			break;
 

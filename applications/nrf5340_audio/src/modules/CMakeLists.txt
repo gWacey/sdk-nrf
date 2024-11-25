@@ -7,7 +7,6 @@
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_i2s.c)
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_usb.c)
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/button_handler.c)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/led_nrf5340.c)
 target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/audio_sync_timer.c)
 
 target_sources_ifdef(CONFIG_NRF5340_AUDIO_CS47L63_DRIVER app PRIVATE
