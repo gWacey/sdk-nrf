@@ -13,6 +13,17 @@ By default, if you have not made any changes to :file:`.conf` files at :file:`ap
 
 .. _nrf53_audio_app_configuration_select_build:
 
+Selecting broadcast or unicast build
+************************************
+
+Given the nRF5340 Audio :ref:`application architecture <nrf53_audio_app_overview>`, the nRF5340 Audio applications can be built for :ref:`either the broadcast or the unicast role <nrf53_audio_app_overview_broadcast_unicast>`:
+
+* The unicast build is identified with :kconfig:option:`CONFIG_TRANSPORT_CIS` Kconfig option set to ``y``.
+  This is the default configuration.
+* The broadcast build can be selected by adding :kconfig:option:`CONFIG_TRANSPORT_CIS` Kconfig option set to ``y`` to the :file:`prj.conf` file.
+
+.. _nrf53_audio_app_configuration_select_transport:
+
 Selecting gateway or headset build
 **********************************
 
