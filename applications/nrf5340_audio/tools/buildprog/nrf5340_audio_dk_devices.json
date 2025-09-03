@@ -1,17 +1,58 @@
 [
- {
-        "nrf5340_audio_dk_snr": 1000,
-        "nrf5340_audio_dk_dev": "headset",
-        "location": ["FRONT_LEFT"]
- },
- {
-        "nrf5340_audio_dk_snr": 1000,
-        "nrf5340_audio_dk_dev": "gateway",
-        "location": ["NA"]
- },
- {
-        "nrf5340_audio_dk_snr": 1000,
-        "nrf5340_audio_dk_dev": "headset",
-        "location": ["FRONT_RIGHT"]
- }
+	{
+		"nrf5340_audio_dk_snr": 1050141720,
+		"nrf5340_audio_dk_dev": "headset",
+		"location": [
+			"FRONT_LEFT"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050161211,
+		"nrf5340_audio_dk_dev": "headset",
+		"location": [
+			"FRONT_LEFT"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050161148,
+		"nrf5340_audio_dk_dev": "gateway",
+		"location": [
+			"NA"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050123875,
+		"nrf5340_audio_dk_dev": "gateway",
+		"location": [
+			"NA"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050135106,
+		"nrf5340_audio_dk_dev": "gateway",
+		"location": [
+			"NA"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050144647,
+		"nrf5340_audio_dk_dev": "headset",
+		"location": [
+			"FRONT_RIGHT"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050152754,
+		"nrf5340_audio_dk_dev": "headset",
+		"location": [
+			"FRONT_RIGHT"
+		]
+	},
+	{
+		"nrf5340_audio_dk_snr": 1050196953,
+		"nrf5340_audio_dk_dev": "headset",
+		"location": [
+			"FRONT_RIGHT"
+		]
+	}
 ]
