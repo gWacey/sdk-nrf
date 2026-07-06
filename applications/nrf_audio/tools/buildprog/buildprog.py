@@ -80,7 +80,6 @@ def __print_dev_conf(device_list):
         "device",
         "only reboot",
         "core app programmed",
-        "core net programmed",
         "location",
     ]
 
@@ -98,7 +97,6 @@ def __print_dev_conf(device_list):
         row.append(device.nrf5340_audio_dk_dev.value)
         row.append(__print_add_color(device.only_reboot))
         row.append(__print_add_color(device.core_app_programmed))
-        row.append(__print_add_color(device.core_net_programmed))
         row.append(loc_names)
 
         table.add_row(row)
@@ -124,8 +122,7 @@ def __build_cmd_get(core: Core, device: AudioDevice,
 
     if core == Core.app:
         build_cmd += " --domain nrf_audio"
-    elif core == Core.net:
-        build_cmd += " --domain ipc_radio"
+        dest_folder = TARGET_AUDIO_BUILD_FOLDER / options.transport / device
     else:
         raise Exception("Invalid core!")
 
@@ -157,8 +154,6 @@ def __build_cmd_get(core: Core, device: AudioDevice,
 
     if pristine:
         build_cmd += " --pristine"
-
-    dest_folder = TARGET_AUDIO_BUILD_FOLDER / options.transport / device / core
 
     return build_cmd, dest_folder, device_flag, overlay_flag
 
@@ -206,9 +201,6 @@ def __populate_hex_paths(dev, options):
     _, temp_dest_folder, _, _ = __build_cmd_get(Core.app, dev.nrf5340_audio_dk_dev, options.pristine, options, dev.sirk)
     dev.hex_path_app = temp_dest_folder / "nrf_audio/zephyr/zephyr.hex"
 
-    _, temp_dest_folder, _, _ = __build_cmd_get(Core.net, dev.nrf5340_audio_dk_dev, options.pristine, options, dev.sirk)
-    dev.hex_path_net = temp_dest_folder / "ipc_radio/zephyr/zephyr.hex"
-
 
 def __finish(device_list):
     """Finish script. Print report"""
@@ -245,6 +237,7 @@ def __main():
     parser.add_argument(
         "-c",
         "--core",
+        default="app",
         type=str,
         choices=[i.name for i in Core],
         help="Select which cores to include in build",
@@ -319,8 +312,6 @@ def __main():
     # Post processing for Enums
     if options.core is None:
         cores = []
-    elif options.core == "both":
-        cores = [Core.app, Core.net]
     else:
         cores = [Core[options.core]]
 

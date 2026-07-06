@@ -23,8 +23,6 @@ class SelectFlags(str, Enum):
 class Core(str, Enum):
     """SoC core"""
     app = "app"
-    net = "net"
-    both = "both"
 
 
 class AudioDevice(str, Enum):
@@ -120,8 +118,6 @@ class DeviceConf:
 
         if (Core.app in cores) and device_selected:
             self.core_app_programmed = SelectFlags.TBD
-        if (Core.net in cores) and device_selected:
-            self.core_net_programmed = SelectFlags.TBD
 
     def __str__(self):
         result = f"{self.nrf5340_audio_dk_snr} {self.nrf5340_audio_dk_dev.name}"
