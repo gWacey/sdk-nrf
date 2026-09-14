@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * The XIAO nRF54LM20A board files (as of this NCS/Zephyr checkout) enable
+ * &clock, &radio, &bt_hci_controller and &lfxo, but never set &xo or &lfclk
+ * to "okay". The open-source Bluetooth Link Layer controller
+ * (subsys/bluetooth/controller/ll_sw/nordic/lll/lll_clock.c) reads the
+ * &lfclk node's "k32src-accuracy-ppm" property at compile time via a
+ * DT_ENUM_IDX()-style macro; since the node is disabled it never appears in
+ * the generated devicetree headers, so that macro is undeclared and the
+ * build fails ("'__P_k32src_accuracy_ppm_IDX_0_ENUM_IDX' undeclared").
+ *
+ * Nordic's own reference boards for the same SoC (nrf54lm20dk, nrf54l15dk)
+ * enable both nodes in their board devicetree; this overlay applies the same
+ * fix at the application level without touching the shared board files.
+ */
+
+&xo {
+	status = "okay";
+};
+
+&lfclk {
+	status = "okay";
+};
+
+/*
+ * zephyr/dts/arm/nordic/nrf54lm20_a_b_cpuapp.dtsi already enables
+ * &bt_hci_sdc (the Nordic SoftDevice Controller) by default for this SoC.
+ * The board's own nrf54lm20a_cpuapp_common.dtsi additionally enables
+ * &bt_hci_controller (Zephyr's open-source software Link Layer controller,
+ * compatible "zephyr,bt-hci-ll-sw-split"). With both devicetree nodes
+ * "okay", Kconfig independently defaults BOTH CONFIG_BT_LL_SOFTDEVICE and
+ * CONFIG_BT_LL_SW_SPLIT to y (nothing makes them mutually exclusive), so
+ * both controller implementations get compiled and linked together and
+ * collide on the same symbols (bt_ctlr_set_public_addr, bt_rand,
+ * bt_encrypt_le/be): "multiple definition of `bt_ctlr_set_public_addr'".
+ *
+ * Disable the redundant open-source controller so only the SoftDevice
+ * Controller (the production controller Nordic ships for this SoC) is
+ * built.
+ */
+&bt_hci_controller {
+	status = "disabled";
+};
+
+/*
+ * nrf54lm20a_cpuapp_common.dtsi sets chosen "zephyr,bt-hci" to
+ * &bt_hci_controller, which we just disabled above. Left unchanged, that
+ * chosen property still points at a disabled node with no device instance,
+ * so zephyr/subsys/bluetooth/host/hci_core.c's DEVICE_DT_GET(DT_CHOSEN(
+ * zephyr_bt_hci)) fails to find the generated device: "'__device_dts_ord_N'
+ * undeclared". Point it at &bt_hci_sdc instead, matching the controller we
+ * actually kept enabled.
+ */
+/ {
+	chosen {
+		zephyr,bt-hci = &bt_hci_sdc;
+	};
+};
