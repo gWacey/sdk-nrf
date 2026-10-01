@@ -23,6 +23,7 @@ This section lists single |NCS| samples for various uses that are not part of ot
    ../../../samples/caf_sensor_manager/README
    ../../../samples/event_manager_proxy/README
    ../../../samples/hw_id/README
+   ../../../samples/nrf_audio_eb/README
    ../../../samples/nrf_profiler/README
    ../../../samples/subsys/rtfw/hid/README
    ../../../samples/subsys/rtfw/timer_gpio/README
