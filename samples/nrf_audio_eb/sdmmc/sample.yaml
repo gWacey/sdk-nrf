@@ -1,0 +1,13 @@
+sample:
+  name: nRF-Audio-EB smoke test
+  description: >
+    This sample is used to evaluate if the sEMMC peripheral
+    will operate with the audio EB.
+tests:
+  sample.nrf_audio_eb.smoke:
+    build_only: true
+    tags: sd mmc
+    platform_allow:
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+    integration_platforms:
+      - nrf54lm20dk/nrf54lm20a/cpuapp

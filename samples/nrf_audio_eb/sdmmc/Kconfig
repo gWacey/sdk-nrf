@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Logging"
+
+module = SD_MMC
+module-str = sd-mmc
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Log levels
+
+source "Kconfig.zephyr"
