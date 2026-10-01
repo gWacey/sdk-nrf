@@ -687,6 +687,7 @@ ci_applications_nrf_audio:
     - modules/lib/cmsis-dsp/
     - nrf/applications/ipc_radio/
     - nrf/applications/nrf_audio/
+    - nrf/boards/shields/nrf_audio_eb/
     - nrf/lib/pcm_mix/
     - nrf/lib/pcm_stream_channel_modifier/
     - nrf/lib/sample_rate_converter/

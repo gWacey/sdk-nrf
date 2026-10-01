@@ -52,6 +52,8 @@
 
 **/shields/                               @nrfconnect/ncs-co-build-system
 
+/boards/shields/nrf_audio_eb/             @nrfconnect/ncs-co-build-system @nrfconnect/ncs-audio
+
 /boards/shields/nrf2240eb/                @nrfconnect/ncs-co-build-system @nrfconnect/ncs-radio-sw
 /boards/shields/nrf21540ek/               @nrfconnect/ncs-co-build-system @nrfconnect/ncs-radio-sw
 
